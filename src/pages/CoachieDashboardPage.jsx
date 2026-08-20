@@ -88,7 +88,7 @@ export default function CoachieDashboardPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-[#1e3a5f]">
+      <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">
         Deine Programme
       </h1>
 
@@ -118,7 +118,7 @@ export default function CoachieDashboardPage() {
                 </p>
                 <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className="h-full rounded-full bg-[#2563eb] transition-all"
+                    className="h-full rounded-full bg-mrh-navy transition-all"
                     style={{ width: `${prozent}%` }}
                   />
                 </div>

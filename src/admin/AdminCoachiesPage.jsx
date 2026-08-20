@@ -16,6 +16,10 @@ export default function AdminCoachiesPage() {
   const [selectedProgramm, setSelectedProgramm] = useState('')
   const [zuordnen, setZuordnen] = useState(false)
 
+  const [resendingId, setResendingId] = useState(null)
+  const [resendMessage, setResendMessage] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
+
   async function loadAll() {
     setLoading(true)
     setError('')
@@ -89,11 +93,54 @@ export default function AdminCoachiesPage() {
     }
   }
 
+  async function handleResend(coachie) {
+    setError('')
+    setResendMessage('')
+    setResendingId(coachie.id)
+    try {
+      await adminFetch('/api/admin/coachies-resend', {
+        method: 'POST',
+        body: JSON.stringify({ email: coachie.email }),
+      })
+      setResendMessage(`Einladung erneut an ${coachie.email} gesendet.`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setResendingId(null)
+    }
+  }
+
+  async function handleDelete(coachie) {
+    if (
+      !window.confirm(
+        `${coachie.name} (${coachie.email}) wirklich endgültig löschen? Alle Zuordnungen und Fortschrittsdaten gehen verloren.`,
+      )
+    ) {
+      return
+    }
+
+    setError('')
+    setDeletingId(coachie.id)
+    try {
+      await adminFetch(`/api/admin/coachies?id=${coachie.id}`, {
+        method: 'DELETE',
+      })
+      await loadAll()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-[#1e3a5f]">Coachies</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">Coachies</h1>
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {resendMessage && (
+        <p className="mb-4 text-sm text-green-700">{resendMessage}</p>
+      )}
 
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
         <form onSubmit={handleInvite} className="rounded-xl bg-white p-5 shadow-sm">
@@ -105,7 +152,7 @@ export default function AdminCoachiesPage() {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
             />
           </div>
           <div className="mb-3">
@@ -115,13 +162,13 @@ export default function AdminCoachiesPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
             />
           </div>
           <button
             type="submit"
             disabled={einladen}
-            className="rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1e4fc4] disabled:opacity-50"
+            className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
           >
             {einladen ? 'Lädt ein…' : 'Einladen'}
           </button>
@@ -136,7 +183,7 @@ export default function AdminCoachiesPage() {
               required
               value={selectedCoachie}
               onChange={(e) => setSelectedCoachie(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
             >
               <option value="">Coachie wählen…</option>
               {coachies.map((c) => (
@@ -151,7 +198,7 @@ export default function AdminCoachiesPage() {
               required
               value={selectedProgramm}
               onChange={(e) => setSelectedProgramm(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
             >
               <option value="">Programm wählen…</option>
               {programme.map((p) => (
@@ -164,7 +211,7 @@ export default function AdminCoachiesPage() {
           <button
             type="submit"
             disabled={zuordnen}
-            className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#152a45] disabled:opacity-50"
+            className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
           >
             {zuordnen ? 'Ordnet zu…' : 'Zuordnen'}
           </button>
@@ -184,10 +231,32 @@ export default function AdminCoachiesPage() {
                 key={coachie.id}
                 className="rounded-xl bg-white p-4 shadow-sm"
               >
-                <h3 className="font-semibold text-slate-800">
-                  {coachie.name}
-                </h3>
-                <p className="mb-2 text-sm text-slate-500">{coachie.email}</p>
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">
+                      {coachie.name}
+                    </h3>
+                    <p className="text-sm text-slate-500">{coachie.email}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      onClick={() => handleResend(coachie)}
+                      disabled={resendingId === coachie.id}
+                      className="text-sm text-mrh-navy hover:underline disabled:opacity-50"
+                    >
+                      {resendingId === coachie.id
+                        ? 'Sendet…'
+                        : 'Einladung erneut senden'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(coachie)}
+                      disabled={deletingId === coachie.id}
+                      className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      {deletingId === coachie.id ? 'Löscht…' : 'Löschen'}
+                    </button>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {eigeneZuordnungen.map((z) => {
                     const programm = programme.find(

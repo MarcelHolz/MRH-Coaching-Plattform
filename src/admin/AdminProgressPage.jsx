@@ -41,7 +41,7 @@ export default function AdminProgressPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-[#1e3a5f]">
+      <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">
         Fortschrittsübersicht
       </h1>
 
@@ -49,7 +49,7 @@ export default function AdminProgressPage() {
         <select
           value={filterCoachie}
           onChange={(e) => setFilterCoachie(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         >
           <option value="">Alle Coachies</option>
           {coachies.map((c) => (

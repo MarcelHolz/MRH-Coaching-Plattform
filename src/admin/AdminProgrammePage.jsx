@@ -61,7 +61,7 @@ export default function AdminProgrammePage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-semibold text-[#1e3a5f]">Programme</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">Programme</h1>
 
       <form
         onSubmit={handleCreate}
@@ -73,19 +73,19 @@ export default function AdminProgrammePage() {
           required
           value={titel}
           onChange={(e) => setTitel(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <input
           type="text"
           placeholder="Beschreibung"
           value={beschreibung}
           onChange={(e) => setBeschreibung(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1e4fc4] disabled:opacity-50"
+          className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
         >
           Anlegen
         </button>
@@ -126,7 +126,7 @@ export default function AdminProgrammePage() {
               <div className="flex items-center gap-3">
                 <Link
                   to={`/admin/programme/${programm.id}`}
-                  className="text-sm text-[#2563eb] hover:underline"
+                  className="text-sm text-mrh-navy hover:underline"
                 >
                   Sessions verwalten
                 </Link>

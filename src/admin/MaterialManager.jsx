@@ -102,7 +102,7 @@ export default function MaterialManager({ sessionId }) {
           required
           value={titel}
           onChange={(e) => setTitel(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <input
           type="url"
@@ -110,18 +110,18 @@ export default function MaterialManager({ sessionId }) {
           required
           value={dateiUrl}
           onChange={(e) => setDateiUrl(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb] sm:col-span-2"
+          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
         />
         <input
           type="text"
           placeholder="Typ (z. B. PDF)"
           value={typ}
           onChange={(e) => setTyp(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <button
           type="submit"
-          className="rounded-lg bg-[#2563eb] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#1e4fc4] sm:col-span-4"
+          className="rounded-lg bg-mrh-navy px-3 py-1.5 text-sm font-medium text-white transition hover:bg-mrh-navy-dark sm:col-span-4"
         >
           Material hinzufügen
         </button>

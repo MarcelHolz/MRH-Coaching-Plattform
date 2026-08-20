@@ -14,6 +14,14 @@ export default function AdminProgramDetailPage() {
   const [workbookUrl, setWorkbookUrl] = useState('')
   const [expandedId, setExpandedId] = useState(null)
 
+  const [editingId, setEditingId] = useState(null)
+  const [editTitel, setEditTitel] = useState('')
+  const [editBeschreibung, setEditBeschreibung] = useState('')
+  const [editVideoUrl, setEditVideoUrl] = useState('')
+  const [editWorkbookUrl, setEditWorkbookUrl] = useState('')
+  const [editReihenfolge, setEditReihenfolge] = useState(0)
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
   async function loadSessions() {
     setLoading(true)
     setError('')
@@ -71,6 +79,45 @@ export default function AdminProgramDetailPage() {
     }
   }
 
+  function startEdit(session) {
+    setExpandedId(null)
+    setEditingId(session.id)
+    setEditTitel(session.titel)
+    setEditBeschreibung(session.beschreibung ?? '')
+    setEditVideoUrl(session.video_url ?? '')
+    setEditWorkbookUrl(session.workbook_url ?? '')
+    setEditReihenfolge(session.reihenfolge)
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function handleUpdate(event) {
+    event.preventDefault()
+    setError('')
+    setEditSubmitting(true)
+    try {
+      await adminFetch('/api/admin/sessions', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          id: editingId,
+          titel: editTitel,
+          beschreibung: editBeschreibung,
+          video_url: editVideoUrl,
+          workbook_url: editWorkbookUrl,
+          reihenfolge: Number(editReihenfolge),
+        }),
+      })
+      setEditingId(null)
+      await loadSessions()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
   async function handleMove(index, direction) {
     const targetIndex = index + direction
     if (targetIndex < 0 || targetIndex >= sessions.length) return
@@ -100,11 +147,11 @@ export default function AdminProgramDetailPage() {
     <div>
       <Link
         to="/admin/programme"
-        className="mb-4 inline-block text-sm text-[#2563eb] hover:underline"
+        className="mb-4 inline-block text-sm text-mrh-navy hover:underline"
       >
         ← Zurück zu Programme
       </Link>
-      <h1 className="mb-6 text-2xl font-semibold text-[#1e3a5f]">
+      <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">
         Sessions verwalten
       </h1>
 
@@ -118,32 +165,32 @@ export default function AdminProgramDetailPage() {
           required
           value={titel}
           onChange={(e) => setTitel(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <input
           type="text"
           placeholder="Beschreibung"
           value={beschreibung}
           onChange={(e) => setBeschreibung(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <input
           type="url"
           placeholder="Video-URL (YouTube)"
           value={videoUrl}
           onChange={(e) => setVideoUrl(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <input
           type="url"
           placeholder="Workbook-URL"
           value={workbookUrl}
           onChange={(e) => setWorkbookUrl(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <button
           type="submit"
-          className="rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#1e4fc4] sm:col-span-2"
+          className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark sm:col-span-2"
         >
           Session anlegen
         </button>
@@ -185,6 +232,14 @@ export default function AdminProgramDetailPage() {
                   </button>
                   <button
                     onClick={() =>
+                      editingId === session.id ? cancelEdit() : startEdit(session)
+                    }
+                    className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
+                  >
+                    {editingId === session.id ? 'Abbrechen' : 'Bearbeiten'}
+                  </button>
+                  <button
+                    onClick={() =>
                       setExpandedId(expandedId === session.id ? null : session.id)
                     }
                     className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
@@ -199,6 +254,58 @@ export default function AdminProgramDetailPage() {
                   </button>
                 </div>
               </div>
+
+              {editingId === session.id && (
+                <form
+                  onSubmit={handleUpdate}
+                  className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"
+                >
+                  <input
+                    type="text"
+                    placeholder="Titel"
+                    required
+                    value={editTitel}
+                    onChange={(e) => setEditTitel(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Reihenfolge"
+                    required
+                    value={editReihenfolge}
+                    onChange={(e) => setEditReihenfolge(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Beschreibung"
+                    value={editBeschreibung}
+                    onChange={(e) => setEditBeschreibung(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
+                  />
+                  <input
+                    type="url"
+                    placeholder="Video-URL (YouTube)"
+                    value={editVideoUrl}
+                    onChange={(e) => setEditVideoUrl(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                  />
+                  <input
+                    type="url"
+                    placeholder="Workbook-URL"
+                    value={editWorkbookUrl}
+                    onChange={(e) => setEditWorkbookUrl(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                  />
+                  <button
+                    type="submit"
+                    disabled={editSubmitting}
+                    className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50 sm:col-span-2"
+                  >
+                    {editSubmitting ? 'Speichert…' : 'Änderungen speichern'}
+                  </button>
+                </form>
+              )}
 
               {expandedId === session.id && (
                 <MaterialManager sessionId={session.id} />

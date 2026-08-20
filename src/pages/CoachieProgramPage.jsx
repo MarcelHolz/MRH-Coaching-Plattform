@@ -72,7 +72,7 @@ function SessionCard({ session, coachieId, status, onStatusChange }) {
             href={session.workbook_url}
             target="_blank"
             rel="noreferrer"
-            className="rounded-lg border border-[#2563eb] px-3 py-1.5 text-[#2563eb] transition hover:bg-[#2563eb] hover:text-white"
+            className="rounded-lg border border-mrh-navy px-3 py-1.5 text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
           >
             Workbook öffnen
           </a>
@@ -89,7 +89,7 @@ function SessionCard({ session, coachieId, status, onStatusChange }) {
                   href={material.datei_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[#2563eb] hover:underline"
+                  className="text-mrh-navy hover:underline"
                 >
                   {material.titel}
                   {material.typ ? ` (${material.typ})` : ''}
@@ -109,7 +109,7 @@ function SessionCard({ session, coachieId, status, onStatusChange }) {
               onClick={() => setAuswahl(option.value)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 auswahl === option.value
-                  ? 'bg-[#2563eb] text-white'
+                  ? 'bg-mrh-navy text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -122,12 +122,12 @@ function SessionCard({ session, coachieId, status, onStatusChange }) {
           onChange={(e) => setNotiz(e.target.value)}
           placeholder="Notiz (optional)"
           rows={2}
-          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+          className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#152a45] disabled:opacity-50"
+          className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
         >
           {saving ? 'Speichert…' : saved ? 'Gespeichert ✓' : 'Speichern'}
         </button>
@@ -233,11 +233,11 @@ export default function CoachieProgramPage() {
     <div>
       <Link
         to="/coachie"
-        className="mb-4 inline-block text-sm text-[#2563eb] hover:underline"
+        className="mb-4 inline-block text-sm text-mrh-navy hover:underline"
       >
         ← Zurück zur Übersicht
       </Link>
-      <h1 className="mb-1 text-2xl font-semibold text-[#1e3a5f]">
+      <h1 className="mb-1 text-2xl font-semibold text-mrh-navy">
         {programm.titel}
       </h1>
       {programm.beschreibung && (

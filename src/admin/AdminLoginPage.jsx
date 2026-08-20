@@ -28,9 +28,9 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-mrh-cream px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-xl font-semibold text-[#1e3a5f]">
+        <h1 className="mb-1 text-xl font-semibold text-mrh-navy">
           Admin-Bereich
         </h1>
         <p className="mb-6 text-sm text-slate-500">MRH Coaching-Plattform</p>
@@ -45,7 +45,7 @@ export default function AdminLoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
             />
           </div>
 
@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg bg-[#1e3a5f] py-2 text-sm font-medium text-white transition hover:bg-[#152a45] disabled:opacity-50"
+            className="w-full rounded-lg bg-mrh-navy py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
           >
             {submitting ? 'Anmelden…' : 'Anmelden'}
           </button>

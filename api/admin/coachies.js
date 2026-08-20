@@ -58,5 +58,56 @@ export default async function handler(req, res) {
     return
   }
 
+  if (req.method === 'DELETE') {
+    const { id } = req.query
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { error: statusError } = await supabase
+      .from('coachie_status')
+      .delete()
+      .eq('coachie_id', id)
+
+    if (statusError) {
+      res.status(500).json({ error: statusError.message })
+      return
+    }
+
+    const { error: assignmentError } = await supabase
+      .from('coachie_programme')
+      .delete()
+      .eq('coachie_id', id)
+
+    if (assignmentError) {
+      res.status(500).json({ error: assignmentError.message })
+      return
+    }
+
+    const { error: coachieError } = await supabase
+      .from('coachies')
+      .delete()
+      .eq('id', id)
+
+    if (coachieError) {
+      res.status(500).json({ error: coachieError.message })
+      return
+    }
+
+    const { error: authError } = await supabase.auth.admin.deleteUser(id)
+
+    if (authError) {
+      res.status(500).json({
+        error: `Coachie-Daten gelöscht, Auth-Konto konnte aber nicht entfernt werden: ${authError.message}`,
+      })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }

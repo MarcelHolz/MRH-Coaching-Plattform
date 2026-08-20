@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  --color-mrh-petrol: #1e3a5f;
-  --color-mrh-accent: #2563eb;
+  --color-mrh-cream: #f7f3ec;
+  --color-mrh-navy: #1e3a5f;
+  --color-mrh-navy-dark: #152a45;
 }
 
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #2c2a26;
 }

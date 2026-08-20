@@ -11,11 +11,11 @@ export default function CoachieLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-[#1e3a5f] text-white">
+    <div className="min-h-screen bg-mrh-cream">
+      <header className="border-b border-slate-200 bg-mrh-navy text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <Link to="/coachie" className="text-lg font-semibold">
-            MRH Coaching-Plattform
+            MRH Beratung &amp; Coaching
           </Link>
           <div className="flex items-center gap-4 text-sm">
             {coachie?.name && <span className="text-slate-200">{coachie.name}</span>}

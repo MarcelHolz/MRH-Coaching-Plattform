@@ -17,10 +17,10 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-[#1e3a5f] text-white">
+    <div className="min-h-screen bg-mrh-cream">
+      <header className="border-b border-slate-200 bg-mrh-navy text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <span className="text-lg font-semibold">MRH Admin</span>
+          <span className="text-lg font-semibold">MRH Beratung &amp; Coaching</span>
           <button
             onClick={handleLogout}
             className="rounded-lg border border-white/30 px-3 py-1.5 text-sm transition hover:bg-white/10"
@@ -36,7 +36,7 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `rounded-t-lg px-4 py-2 text-sm font-medium transition ${
                   isActive
-                    ? 'bg-slate-50 text-[#1e3a5f]'
+                    ? 'bg-mrh-cream text-mrh-navy'
                     : 'text-slate-200 hover:bg-white/10'
                 }`
               }
