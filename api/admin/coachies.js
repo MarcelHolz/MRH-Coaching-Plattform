@@ -30,7 +30,12 @@ export default async function handler(req, res) {
     }
 
     const { data: invited, error: inviteError } =
-      await supabase.auth.admin.inviteUserByEmail(email)
+      await supabase.auth.admin.inviteUserByEmail(
+        email,
+        process.env.APP_URL
+          ? { redirectTo: `${process.env.APP_URL}/passwort-festlegen` }
+          : undefined,
+      )
 
     if (inviteError) {
       res.status(500).json({ error: inviteError.message })

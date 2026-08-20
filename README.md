@@ -65,6 +65,7 @@ vercel dev
 | `SUPABASE_SERVICE_ROLE_KEY` | Server | Supabase service_role Key — **niemals im Client** |
 | `ADMIN_PASSWORD` | Server | Passwort für den Admin-Login |
 | `ADMIN_TOKEN_SECRET` | Server | Geheimnis zum Signieren der Admin-Session-Tokens |
+| `APP_URL` | Server | Öffentliche URL der App, für den Redirect im Einladungslink |
 
 `.env.local` ist gitignored. `.env.example` dient als Vorlage.
 
@@ -88,7 +89,14 @@ vercel dev
 1. Im Admin-Bereich (`/admin/login`) mit dem `ADMIN_PASSWORD` anmelden.
 2. Unter **Coachies** einen neuen Coachie per Name/E-Mail einladen — das
    löst `supabase.auth.admin.inviteUserByEmail` aus, der Coachie erhält eine
-   E-Mail zum Setzen seines Passworts.
+   Einladungs-E-Mail von Supabase. Der Link darin meldet ihn automatisch an
+   und leitet (sofern `APP_URL` gesetzt und in Supabase als Redirect URL
+   erlaubt ist) direkt auf `/passwort-festlegen` weiter, wo er per
+   `supabase.auth.updateUser({ password })` ein eigenes Passwort setzt.
+   Ohne `APP_URL`/passendem Supabase-Redirect landet er zwar auf einer
+   anderen Seite, wird aber trotzdem automatisch zu `/passwort-festlegen`
+   umgeleitet, solange der Einladungslink (`#...&type=invite`) noch in der
+   URL steht — erst danach kann er sich mit E-Mail + Passwort einloggen.
 3. Den Coachie einem oder mehreren Programmen zuordnen.
 4. Unter **Programme** die zugehörigen Sessions (inkl. Video, Workbook,
    Materialien) anlegen und aktivieren.
