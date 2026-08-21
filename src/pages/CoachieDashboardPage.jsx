@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { formatPreis } from '../lib/preis'
 
 function ProgressRing({ prozent }) {
   const size = 88
@@ -54,6 +55,7 @@ function formatDatum(iso) {
 export default function CoachieDashboardPage() {
   const { coachie } = useAuth()
   const [programme, setProgramme] = useState([])
+  const [teaserProgramme, setTeaserProgramme] = useState([])
   const [abgelaufeneProgramme, setAbgelaufeneProgramme] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -92,6 +94,20 @@ export default function CoachieDashboardPage() {
       const aktiveProgramme = (zuordnungen ?? [])
         .map((z) => z.programme)
         .filter((p) => p && p.aktiv)
+
+      const zugeordneteIds = new Set(
+        (zuordnungen ?? []).map((z) => z.programm_id),
+      )
+
+      const { data: teaser } = await supabase
+        .from('programme')
+        .select('id, titel, beschreibung, preis_cent, preis_anzeigen, slug, oeffentlich_kaufbar')
+        .eq('teaser_aktiv', true)
+        .eq('aktiv', true)
+
+      const teaserOhneEigene = (teaser ?? []).filter(
+        (t) => !zugeordneteIds.has(t.id),
+      )
 
       const programmeMitFortschritt = await Promise.all(
         aktiveProgramme.map(async (programm) => {
@@ -135,6 +151,7 @@ export default function CoachieDashboardPage() {
 
       if (!cancelled) {
         setProgramme(programmeMitFortschritt)
+        setTeaserProgramme(teaserOhneEigene)
         setAbgelaufeneProgramme(abgelaufen)
         setLoading(false)
       }
@@ -272,6 +289,47 @@ export default function CoachieDashboardPage() {
             })}
           </div>
         </>
+      )}
+
+      {teaserProgramme.length > 0 && (
+        <div className={programme.length === 0 ? 'mt-8' : 'mt-10'}>
+          <h2 className="mb-4 text-lg font-semibold text-mrh-navy">
+            Weitere Programme
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {teaserProgramme.map((programm) => (
+              <div
+                key={programm.id}
+                className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-5"
+              >
+                <span className="mb-3 inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                  Vorschau
+                </span>
+                <h3 className="mb-1 font-semibold text-slate-800">
+                  {programm.titel}
+                </h3>
+                <p className="mb-4 line-clamp-2 text-sm text-mrh-grey">
+                  {programm.beschreibung}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-mrh-navy">
+                    {programm.preis_anzeigen
+                      ? (formatPreis(programm.preis_cent) ?? 'Preis auf Anfrage')
+                      : 'Preis auf Anfrage'}
+                  </span>
+                  {programm.oeffentlich_kaufbar && programm.slug && (
+                    <a
+                      href={`/kaufen/${programm.slug}`}
+                      className="rounded-lg border border-mrh-navy px-3 py-1.5 text-sm text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
+                    >
+                      Mehr erfahren
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )

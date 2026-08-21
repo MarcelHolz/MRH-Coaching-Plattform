@@ -64,6 +64,8 @@ export default function AdminProgrammePage() {
   const [editStripePriceId, setEditStripePriceId] = useState('')
   const [editSlug, setEditSlug] = useState('')
   const [editKaufbar, setEditKaufbar] = useState(false)
+  const [editTeaser, setEditTeaser] = useState(false)
+  const [editPreisAnzeigen, setEditPreisAnzeigen] = useState(true)
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
@@ -74,6 +76,8 @@ export default function AdminProgrammePage() {
     setEditStripePriceId(programm.stripe_price_id ?? '')
     setEditSlug(programm.slug ?? '')
     setEditKaufbar(programm.oeffentlich_kaufbar ?? false)
+    setEditTeaser(programm.teaser_aktiv ?? false)
+    setEditPreisAnzeigen(programm.preis_anzeigen ?? true)
   }
 
   function cancelEdit() {
@@ -93,6 +97,8 @@ export default function AdminProgrammePage() {
           stripe_price_id: editStripePriceId || null,
           slug: editSlug || null,
           oeffentlich_kaufbar: editKaufbar,
+          teaser_aktiv: editTeaser,
+          preis_anzeigen: editPreisAnzeigen,
         }),
       })
       setEditingId(null)
@@ -162,6 +168,11 @@ export default function AdminProgrammePage() {
                     {programm.oeffentlich_kaufbar && (
                       <span className="rounded-full bg-mrh-orange/15 px-2 py-0.5 text-xs font-medium text-mrh-orange-dark">
                         Öffentlich kaufbar
+                      </span>
+                    )}
+                    {programm.teaser_aktiv && (
+                      <span className="rounded-full bg-mrh-navy/10 px-2 py-0.5 text-xs font-medium text-mrh-navy">
+                        Teaser
                       </span>
                     )}
                   </div>
@@ -258,6 +269,24 @@ export default function AdminProgrammePage() {
                       className="rounded border-slate-300"
                     />
                     Öffentlich kaufbar (Kaufseite unter /kaufen/… erreichbar)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={editTeaser}
+                      onChange={(e) => setEditTeaser(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Als Teaser zeigen (nicht zugeordneten Coachies als Vorschau)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={editPreisAnzeigen}
+                      onChange={(e) => setEditPreisAnzeigen(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Preis anzeigen (sonst &bdquo;Preis auf Anfrage&ldquo; im Teaser)
                   </label>
                   <button
                     type="submit"

@@ -18,12 +18,13 @@ export default async function handler(req, res) {
 
   const supabase = getSupabaseAdmin()
 
-  const { error } = await supabase.auth.admin.inviteUserByEmail(
-    email,
-    process.env.APP_URL
-      ? { redirectTo: `${process.env.APP_URL}/passwort-festlegen` }
-      : undefined,
-  )
+  const appUrl =
+    process.env.APP_URL ||
+    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+
+  const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${appUrl}/passwort-festlegen`,
+  })
 
   if (error) {
     res.status(500).json({ error: error.message })

@@ -94,13 +94,14 @@ export default async function handler(req, res) {
     // aus Phase 1). Ein bereits bestehender Coachie bekommt hier bewusst
     // KEINE erneute Einladung -- er hat schon ein Passwort und wird nur
     // dem neuen Programm zugeordnet.
+    const appUrl =
+      process.env.APP_URL ||
+      `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+
     const { data: invited, error: inviteError } =
-      await supabase.auth.admin.inviteUserByEmail(
-        email,
-        process.env.APP_URL
-          ? { redirectTo: `${process.env.APP_URL}/passwort-festlegen` }
-          : undefined,
-      )
+      await supabase.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${appUrl}/passwort-festlegen`,
+      })
 
     if (inviteError) {
       res.status(500).json({ error: inviteError.message })

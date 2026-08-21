@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-
-const preisFormat = new Intl.NumberFormat('de-DE', {
-  style: 'currency',
-  currency: 'EUR',
-})
+import { formatPreis } from '../lib/preis'
 
 export default function KaufenPage() {
   const { slug } = useParams()
@@ -81,7 +77,7 @@ export default function KaufenPage() {
             )}
             {programm.preis_cent != null && (
               <p className="mb-6 text-3xl font-semibold text-mrh-navy">
-                {preisFormat.format(programm.preis_cent / 100)}
+                {formatPreis(programm.preis_cent)}
               </p>
             )}
             <button

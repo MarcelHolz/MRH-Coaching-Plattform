@@ -90,16 +90,36 @@ vercel dev
 2. Unter **Coachies** einen neuen Coachie per Name/E-Mail einladen — das
    löst `supabase.auth.admin.inviteUserByEmail` aus, der Coachie erhält eine
    Einladungs-E-Mail von Supabase. Der Link darin meldet ihn automatisch an
-   und leitet (sofern `APP_URL` gesetzt und in Supabase als Redirect URL
-   erlaubt ist) direkt auf `/passwort-festlegen` weiter, wo er per
+   und leitet direkt auf `/passwort-festlegen` weiter, wo er per
    `supabase.auth.updateUser({ password })` ein eigenes Passwort setzt.
-   Ohne `APP_URL`/passendem Supabase-Redirect landet er zwar auf einer
-   anderen Seite, wird aber trotzdem automatisch zu `/passwort-festlegen`
-   umgeleitet, solange der Einladungslink (`#...&type=invite`) noch in der
-   URL steht — erst danach kann er sich mit E-Mail + Passwort einloggen.
 3. Den Coachie einem oder mehreren Programmen zuordnen.
 4. Unter **Programme** die zugehörigen Sessions (inkl. Video, Workbook,
    Materialien) anlegen und aktivieren.
+
+### `APP_URL` korrekt setzen (Einladungslinks)
+
+`api/admin/coachies.js`, `api/admin/coachies-resend.js` und
+`api/webhooks/stripe.js` bauen den Redirect-Link im Einladungslink so:
+`process.env.APP_URL`, falls gesetzt — sonst automatisch aus dem
+`Host`-Header des eingehenden Requests abgeleitet. Zeigte ein
+Einladungslink auf `localhost`, lag es an einer dieser zwei Stellen:
+
+1. **`APP_URL` in Vercel setzen** (Project Settings → Environment
+   Variables, für **Production** anhaken, danach neu deployen): der
+   Wert ist die tatsächliche Produktions-Domain der App, z. B.
+   `https://mrh-coaching-plattform.vercel.app` oder eure eigene Domain
+   falls eingerichtet — ohne `/` am Ende. Die genaue Domain steht in
+   Vercel unter dem Projekt → **Domains**; das kann ich von hier aus
+   nicht einsehen, daher kein exakter Wert von mir vorgegeben.
+2. **Supabase Authentication → URL Configuration** prüfen:
+   - **Site URL** muss auf dieselbe Produktions-Domain zeigen, nicht auf
+     `http://localhost:3000` (Supabase-Standard bei Projekt-Anlage).
+     Wenn `redirectTo` aus irgendeinem Grund nicht greift, fällt Supabase
+     stillschweigend auf die Site URL zurück — ist die noch `localhost`,
+     landen Einladungslinks dort, egal was der Code sendet.
+   - **Redirect URLs** muss `<APP_URL>/passwort-festlegen` enthalten
+     (oder großzügiger `<APP_URL>/**`), sonst ignoriert Supabase das per
+     Code übergebene `redirectTo` ebenfalls und nutzt nur die Site URL.
 
 ## Branding
 
@@ -171,6 +191,20 @@ Frontend) das Programm inklusive Sessions und Materialien für diesen
 Coachie automatisch aus; er sieht stattdessen einen Hinweis mit
 Kontaktmöglichkeit für eine Verlängerung. Manuell von Marcel zugeordnete
 Programme haben `zugriff_bis = NULL` und bleiben unbegrenzt zugänglich.
+
+## Teaser-Programme
+
+Programme mit `teaser_aktiv = true` werden im Coachie-Dashboard unter
+"Weitere Programme" auch Coachies angezeigt, die diesem Programm nicht
+zugeordnet sind — als nicht anklickbare Vorschau-Kachel (Titel,
+Beschreibung, Preis), mit einem "Mehr erfahren"-Link zur öffentlichen
+Kaufseite, falls das Programm zusätzlich `oeffentlich_kaufbar` ist.
+`preis_anzeigen = false` zeigt stattdessen "Preis auf Anfrage".
+
+Einmalige Einrichtung: `supabase_migrations/teaser_programme.sql` im
+Supabase SQL Editor ausführen (neue Spalten + eine zusätzliche,
+rein additive RLS-Policy). Danach im Admin-Bereich unter **Programme →
+Verkauf einrichten** die beiden neuen Schalter setzen.
 
 ## Projektstruktur
 
