@@ -201,7 +201,7 @@ export default function CoachieDashboardPage() {
                 <img
                   src="/brand/marcel-blazer.webp"
                   alt=""
-                  className="hidden h-20 w-20 shrink-0 rounded-full object-cover sm:block"
+                  className="hidden h-20 w-20 shrink-0 rounded-full object-cover object-top sm:block"
                 />
                 <div>
                   <h1 className="text-2xl font-semibold text-mrh-navy">
