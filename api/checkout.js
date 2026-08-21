@@ -1,4 +1,4 @@
-import Stripe from 'stripe'
+import { getStripe } from './_lib/stripeClient.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 
 export default async function handler(req, res) {
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     process.env.APP_URL ||
     `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+  const stripe = getStripe()
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',

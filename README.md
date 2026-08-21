@@ -177,6 +177,14 @@ weiterhin ausschließlich manuell zugeordnet.
 6. Mit Stripe-Testkarten (`4242 4242 4242 4242`) einen Testkauf
    durchspielen, bevor auf Live-Modus umgestellt wird.
 
+`api/checkout.js` und `api/webhooks/stripe.js` teilen sich einen
+Stripe-Client aus `api/_lib/stripeClient.js` (ein Modul-Singleton, analog
+zu `getSupabaseAdmin()`), mit explizitem Timeout, `maxNetworkRetries`
+und `dns.setDefaultResultOrder('ipv4first')` — letzteres vermeidet eine
+bekannte Ursache für `StripeConnectionError` in Cloud-/Serverless-Umgebungen,
+bei der Node einen kaputten IPv6-Pfad zu einer externen API bevorzugt,
+obwohl IPv4 funktioniert.
+
 ### Ablauf
 
 `/kaufen/<slug>` → Stripe Checkout (hosted, sammelt E-Mail selbst) →

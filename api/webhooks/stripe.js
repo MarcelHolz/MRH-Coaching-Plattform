@@ -1,4 +1,4 @@
-import Stripe from 'stripe'
+import { getStripe } from '../_lib/stripeClient.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // Stripe-Signaturprüfung braucht den unveränderten Roh-Body (byte-genau),
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+  const stripe = getStripe()
   const signature = req.headers['stripe-signature']
   const rawBody = await readRawBody(req)
 
