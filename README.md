@@ -224,6 +224,19 @@ Suche über Name/E-Mail als Fallback (z. B. wenn beim Test eine andere
 Adresse verwendet wurde). Verknüpfte Ergebnisse werden einmalig als
 Kopie gespeichert, nicht bei jedem Aufruf neu abgefragt.
 
+Jede Kachel zeigt zunächst nur den dominanten Typ; über "Vollständige
+Auswertung anzeigen" öffnet sich ein Diverging-Balkendiagramm der vier
+Punktewerte (Dominant/Kreativ/Sachlich/Harmonisch — Werte können negativ
+sein, deshalb bewusst kein Radardiagramm) sowie, beim
+Coaching-Vorbereitungstest zusätzlich, eine Block-für-Block-Übersicht
+(je Block: am meisten/am wenigsten gewählter Typ). Beides steckt bereits
+vollständig in `ergebnis_daten` (`punkte_*`- bzw. `block_antworten`-Feld) —
+keine zusätzliche Migration nötig. **Nicht** enthalten sind die
+Fließtext-Interpretationen aus dem per E-Mail versendeten PDF-Bericht
+(die werden dort offenbar zur Versandzeit generiert und nirgends
+persistiert, auch nicht im Profil-Quiz-Projekt selbst) — das PDF lässt
+sich aktuell also nicht 1:1 nachbilden, nur die zugrunde liegenden Zahlen.
+
 Das Profil-Quiz-Projekt ist eine komplett separate Supabase-Instanz
 (eigene Region, eigene Zugangsdaten) — die Coaching-Plattform bekommt
 bewusst **keinen** `service_role`-Zugriff darauf. Stattdessen läuft der
