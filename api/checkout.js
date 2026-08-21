@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     line_items: [{ price: programm.stripe_price_id, quantity: 1 }],
-    success_url: `${appUrl}/kaufen/${slug}?erfolg=1`,
+    success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/kaufen/${slug}?abgebrochen=1`,
     metadata: { programm_id: programm.id },
   })
