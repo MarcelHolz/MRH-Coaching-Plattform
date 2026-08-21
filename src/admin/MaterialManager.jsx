@@ -13,7 +13,7 @@ export default function MaterialManager({ sessionId }) {
     setLoading(true)
     try {
       const data = await adminFetch(
-        `/api/admin/materials?session_id=${sessionId}`,
+        `/api/admin/sessions?resource=materials&session_id=${sessionId}`,
       )
       setMaterialien(data.materialien ?? [])
     } catch (err) {
@@ -32,7 +32,7 @@ export default function MaterialManager({ sessionId }) {
     event.preventDefault()
     setError('')
     try {
-      await adminFetch('/api/admin/materials', {
+      await adminFetch('/api/admin/sessions?resource=materials', {
         method: 'POST',
         body: JSON.stringify({
           session_id: sessionId,
@@ -53,7 +53,9 @@ export default function MaterialManager({ sessionId }) {
   async function handleDelete(id) {
     setError('')
     try {
-      await adminFetch(`/api/admin/materials?id=${id}`, { method: 'DELETE' })
+      await adminFetch(`/api/admin/sessions?resource=materials&id=${id}`, {
+        method: 'DELETE',
+      })
       await loadMaterialien()
     } catch (err) {
       setError(err.message)

@@ -98,7 +98,7 @@ vercel dev
 
 ### `APP_URL` korrekt setzen (Einladungslinks)
 
-`api/admin/coachies.js`, `api/admin/coachies-resend.js` und
+`api/admin/coachies.js` (Standard- und `?resource=resend`-Zweig) und
 `api/webhooks/stripe.js` bauen den Redirect-Link im Einladungslink so:
 `process.env.APP_URL`, falls gesetzt — sonst automatisch aus dem
 `Host`-Header des eingehenden Requests abgeleitet. Zeigte ein
@@ -268,7 +268,42 @@ src/
   lib/           Supabase-Client, adminFetch-Helper, YouTube-Embed-Utility
   pages/         Coachie-Seiten (Login, Dashboard, Programmdetail)
 api/
-  _lib/          adminAuth (HMAC-Token), supabaseAdmin (service_role Client)
-  admin/         Serverless Functions für Programme, Sessions, Materialien,
-                 Coachies, Zuordnungen, Fortschritt
+  _lib/          adminAuth (HMAC-Token), supabaseAdmin (service_role Client),
+                 stripeClient (Stripe-SDK-Singleton)
+  admin/         Serverless Functions für Programme, Sessions (+Materialien
+                 via ?resource=materials), Coachies (+Zuordnungen via
+                 ?resource=assignments, +Einladung erneut senden via
+                 ?resource=resend), Testergebnisse (+Suche via
+                 ?resource=suche), Fortschritt, Login
+  checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
+                 Checkout Session
+  webhooks/      Stripe-Webhook (Signaturprüfung, Idempotenz)
 ```
+
+## API-Konsolidierung (Vercel Hobby: max. 12 Functions)
+
+Vercel zählt jede Datei unter `api/` (außer `api/_lib/*`) als eigene
+Serverless Function; der kostenlose Hobby-Plan erlaubt max. 12 pro
+Deployment. Ursprünglich waren es 13 Dateien (`coachies.js`,
+`coachies-resend.js`, `assignments.js`, `sessions.js`, `materials.js`,
+`testergebnisse.js`, `testergebnisse-suche.js`, `programme.js`,
+`progress.js`, `login.js`, `public/programme.js`, `checkout.js`,
+`webhooks/stripe.js`) — über dem Limit.
+
+Thematisch verwandte Endpunkte wurden in einer Datei mit
+Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
+
+- `api/admin/coachies.js` — Standard (Coachies), `?resource=resend`
+  (Einladung erneut senden), `?resource=assignments`
+  (Programm-Zuordnungen).
+- `api/admin/sessions.js` — Standard (Sessions), `?resource=materials`
+  (Session-Materialien).
+- `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
+  `?resource=suche` (Profil-Quiz-Suche).
+- `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
+  `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
+
+Ergebnis: 8 Functions (`admin/coachies.js`, `admin/login.js`,
+`admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
+`admin/testergebnisse.js`, `checkout.js`, `webhooks/stripe.js`) —
+deutlich unter dem Hobby-Limit von 12, ohne Funktionsverlust.

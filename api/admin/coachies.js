@@ -1,11 +1,13 @@
 import { requireAdmin } from '../_lib/adminAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
-export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+// Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions).
+// ?resource= steuert, welche der drei früher getrennten Dateien
+// (coachies.js, coachies-resend.js, assignments.js) angesprochen wird.
+// Verhalten je Resource ist unverändert 1:1 aus den Originaldateien
+// übernommen.
 
-  const supabase = getSupabaseAdmin()
-
+async function handleCoachies(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('coachies')
@@ -111,4 +113,119 @@ export default async function handler(req, res) {
   }
 
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
+async function handleResend(req, res, supabase) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
+  const { email } = req.body ?? {}
+
+  if (!email) {
+    res.status(400).json({ error: 'email ist erforderlich.' })
+    return
+  }
+
+  const appUrl =
+    process.env.APP_URL ||
+    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+
+  const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${appUrl}/passwort-festlegen`,
+  })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ ok: true })
+}
+
+async function handleAssignments(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase.from('coachie_programme').select('*')
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ assignments: data })
+    return
+  }
+
+  if (req.method === 'POST') {
+    const { coachie_id, programm_id } = req.body ?? {}
+
+    if (!coachie_id || !programm_id) {
+      res
+        .status(400)
+        .json({ error: 'coachie_id und programm_id sind erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('coachie_programme')
+      .insert({
+        coachie_id,
+        programm_id,
+        zugewiesen_am: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ assignment: data })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { error } = await supabase
+      .from('coachie_programme')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
+export default async function handler(req, res) {
+  if (!requireAdmin(req, res)) return
+
+  const supabase = getSupabaseAdmin()
+  const { resource } = req.query
+
+  if (resource === 'resend') {
+    await handleResend(req, res, supabase)
+    return
+  }
+
+  if (resource === 'assignments') {
+    await handleAssignments(req, res, supabase)
+    return
+  }
+
+  await handleCoachies(req, res, supabase)
 }

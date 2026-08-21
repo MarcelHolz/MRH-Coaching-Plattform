@@ -16,7 +16,7 @@ export default function KaufenPage() {
       setLoading(true)
       setError('')
       try {
-        const response = await fetch(`/api/public/programme?slug=${slug}`)
+        const response = await fetch(`/api/checkout?slug=${slug}`)
         const data = await response.json().catch(() => null)
 
         if (!response.ok) {

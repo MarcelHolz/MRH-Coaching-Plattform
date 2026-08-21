@@ -53,7 +53,7 @@ export default function TestergebnisseManager({ coachieId, coachieEmail }) {
       const [verknuepftData, vorschlagData] = await Promise.all([
         adminFetch(`/api/admin/testergebnisse?coachie_id=${coachieId}`),
         adminFetch(
-          `/api/admin/testergebnisse-suche?such_email=${encodeURIComponent(coachieEmail)}`,
+          `/api/admin/testergebnisse?resource=suche&such_email=${encodeURIComponent(coachieEmail)}`,
         ),
       ])
       setVerknuepft(verknuepftData.testergebnisse ?? [])
@@ -79,7 +79,7 @@ export default function TestergebnisseManager({ coachieId, coachieEmail }) {
     try {
       const query = encodeURIComponent(suchbegriff.trim())
       const data = await adminFetch(
-        `/api/admin/testergebnisse-suche?such_email=${query}&such_name=${query}`,
+        `/api/admin/testergebnisse?resource=suche&such_email=${query}&such_name=${query}`,
       )
       setSucheErgebnisse(data.ergebnisse ?? [])
     } catch (err) {

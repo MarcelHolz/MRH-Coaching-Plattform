@@ -29,7 +29,7 @@ export default function AdminCoachiesPage() {
       const [coachiesData, programmeData, assignmentsData] = await Promise.all([
         adminFetch('/api/admin/coachies'),
         adminFetch('/api/admin/programme'),
-        adminFetch('/api/admin/assignments'),
+        adminFetch('/api/admin/coachies?resource=assignments'),
       ])
       setCoachies(coachiesData.coachies ?? [])
       setProgramme(programmeData.programme ?? [])
@@ -70,7 +70,7 @@ export default function AdminCoachiesPage() {
     setError('')
     setZuordnen(true)
     try {
-      await adminFetch('/api/admin/assignments', {
+      await adminFetch('/api/admin/coachies?resource=assignments', {
         method: 'POST',
         body: JSON.stringify({
           coachie_id: selectedCoachie,
@@ -88,7 +88,9 @@ export default function AdminCoachiesPage() {
   async function handleUnassign(id) {
     setError('')
     try {
-      await adminFetch(`/api/admin/assignments?id=${id}`, { method: 'DELETE' })
+      await adminFetch(`/api/admin/coachies?resource=assignments&id=${id}`, {
+        method: 'DELETE',
+      })
       await loadAll()
     } catch (err) {
       setError(err.message)
@@ -100,7 +102,7 @@ export default function AdminCoachiesPage() {
     setResendMessage('')
     setResendingId(coachie.id)
     try {
-      await adminFetch('/api/admin/coachies-resend', {
+      await adminFetch('/api/admin/coachies?resource=resend', {
         method: 'POST',
         body: JSON.stringify({ email: coachie.email }),
       })

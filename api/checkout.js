@@ -1,20 +1,49 @@
 import { getStripe } from './_lib/stripeClient.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Methode nicht erlaubt.' })
-    return
-  }
+// Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions).
+// GET ?slug= übernimmt die frühere api/public/programme.js (öffentliche
+// Programm-Vorschau für /kaufen/:slug, kein Admin-Auth), POST erstellt
+// wie bisher die Stripe Checkout Session. Beide Zweige sind bewusst
+// ohne requireAdmin -- diese Route ist für nicht eingeloggte Besucher
+// der Kaufseite gedacht.
 
-  const { slug } = req.body ?? {}
+async function handleVorschau(req, res, supabase) {
+  const { slug } = req.query
 
   if (!slug) {
     res.status(400).json({ error: 'slug ist erforderlich.' })
     return
   }
 
-  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from('programme')
+    .select('titel, beschreibung, preis_cent, slug')
+    .eq('slug', slug)
+    .eq('oeffentlich_kaufbar', true)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  if (!data) {
+    res.status(404).json({ error: 'Programm nicht gefunden.' })
+    return
+  }
+
+  res.status(200).json({ programm: data })
+}
+
+async function handleCheckoutSession(req, res, supabase) {
+  const { slug } = req.body ?? {}
+
+  if (!slug) {
+    res.status(400).json({ error: 'slug ist erforderlich.' })
+    return
+  }
 
   const { data: programm, error } = await supabase
     .from('programme')
@@ -49,4 +78,20 @@ export default async function handler(req, res) {
   })
 
   res.status(200).json({ url: session.url })
+}
+
+export default async function handler(req, res) {
+  const supabase = getSupabaseAdmin()
+
+  if (req.method === 'GET') {
+    await handleVorschau(req, res, supabase)
+    return
+  }
+
+  if (req.method === 'POST') {
+    await handleCheckoutSession(req, res, supabase)
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
