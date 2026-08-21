@@ -6,6 +6,42 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 // sonst (default) das bisherige Verhalten dieser Datei (Liste/
 // Verknüpfen). Verhalten je Resource ist unverändert 1:1 aus den
 // Originaldateien übernommen.
+//
+// Zugriff auf das Profil-Quiz-Projekt läuft über eine dort deployte
+// Edge Function (profil-quiz-edge-function/, ruft intern mit
+// service_role auf), geschützt durch PROFIL_QUIZ_READER_SECRET --
+// siehe README-Abschnitt "Testergebnisse".
+
+async function callProfilQuizReader(action, payload, res) {
+  const profilQuizUrl = process.env.PROFIL_QUIZ_URL
+  const readerSecret = process.env.PROFIL_QUIZ_READER_SECRET
+
+  if (!profilQuizUrl || !readerSecret) {
+    res.status(500).json({
+      error: 'PROFIL_QUIZ_URL und PROFIL_QUIZ_READER_SECRET müssen serverseitig gesetzt sein.',
+    })
+    return null
+  }
+
+  const response = await fetch(`${profilQuizUrl}/functions/v1/testergebnisse-reader`, {
+    method: 'POST',
+    headers: {
+      'x-reader-secret': readerSecret,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action, ...payload }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    res.status(502).json({
+      error: `Profil-Quiz-Anfrage fehlgeschlagen (${response.status}): ${detail}`,
+    })
+    return null
+  }
+
+  return response.json()
+}
 
 async function handleSuche(req, res) {
   if (req.method !== 'GET') {
@@ -20,45 +56,14 @@ async function handleSuche(req, res) {
     return
   }
 
-  const profilQuizUrl = process.env.PROFIL_QUIZ_URL
-  const anonKey = process.env.PROFIL_QUIZ_ANON_KEY
-  const token = process.env.PROFIL_QUIZ_READER_TOKEN
+  const result = await callProfilQuizReader(
+    'suchen',
+    { such_email: suchEmail || null, such_name: suchName || null },
+    res,
+  )
+  if (result === null) return
 
-  if (!profilQuizUrl || !anonKey || !token) {
-    res.status(500).json({
-      error:
-        'PROFIL_QUIZ_URL, PROFIL_QUIZ_ANON_KEY und PROFIL_QUIZ_READER_TOKEN müssen serverseitig gesetzt sein.',
-    })
-    return
-  }
-
-  const response = await fetch(`${profilQuizUrl}/rest/v1/rpc/testergebnisse_suchen`, {
-    method: 'POST',
-    headers: {
-      // apikey = echter Projekt-Key (Gateway-Zugang), Authorization = unser
-      // selbst gemintetes Reader-JWT (bestimmt die Postgres-Rolle). Beide
-      // dürfen NICHT denselben Wert haben -- apikey kennt unser Custom-JWT
-      // nicht und lehnt sonst mit "Invalid API key" ab.
-      apikey: anonKey,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      such_email: suchEmail || null,
-      such_name: suchName || null,
-    }),
-  })
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '')
-    res.status(502).json({
-      error: `Profil-Quiz-Anfrage fehlgeschlagen (${response.status}): ${detail}`,
-    })
-    return
-  }
-
-  const ergebnisse = await response.json()
-  res.status(200).json({ ergebnisse })
+  res.status(200).json({ ergebnisse: result.ergebnisse })
 }
 
 async function handleLink(req, res, supabase) {
@@ -96,40 +101,14 @@ async function handleLink(req, res, supabase) {
       return
     }
 
-    const profilQuizUrl = process.env.PROFIL_QUIZ_URL
-    const anonKey = process.env.PROFIL_QUIZ_ANON_KEY
-    const token = process.env.PROFIL_QUIZ_READER_TOKEN
-
-    if (!profilQuizUrl || !anonKey || !token) {
-      res.status(500).json({
-        error:
-          'PROFIL_QUIZ_URL, PROFIL_QUIZ_ANON_KEY und PROFIL_QUIZ_READER_TOKEN müssen serverseitig gesetzt sein.',
-      })
-      return
-    }
-
-    const detailResponse = await fetch(
-      `${profilQuizUrl}/rest/v1/rpc/testergebnis_abrufen`,
-      {
-        method: 'POST',
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ such_test_typ: testTyp, such_id: quellId }),
-      },
+    const detailResult = await callProfilQuizReader(
+      'abrufen',
+      { such_test_typ: testTyp, such_id: quellId },
+      res,
     )
+    if (detailResult === null) return
 
-    if (!detailResponse.ok) {
-      const detail = await detailResponse.text().catch(() => '')
-      res.status(502).json({
-        error: `Profil-Quiz-Anfrage fehlgeschlagen (${detailResponse.status}): ${detail}`,
-      })
-      return
-    }
-
-    const ergebnisDaten = await detailResponse.json()
+    const ergebnisDaten = detailResult.ergebnis
 
     if (!ergebnisDaten) {
       res.status(404).json({ error: 'Testergebnis wurde im Profil-Quiz nicht gefunden.' })

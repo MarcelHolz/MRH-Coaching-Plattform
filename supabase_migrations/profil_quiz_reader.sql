@@ -1,4 +1,13 @@
 -- ============================================================
+-- ÜBERHOLT -- siehe profil_quiz_reader_v2.sql. Der hier eingerichtete
+-- Zugriffsweg (Custom-Rolle + selbst gemintetes JWT) wurde durch eine
+-- Edge Function ersetzt, weil die Verwaltung mehrerer HS256-Keys im
+-- neuen Supabase "JWT Signing Keys"-UI nicht zuverlässig nutzbar war.
+-- Diese Datei bleibt nur als Historie stehen (dokumentiert, was auf
+-- dem Profil-Quiz-Projekt ursprünglich ausgeführt wurde) -- für ein
+-- neues Setup bitte NICHT diese Datei, sondern profil_quiz_reader_v2.sql
+-- verwenden.
+--
 -- ACHTUNG: Diese Datei gehört NICHT zur Coaching-Plattform-Datenbank.
 -- Im SQL Editor des ANDEREN Supabase-Projekts ausführen:
 -- "Profil-Quiz" (rbfsfcetdzdsyoffglwi, Region eu-west-1).

@@ -1,0 +1,10 @@
+project_id = "rbfsfcetdzdsyoffglwi"
+
+# verify_jwt = false ist Absicht: Der Aufrufer (Coaching-Plattform-Backend)
+# hat kein Supabase-JWT dieses Projekts, sondern authentisiert sich über
+# ein eigenes Secret im Header "x-reader-secret" (siehe index.ts). Ohne
+# diese Zeile würde die Supabase-Plattform jede Anfrage schon vor dem
+# eigenen Code der Function mit 401 ablehnen, weil kein gültiges
+# Supabase-Auth-JWT mitgeschickt wird.
+[functions.testergebnisse-reader]
+verify_jwt = false

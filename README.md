@@ -226,73 +226,83 @@ Kopie gespeichert, nicht bei jedem Aufruf neu abgefragt.
 
 Das Profil-Quiz-Projekt ist eine komplett separate Supabase-Instanz
 (eigene Region, eigene Zugangsdaten) — die Coaching-Plattform bekommt
-bewusst **keinen** `service_role`-Zugriff darauf, sondern nur `EXECUTE`
-auf zwei schmale SQL-Funktionen über eine dedizierte, sonst rechtelose
-Postgres-Rolle. Ein kompromittiertes Zugriffstoken kann damit höchstens
-Testergebnisse per Name/E-Mail nachschlagen — nichts anderes in diesem
-Projekt lesen, schreiben oder löschen.
+bewusst **keinen** `service_role`-Zugriff darauf. Stattdessen läuft der
+Zugriff über eine dort deployte **Edge Function**
+(`testergebnisse-reader`), die intern mit dem projekteigenen
+`service_role`-Key auf zwei schmale `SECURITY DEFINER`-SQL-Funktionen
+zugreift und sich nach außen über ein selbst vergebenes Secret im
+Header absichert — kein Tabellenzugriff, kein Supabase-JWT nötig. Ein
+kompromittiertes Secret kann damit höchstens Testergebnisse per
+Name/E-Mail nachschlagen — nichts anderes in diesem Projekt lesen,
+schreiben oder löschen. Der `service_role`-Key selbst verlässt das
+Profil-Quiz-Projekt nie (von Supabase automatisch in die Edge Function
+injiziert, nirgendwo manuell eingetragen).
+
+(Ursprünglich war das über eine dedizierte Postgres-Rolle mit selbst
+gemintetem JWT gelöst — siehe `supabase_migrations/profil_quiz_reader.sql`,
+inzwischen überholt. Umgestellt auf die Edge Function, weil die
+Verwaltung mehrerer HS256-Signing-Keys im neuen Supabase-Dashboard nicht
+zuverlässig nutzbar war.)
 
 ### Einmalige Einrichtung (zwei Supabase-Projekte)
 
 1. **Im Profil-Quiz-Projekt** (`rbfsfcetdzdsyoffglwi`, eu-west-1) im SQL
-   Editor `supabase_migrations/profil_quiz_reader.sql` ausführen. Legt
-   die Rolle `coaching_plattform_reader` sowie zwei
-   `SECURITY DEFINER`-Funktionen an; kein Tabellenzugriff wird gewährt.
-2. Token erzeugen — **lokal, niemals das Secret weitergeben**:
+   Editor `supabase_migrations/profil_quiz_reader_v2.sql` ausführen.
+   Legt die zwei `SECURITY DEFINER`-Funktionen an (bzw. aktualisiert sie,
+   falls die alte Migration bereits lief) und beschränkt `EXECUTE` auf
+   `service_role`; kein Tabellenzugriff wird gewährt.
+2. Eigenes Secret erzeugen — ein beliebiger langer Zufallswert, z. B.:
    ```bash
-   PROFIL_QUIZ_JWT_SECRET="<HS256-Secret, siehe unten>" \
-   PROFIL_QUIZ_JWT_KID="<Key ID desselben HS256-Keys, siehe unten>" \
-     node scripts/mint-profil-quiz-token.mjs
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
-   Beide Werte sind nötig — nur das Secret zu setzen erzeugt zwar ein
-   strukturell gültiges Token, das Supabase aber mit `401 PGRST301 /
-   "No suitable key or wrong key type"` ablehnt: Bei mehreren aktiven
-   Signing Keys im Projekt (z. B. asymmetrischer "Current"-Key +
-   HS256-Standby-Key) muss der `kid`-Claim im JWT-Header verraten,
-   *welcher* Key zur Verifikation herangezogen werden soll — ohne ihn
-   findet Supabase keinen eindeutigen Kandidaten, selbst wenn Secret und
-   Signatur an sich korrekt wären.
-   Das Skript signiert klassisch HS256 (HMAC) und braucht dafür ein
-   symmetrisches Secret. Steht im Profil-Quiz-Projekt der aktuell aktive
-   ("Current") Signing Key auf ein asymmetrisches Verfahren (ECC/RSA,
-   erkennbar im neuen "JWT Signing Keys"-Tab unter Project Settings →
-   API), reicht **keine** der beiden Standardquellen automatisch:
-   - Der **private** Schlüssel eines ECC/RSA-Keys wird von Supabase nie
-     herausgegeben — damit lässt sich kein eigenes Token signieren.
-   - Das **Legacy**-HS256-Secret funktioniert zwar aktuell noch (Supabase
-     verifiziert weiterhin gegen alle nicht widerrufenen Keys, nicht nur
-     gegen "Current"), ist aber dasselbe Secret, das auch `anon`/
-     `service_role` absichert und laut Supabase-eigener Migrationsanleitung
-     irgendwann widerrufen werden soll — als Dauerlösung ungeeignet.
+   Diesen Wert für die nächsten beiden Schritte merken (nirgendwo außer
+   den beiden folgenden Stellen eintragen).
+3. Edge Function deployen — im Ordner `profil-quiz-edge-function/` dieses
+   Repos (separates Deployment-Ziel, gehört nicht zur Coaching-Plattform
+   selbst):
+   ```bash
+   cd profil-quiz-edge-function
+   npx supabase@latest login
+   npx supabase@latest link --project-ref rbfsfcetdzdsyoffglwi
+   npx supabase@latest secrets set READER_SECRET="<Secret aus Schritt 2>" \
+     --project-ref rbfsfcetdzdsyoffglwi
+   npx supabase@latest functions deploy testergebnisse-reader \
+     --project-ref rbfsfcetdzdsyoffglwi
+   ```
+   `npx supabase@latest` lädt die Supabase-CLI bei Bedarf automatisch,
+   keine separate Installation nötig. `login` öffnet einmalig den Browser
+   zur Anmeldung; `link` verbindet diesen lokalen Ordner mit dem
+   Profil-Quiz-Projekt (getrennt vom Coaching-Plattform-Projekt).
+   `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` müssen nicht gesetzt werden
+   — die injiziert Supabase automatisch in jede Edge Function.
 
-   Sauberer Weg: im Profil-Quiz-Projekt unter Project Settings → API →
-   JWT Signing Keys einen **eigenen, zusätzlichen HS256-Key anlegen**
-   (Status bleibt bewusst "Standby" — **nicht** zu "Current" rotieren,
-   das würde die Signatur aller neuen Auth-Sessions im gesamten Projekt
-   umstellen). Standby-Keys werden von Supabase bereits jetzt für die
-   Verifikation akzeptiert, ganz unabhängig vom Rotationsstatus — die
-   Rotation entscheidet nur, welcher Key *neue* Auth-Tokens signiert.
-   Secret UND Key ID (`kid`, im Dashboard direkt neben dem Secret sichtbar,
-   Format wie eine UUID) dieses Standby-Keys als `PROFIL_QUIZ_JWT_SECRET`
-   bzw. `PROFIL_QUIZ_JWT_KID` verwenden. Die Ausgabe des Skripts ist der
-   fertige Token.
-3. **Im Coaching-Plattform-Projekt** (dieses hier) im SQL Editor
+   Sicherheitshalber danach im Profil-Quiz-Dashboard prüfen: **Edge
+   Functions → testergebnisse-reader → "Enforce JWT Verification"** muss
+   **aus** sein (steuert `supabase/config.toml` in diesem Ordner
+   automatisch mit, aber ein CLI-seitiger Bug kann das vereinzelt nicht
+   zuverlässig durchsetzen — deshalb kurz nachsehen).
+4. Testen, unabhängig vom Coaching-Plattform-Deployment:
+   ```bash
+   curl -i -X POST "https://rbfsfcetdzdsyoffglwi.supabase.co/functions/v1/testergebnisse-reader" \
+     -H "x-reader-secret: <Secret aus Schritt 2>" \
+     -H "Content-Type: application/json" \
+     -d '{"action":"suchen","such_email":"test@example.com"}'
+   ```
+   `200` mit `{"ergebnisse":[...]}` (auch leer) = funktioniert. `401` =
+   Secret stimmt nicht überein oder wurde nicht gesetzt (Schritt 3).
+5. **Im Coaching-Plattform-Projekt** (dieses hier) im SQL Editor
    `supabase_migrations/testergebnisse.sql` ausführen (neue Tabelle
    `coachie_testergebnisse`, eigene RLS-Policy).
-4. In Vercel (Coaching-Plattform) drei Variablen eintragen, server-only,
+6. In Vercel (Coaching-Plattform) zwei Variablen eintragen, server-only,
    alle drei Umgebungen:
    - `PROFIL_QUIZ_URL` (Standard: `https://rbfsfcetdzdsyoffglwi.supabase.co`)
-   - `PROFIL_QUIZ_ANON_KEY` — der normale `anon`/publishable Key des
-     Profil-Quiz-Projekts (Project Settings → API → "anon public"). Dieser
-     Key allein gewährt **keinen** Zugriff auf Testergebnis-Daten (kein
-     Tabellenzugriff, keine RLS-Policy dafür) — er wird nur vom
-     API-Gateway geprüft, bevor die Anfrage überhaupt ankommt. Ohne ihn
-     kommt `401 Invalid API key` zurück, auch wenn der Reader-Token
-     korrekt ist.
-   - `PROFIL_QUIZ_READER_TOKEN` (Ausgabe aus Schritt 2) — dieser Token
-     bestimmt über den `Authorization`-Header die tatsächliche
-     Postgres-Rolle (`coaching_plattform_reader`) und damit den
-     eigentlichen, eingeschränkten Zugriff.
+   - `PROFIL_QUIZ_READER_SECRET` — derselbe Wert wie in Schritt 2/3.
+
+   `PROFIL_QUIZ_ANON_KEY` und `PROFIL_QUIZ_READER_TOKEN` (aus einer
+   früheren Version dieses Setups) werden nicht mehr gebraucht — die
+   Edge Function braucht keinen Supabase-API-Key vom aufrufenden Client,
+   da `verify_jwt` für sie bewusst deaktiviert ist und stattdessen das
+   eigene Secret prüft.
 
 Struktur ist bewusst so angelegt (eigenes `test_typ`-Feld, eigene
 Tabelle), dass sie sich später um Zertifikate erweitern lässt, ohne
@@ -319,6 +329,10 @@ api/
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
   webhooks/      Stripe-Webhook (Signaturprüfung, Idempotenz)
+profil-quiz-edge-function/
+                 Separates Deployment-Ziel (NICHT Teil der Coaching-
+                 Plattform-App) -- Edge Function fürs Profil-Quiz-Projekt,
+                 siehe README-Abschnitt "Testergebnisse"
 ```
 
 ## API-Konsolidierung (Vercel Hobby: max. 12 Functions)
