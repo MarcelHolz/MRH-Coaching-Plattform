@@ -12,8 +12,17 @@
 // Nutzung:
 //   PROFIL_QUIZ_JWT_SECRET="..." node scripts/mint-profil-quiz-token.mjs
 //
-// Das Secret: Supabase Dashboard -> Profil-Quiz-Projekt -> Project
-// Settings -> API -> JWT Settings -> "JWT Secret".
+// Das Secret muss ein HS256-Secret sein (dieses Skript signiert HMAC).
+// Läuft das Profil-Quiz-Projekt bereits auf den neuen "JWT Signing
+// Keys" mit einem asymmetrischen (ECC/RSA) Key als "Current", dann NICHT
+// diesen Key verwenden -- der private Schlüssel wird von Supabase nie
+// herausgegeben. Stattdessen im Dashboard unter Project Settings -> API
+// -> JWT Signing Keys einen eigenen HS256-Key anlegen (Status "Standby"
+// reicht, NICHT zu "Current" rotieren -- Standby-Keys werden schon jetzt
+// für die Verifikation akzeptiert) und dessen Secret hier eintragen.
+// Alternativ funktioniert (noch) auch das "Legacy"-JWT-Secret, ist aber
+// dasselbe Secret wie für anon/service_role und kann später widerrufen
+// werden -- als Dauerlösung ungeeignet.
 //
 // Die Ausgabe ist der fertige Token -- in Vercel (Coaching-Plattform-
 // Projekt) als PROFIL_QUIZ_READER_TOKEN eintragen (server-only, alle

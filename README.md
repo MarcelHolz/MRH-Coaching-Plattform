@@ -240,11 +240,31 @@ Projekt lesen, schreiben oder löschen.
    `SECURITY DEFINER`-Funktionen an; kein Tabellenzugriff wird gewährt.
 2. Token erzeugen — **lokal, niemals das Secret weitergeben**:
    ```bash
-   PROFIL_QUIZ_JWT_SECRET="<JWT Secret aus Profil-Quiz → Project Settings → API>" \
+   PROFIL_QUIZ_JWT_SECRET="<HS256-Secret, siehe unten>" \
      node scripts/mint-profil-quiz-token.mjs
    ```
-   Das JWT Secret steht im Profil-Quiz-Projekt unter Project Settings →
-   API → JWT Settings. Die Ausgabe des Skripts ist der fertige Token.
+   Das Skript signiert klassisch HS256 (HMAC) und braucht dafür ein
+   symmetrisches Secret. Steht im Profil-Quiz-Projekt der aktuell aktive
+   ("Current") Signing Key auf ein asymmetrisches Verfahren (ECC/RSA,
+   erkennbar im neuen "JWT Signing Keys"-Tab unter Project Settings →
+   API), reicht **keine** der beiden Standardquellen automatisch:
+   - Der **private** Schlüssel eines ECC/RSA-Keys wird von Supabase nie
+     herausgegeben — damit lässt sich kein eigenes Token signieren.
+   - Das **Legacy**-HS256-Secret funktioniert zwar aktuell noch (Supabase
+     verifiziert weiterhin gegen alle nicht widerrufenen Keys, nicht nur
+     gegen "Current"), ist aber dasselbe Secret, das auch `anon`/
+     `service_role` absichert und laut Supabase-eigener Migrationsanleitung
+     irgendwann widerrufen werden soll — als Dauerlösung ungeeignet.
+
+   Sauberer Weg: im Profil-Quiz-Projekt unter Project Settings → API →
+   JWT Signing Keys einen **eigenen, zusätzlichen HS256-Key anlegen**
+   (Status bleibt bewusst "Standby" — **nicht** zu "Current" rotieren,
+   das würde die Signatur aller neuen Auth-Sessions im gesamten Projekt
+   umstellen). Standby-Keys werden von Supabase bereits jetzt für die
+   Verifikation akzeptiert, ganz unabhängig vom Rotationsstatus — die
+   Rotation entscheidet nur, welcher Key *neue* Auth-Tokens signiert.
+   Den Secret-Wert dieses Standby-Keys als `PROFIL_QUIZ_JWT_SECRET`
+   verwenden. Die Ausgabe des Skripts ist der fertige Token.
 3. **Im Coaching-Plattform-Projekt** (dieses hier) im SQL Editor
    `supabase_migrations/testergebnisse.sql` ausführen (neue Tabelle
    `coachie_testergebnisse`, eigene RLS-Policy).
