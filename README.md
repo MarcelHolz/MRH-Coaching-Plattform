@@ -214,6 +214,49 @@ Supabase SQL Editor ausführen (neue Spalten + eine zusätzliche,
 rein additive RLS-Policy). Danach im Admin-Bereich unter **Programme →
 Verkauf einrichten** die beiden neuen Schalter setzen.
 
+## Testergebnisse ("Meine Auswertungen")
+
+Coachies sehen ihre verknüpften Kurztest-Ergebnisse (aus dem separaten
+Profil-Quiz-Projekt) unter **Meine Auswertungen**. Marcel verknüpft sie
+im Admin-Bereich pro Coachie (**Coachies → Testergebnisse verknüpfen**)
+— automatischer Vorschlag per exaktem E-Mail-Abgleich, plus manuelle
+Suche über Name/E-Mail als Fallback (z. B. wenn beim Test eine andere
+Adresse verwendet wurde). Verknüpfte Ergebnisse werden einmalig als
+Kopie gespeichert, nicht bei jedem Aufruf neu abgefragt.
+
+Das Profil-Quiz-Projekt ist eine komplett separate Supabase-Instanz
+(eigene Region, eigene Zugangsdaten) — die Coaching-Plattform bekommt
+bewusst **keinen** `service_role`-Zugriff darauf, sondern nur `EXECUTE`
+auf zwei schmale SQL-Funktionen über eine dedizierte, sonst rechtelose
+Postgres-Rolle. Ein kompromittiertes Zugriffstoken kann damit höchstens
+Testergebnisse per Name/E-Mail nachschlagen — nichts anderes in diesem
+Projekt lesen, schreiben oder löschen.
+
+### Einmalige Einrichtung (zwei Supabase-Projekte)
+
+1. **Im Profil-Quiz-Projekt** (`rbfsfcetdzdsyoffglwi`, eu-west-1) im SQL
+   Editor `supabase_migrations/profil_quiz_reader.sql` ausführen. Legt
+   die Rolle `coaching_plattform_reader` sowie zwei
+   `SECURITY DEFINER`-Funktionen an; kein Tabellenzugriff wird gewährt.
+2. Token erzeugen — **lokal, niemals das Secret weitergeben**:
+   ```bash
+   PROFIL_QUIZ_JWT_SECRET="<JWT Secret aus Profil-Quiz → Project Settings → API>" \
+     node scripts/mint-profil-quiz-token.mjs
+   ```
+   Das JWT Secret steht im Profil-Quiz-Projekt unter Project Settings →
+   API → JWT Settings. Die Ausgabe des Skripts ist der fertige Token.
+3. **Im Coaching-Plattform-Projekt** (dieses hier) im SQL Editor
+   `supabase_migrations/testergebnisse.sql` ausführen (neue Tabelle
+   `coachie_testergebnisse`, eigene RLS-Policy).
+4. In Vercel (Coaching-Plattform) `PROFIL_QUIZ_URL` (Standard:
+   `https://rbfsfcetdzdsyoffglwi.supabase.co`) und
+   `PROFIL_QUIZ_READER_TOKEN` (Ausgabe aus Schritt 2) eintragen,
+   server-only, alle drei Umgebungen.
+
+Struktur ist bewusst so angelegt (eigenes `test_typ`-Feld, eigene
+Tabelle), dass sie sich später um Zertifikate erweitern lässt, ohne
+etwas Bestehendes umbauen zu müssen.
+
 ## Projektstruktur
 
 ```

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminFetch } from '../lib/adminFetch'
+import TestergebnisseManager from './TestergebnisseManager'
 
 export default function AdminCoachiesPage() {
   const [coachies, setCoachies] = useState([])
@@ -19,6 +20,7 @@ export default function AdminCoachiesPage() {
   const [resendingId, setResendingId] = useState(null)
   const [resendMessage, setResendMessage] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
 
   async function loadAll() {
     setLoading(true)
@@ -240,6 +242,16 @@ export default function AdminCoachiesPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <button
+                      onClick={() =>
+                        setExpandedId(expandedId === coachie.id ? null : coachie.id)
+                      }
+                      className="text-sm text-mrh-navy hover:underline"
+                    >
+                      {expandedId === coachie.id
+                        ? 'Schließen'
+                        : 'Testergebnisse verknüpfen'}
+                    </button>
+                    <button
                       onClick={() => handleResend(coachie)}
                       disabled={resendingId === coachie.id}
                       className="text-sm text-mrh-navy hover:underline disabled:opacity-50"
@@ -283,6 +295,13 @@ export default function AdminCoachiesPage() {
                     </span>
                   )}
                 </div>
+
+                {expandedId === coachie.id && (
+                  <TestergebnisseManager
+                    coachieId={coachie.id}
+                    coachieEmail={coachie.email}
+                  />
+                )}
               </div>
             )
           })}

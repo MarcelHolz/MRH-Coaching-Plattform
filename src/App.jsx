@@ -8,6 +8,7 @@ import KaufErfolgPage from './pages/KaufErfolgPage'
 import CoachieLayout from './layouts/CoachieLayout'
 import CoachieDashboardPage from './pages/CoachieDashboardPage'
 import CoachieProgramPage from './pages/CoachieProgramPage'
+import CoachieAuswertungenPage from './pages/CoachieAuswertungenPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -47,6 +48,7 @@ export default function App() {
             >
               <Route index element={<CoachieDashboardPage />} />
               <Route path="programme/:programId" element={<CoachieProgramPage />} />
+              <Route path="auswertungen" element={<CoachieAuswertungenPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
