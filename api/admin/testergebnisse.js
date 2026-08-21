@@ -21,11 +21,13 @@ async function handleSuche(req, res) {
   }
 
   const profilQuizUrl = process.env.PROFIL_QUIZ_URL
+  const anonKey = process.env.PROFIL_QUIZ_ANON_KEY
   const token = process.env.PROFIL_QUIZ_READER_TOKEN
 
-  if (!profilQuizUrl || !token) {
+  if (!profilQuizUrl || !anonKey || !token) {
     res.status(500).json({
-      error: 'PROFIL_QUIZ_URL und PROFIL_QUIZ_READER_TOKEN müssen serverseitig gesetzt sein.',
+      error:
+        'PROFIL_QUIZ_URL, PROFIL_QUIZ_ANON_KEY und PROFIL_QUIZ_READER_TOKEN müssen serverseitig gesetzt sein.',
     })
     return
   }
@@ -33,7 +35,11 @@ async function handleSuche(req, res) {
   const response = await fetch(`${profilQuizUrl}/rest/v1/rpc/testergebnisse_suchen`, {
     method: 'POST',
     headers: {
-      apikey: token,
+      // apikey = echter Projekt-Key (Gateway-Zugang), Authorization = unser
+      // selbst gemintetes Reader-JWT (bestimmt die Postgres-Rolle). Beide
+      // dürfen NICHT denselben Wert haben -- apikey kennt unser Custom-JWT
+      // nicht und lehnt sonst mit "Invalid API key" ab.
+      apikey: anonKey,
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
@@ -91,11 +97,13 @@ async function handleLink(req, res, supabase) {
     }
 
     const profilQuizUrl = process.env.PROFIL_QUIZ_URL
+    const anonKey = process.env.PROFIL_QUIZ_ANON_KEY
     const token = process.env.PROFIL_QUIZ_READER_TOKEN
 
-    if (!profilQuizUrl || !token) {
+    if (!profilQuizUrl || !anonKey || !token) {
       res.status(500).json({
-        error: 'PROFIL_QUIZ_URL und PROFIL_QUIZ_READER_TOKEN müssen serverseitig gesetzt sein.',
+        error:
+          'PROFIL_QUIZ_URL, PROFIL_QUIZ_ANON_KEY und PROFIL_QUIZ_READER_TOKEN müssen serverseitig gesetzt sein.',
       })
       return
     }
@@ -105,7 +113,7 @@ async function handleLink(req, res, supabase) {
       {
         method: 'POST',
         headers: {
-          apikey: token,
+          apikey: anonKey,
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },

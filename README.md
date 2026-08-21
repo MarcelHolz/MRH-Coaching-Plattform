@@ -268,10 +268,20 @@ Projekt lesen, schreiben oder löschen.
 3. **Im Coaching-Plattform-Projekt** (dieses hier) im SQL Editor
    `supabase_migrations/testergebnisse.sql` ausführen (neue Tabelle
    `coachie_testergebnisse`, eigene RLS-Policy).
-4. In Vercel (Coaching-Plattform) `PROFIL_QUIZ_URL` (Standard:
-   `https://rbfsfcetdzdsyoffglwi.supabase.co`) und
-   `PROFIL_QUIZ_READER_TOKEN` (Ausgabe aus Schritt 2) eintragen,
-   server-only, alle drei Umgebungen.
+4. In Vercel (Coaching-Plattform) drei Variablen eintragen, server-only,
+   alle drei Umgebungen:
+   - `PROFIL_QUIZ_URL` (Standard: `https://rbfsfcetdzdsyoffglwi.supabase.co`)
+   - `PROFIL_QUIZ_ANON_KEY` — der normale `anon`/publishable Key des
+     Profil-Quiz-Projekts (Project Settings → API → "anon public"). Dieser
+     Key allein gewährt **keinen** Zugriff auf Testergebnis-Daten (kein
+     Tabellenzugriff, keine RLS-Policy dafür) — er wird nur vom
+     API-Gateway geprüft, bevor die Anfrage überhaupt ankommt. Ohne ihn
+     kommt `401 Invalid API key` zurück, auch wenn der Reader-Token
+     korrekt ist.
+   - `PROFIL_QUIZ_READER_TOKEN` (Ausgabe aus Schritt 2) — dieser Token
+     bestimmt über den `Authorization`-Header die tatsächliche
+     Postgres-Rolle (`coaching_plattform_reader`) und damit den
+     eigentlichen, eingeschränkten Zugriff.
 
 Struktur ist bewusst so angelegt (eigenes `test_typ`-Feld, eigene
 Tabelle), dass sie sich später um Zertifikate erweitern lässt, ohne
