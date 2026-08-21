@@ -6,3 +6,7 @@ dist
 .vercel
 .DS_Store
 *.log
+
+# Marcels persönliche Fotos — manuell ablegen, siehe public/brand/README.md
+public/brand/*
+!public/brand/README.md

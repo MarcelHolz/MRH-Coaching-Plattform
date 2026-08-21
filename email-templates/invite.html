@@ -1,0 +1,46 @@
+<!--
+  Supabase Auth Email Template: "Invite user"
+  Einfügen unter: Supabase Dashboard → Authentication → Email Templates → Invite user
+  (Subject heading frei wählbar, z. B. "Deine Einladung zu MRH Beratung & Coaching")
+
+  Verwendet nur Supabase-eigene Template-Variablen ({{ .ConfirmationURL }}) und
+  ausschließlich Inline-Styles, da die meisten E-Mail-Clients externe/eingebettete
+  <style>-Blöcke ignorieren oder unzuverlässig behandeln.
+-->
+<div style="background-color:#f7f3ec; padding:32px 16px; font-family:Arial, Helvetica, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden;">
+    <tr>
+      <td style="background-color:#1f2a44; padding:28px 32px;">
+        <span style="color:#ffffff; font-size:18px; font-weight:600;">MRH Beratung &amp; Coaching</span>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px;">
+        <h1 style="margin:0 0 12px; color:#1f2a44; font-size:20px; font-weight:600;">
+          Du bist eingeladen.
+        </h1>
+        <p style="margin:0 0 20px; color:#333333; font-size:15px; line-height:1.6;">
+          Marcel hat dich zur MRH Coaching-Plattform eingeladen. Leg dein
+          Passwort fest und leg direkt los.
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="border-radius:8px; background-color:#d9772e;">
+              <a href="{{ .ConfirmationURL }}"
+                 style="display:inline-block; padding:12px 28px; color:#ffffff; font-size:15px; font-weight:600; text-decoration:none;">
+                Einladung annehmen
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:28px 0 0; color:#6b7280; font-size:13px; line-height:1.5;">
+          Funktioniert der Button nicht? Link kopieren:<br>
+          <a href="{{ .ConfirmationURL }}" style="color:#1f2a44; word-break:break-all;">{{ .ConfirmationURL }}</a>
+        </p>
+      </td>
+    </tr>
+  </table>
+  <p style="max-width:480px; margin:16px auto 0; color:#6b7280; font-size:12px; text-align:center;">
+    MRH Beratung &amp; Coaching
+  </p>
+</div>

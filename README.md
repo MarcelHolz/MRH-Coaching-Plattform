@@ -101,6 +101,30 @@ vercel dev
 4. Unter **Programme** die zugehörigen Sessions (inkl. Video, Workbook,
    Materialien) anlegen und aktivieren.
 
+## Branding
+
+Farbpalette als Tailwind-Theme-Tokens in `src/index.css` (`@theme`):
+
+| Token | Wert | Verwendung |
+| --- | --- | --- |
+| `mrh-cream` | `#f7f3ec` | Seitenhintergrund |
+| `mrh-navy` / `mrh-navy-dark` | `#1f2a44` / `#161d30` | Header, Buttons, Überschriften |
+| `mrh-orange` / `mrh-orange-dark` | `#d9772e` / `#b26226` | Call-to-Action, Hervorhebungen, "abgeschlossen"-Badges |
+| `mrh-grey` | `#6b7280` | Metadaten, Zeitstempel, sekundäre Beschriftungen |
+
+**Bildmaterial**: `public/brand/` erwartet drei Dateien (Marcels Fotos von
+mrh-beratung.de), die aus Netzwerkgründen nicht automatisch geholt werden
+konnten — Details und exakte Dateinamen in `public/brand/README.md`. Ohne
+diese Dateien funktionieren Login-Seite, Passwort-festlegen-Seite,
+Coachie-Dashboard und Programm-Detailseite normal, zeigen aber ein
+gebrochenes Bild-Icon statt Foto.
+
+**Einladungs-E-Mail**: `email-templates/invite.html` enthält das
+HTML-Template im MRH-Design (Creme/Navy/Orange). Unter Supabase Dashboard →
+Authentication → Email Templates → **Invite user** den Inhalt der Datei
+einfügen (nutzt ausschließlich die Supabase-eigene Variable
+`{{ .ConfirmationURL }}`, keine weitere Konfiguration nötig).
+
 ## Projektstruktur
 
 ```

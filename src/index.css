@@ -2,8 +2,11 @@
 
 @theme {
   --color-mrh-cream: #f7f3ec;
-  --color-mrh-navy: #1e3a5f;
-  --color-mrh-navy-dark: #152a45;
+  --color-mrh-navy: #1f2a44;
+  --color-mrh-navy-dark: #161d30;
+  --color-mrh-orange: #d9772e;
+  --color-mrh-orange-dark: #b26226;
+  --color-mrh-grey: #6b7280;
 }
 
 body {
