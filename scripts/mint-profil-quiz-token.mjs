@@ -10,7 +10,8 @@
 // die beiden Funktionen an).
 //
 // Nutzung:
-//   PROFIL_QUIZ_JWT_SECRET="..." node scripts/mint-profil-quiz-token.mjs
+//   PROFIL_QUIZ_JWT_SECRET="..." PROFIL_QUIZ_JWT_KID="..." \
+//     node scripts/mint-profil-quiz-token.mjs
 //
 // Das Secret muss ein HS256-Secret sein (dieses Skript signiert HMAC).
 // Läuft das Profil-Quiz-Projekt bereits auf den neuen "JWT Signing
@@ -19,7 +20,12 @@
 // herausgegeben. Stattdessen im Dashboard unter Project Settings -> API
 // -> JWT Signing Keys einen eigenen HS256-Key anlegen (Status "Standby"
 // reicht, NICHT zu "Current" rotieren -- Standby-Keys werden schon jetzt
-// für die Verifikation akzeptiert) und dessen Secret hier eintragen.
+// für die Verifikation akzeptiert) und dessen Secret UND Key ID (kid,
+// eine UUID neben dem Secret) hier eintragen. Beides wird gebraucht --
+// ohne passenden "kid"-Claim im Header kann Supabase/PostgREST unter
+// mehreren aktiven Keys nicht erkennen, mit welchem Key verifiziert
+// werden soll, und lehnt mit "No suitable key or wrong key type" ab,
+// selbst wenn Secret und Signatur an sich korrekt wären.
 // Alternativ funktioniert (noch) auch das "Legacy"-JWT-Secret, ist aber
 // dasselbe Secret wie für anon/service_role und kann später widerrufen
 // werden -- als Dauerlösung ungeeignet.
@@ -32,9 +38,19 @@
 import crypto from 'node:crypto'
 
 const secret = process.env.PROFIL_QUIZ_JWT_SECRET
+const kid = process.env.PROFIL_QUIZ_JWT_KID
 
 if (!secret) {
   console.error('Bitte PROFIL_QUIZ_JWT_SECRET als Umgebungsvariable setzen.')
+  process.exit(1)
+}
+
+if (!kid) {
+  console.error(
+    'Bitte PROFIL_QUIZ_JWT_KID als Umgebungsvariable setzen (Key ID des ' +
+      'HS256-Keys, im Dashboard unter Project Settings -> API -> JWT ' +
+      'Signing Keys direkt neben dem Secret sichtbar, Format wie eine UUID).',
+  )
   process.exit(1)
 }
 
@@ -42,7 +58,7 @@ function base64url(input) {
   return Buffer.from(input).toString('base64url')
 }
 
-const header = { alg: 'HS256', typ: 'JWT' }
+const header = { alg: 'HS256', typ: 'JWT', kid }
 const payload = {
   role: 'coaching_plattform_reader',
   iss: 'supabase',

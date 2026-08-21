@@ -241,8 +241,17 @@ Projekt lesen, schreiben oder löschen.
 2. Token erzeugen — **lokal, niemals das Secret weitergeben**:
    ```bash
    PROFIL_QUIZ_JWT_SECRET="<HS256-Secret, siehe unten>" \
+   PROFIL_QUIZ_JWT_KID="<Key ID desselben HS256-Keys, siehe unten>" \
      node scripts/mint-profil-quiz-token.mjs
    ```
+   Beide Werte sind nötig — nur das Secret zu setzen erzeugt zwar ein
+   strukturell gültiges Token, das Supabase aber mit `401 PGRST301 /
+   "No suitable key or wrong key type"` ablehnt: Bei mehreren aktiven
+   Signing Keys im Projekt (z. B. asymmetrischer "Current"-Key +
+   HS256-Standby-Key) muss der `kid`-Claim im JWT-Header verraten,
+   *welcher* Key zur Verifikation herangezogen werden soll — ohne ihn
+   findet Supabase keinen eindeutigen Kandidaten, selbst wenn Secret und
+   Signatur an sich korrekt wären.
    Das Skript signiert klassisch HS256 (HMAC) und braucht dafür ein
    symmetrisches Secret. Steht im Profil-Quiz-Projekt der aktuell aktive
    ("Current") Signing Key auf ein asymmetrisches Verfahren (ECC/RSA,
@@ -263,8 +272,10 @@ Projekt lesen, schreiben oder löschen.
    umstellen). Standby-Keys werden von Supabase bereits jetzt für die
    Verifikation akzeptiert, ganz unabhängig vom Rotationsstatus — die
    Rotation entscheidet nur, welcher Key *neue* Auth-Tokens signiert.
-   Den Secret-Wert dieses Standby-Keys als `PROFIL_QUIZ_JWT_SECRET`
-   verwenden. Die Ausgabe des Skripts ist der fertige Token.
+   Secret UND Key ID (`kid`, im Dashboard direkt neben dem Secret sichtbar,
+   Format wie eine UUID) dieses Standby-Keys als `PROFIL_QUIZ_JWT_SECRET`
+   bzw. `PROFIL_QUIZ_JWT_KID` verwenden. Die Ausgabe des Skripts ist der
+   fertige Token.
 3. **Im Coaching-Plattform-Projekt** (dieses hier) im SQL Editor
    `supabase_migrations/testergebnisse.sql` ausführen (neue Tabelle
    `coachie_testergebnisse`, eigene RLS-Policy).
