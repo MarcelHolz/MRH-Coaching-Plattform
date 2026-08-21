@@ -125,6 +125,53 @@ Authentication → Email Templates → **Invite user** den Inhalt der Datei
 einfügen (nutzt ausschließlich die Supabase-eigene Variable
 `{{ .ConfirmationURL }}`, keine weitere Konfiguration nötig).
 
+## Phase 2: Self-Signup & Stripe-Zahlung
+
+Ergänzt einen zweiten, parallelen Zugangsweg für kleinere Programme: ein
+Interessent bezahlt über eine öffentliche Kaufseite per Stripe Checkout und
+wird automatisch als Coachie angelegt und zugeordnet — ohne dass Marcel
+manuell im Admin freischalten muss. Große/individuelle Programme bleiben
+weiterhin ausschließlich manuell zugeordnet.
+
+### Einmalige Einrichtung
+
+1. **Datenbank-Migration**: `supabase_migrations/phase2_stripe.sql` im
+   Supabase SQL Editor ausführen (neue Spalten auf `programme` und
+   `coachie_programme`, neue Tabelle `stripe_events`, verschärfte
+   RLS-Policies für abgelaufenen Zugriff). Wurde gegen den aktuellen
+   Live-Stand von Schema und Policies geprüft, aber bewusst nicht
+   automatisch angewendet — bitte vor dem Ausführen selbst durchlesen.
+2. Für jedes zu verkaufende Programm in Stripe ein **Produkt + Price**
+   anlegen (Modus **Payment**, nicht Subscription — Einmalzahlung).
+   Stripe Invoicing/automatische Zahlungsbelege aktivieren.
+3. Im Admin-Bereich unter **Programme → Verkauf einrichten**: Preis,
+   Stripe Price ID, Slug eintragen und "Öffentlich kaufbar" aktivieren.
+   Die Kaufseite ist danach unter `/kaufen/<slug>` erreichbar.
+4. Umgebungsvariablen ergänzen: `STRIPE_SECRET_KEY`,
+   `STRIPE_WEBHOOK_SECRET` (server-only, wie die bestehenden
+   Vercel-Variablen in allen drei Umgebungen anhaken).
+5. In Stripe unter **Developers → Webhooks** einen Endpunkt auf
+   `<APP_URL>/api/webhooks/stripe` eintragen, Event-Typ
+   `checkout.session.completed` abonnieren. Das dabei angezeigte Signing
+   Secret ist `STRIPE_WEBHOOK_SECRET`.
+6. Mit Stripe-Testkarten (`4242 4242 4242 4242`) einen Testkauf
+   durchspielen, bevor auf Live-Modus umgestellt wird.
+
+### Ablauf
+
+`/kaufen/<slug>` → Stripe Checkout (hosted, sammelt E-Mail selbst) →
+Webhook `checkout.session.completed` → neuer Coachie wird angelegt und
+erhält dieselbe Einladungs-E-Mail wie beim manuellen Einladen (bereits
+bestehende Coachies bekommen keine erneute Einladung, nur die neue
+Zuordnung) → `coachie_programme.zugriff_bis` wird automatisch auf
+Kaufdatum + 36 Monate gesetzt.
+
+Nach Ablauf von `zugriff_bis` blendet die Datenbank (nicht nur das
+Frontend) das Programm inklusive Sessions und Materialien für diesen
+Coachie automatisch aus; er sieht stattdessen einen Hinweis mit
+Kontaktmöglichkeit für eine Verlängerung. Manuell von Marcel zugeordnete
+Programme haben `zugriff_bis = NULL` und bleiben unbegrenzt zugänglich.
+
 ## Projektstruktur
 
 ```

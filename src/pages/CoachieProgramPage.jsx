@@ -218,11 +218,25 @@ export default function CoachieProgramPage() {
         .from('programme')
         .select('*')
         .eq('id', programId)
-        .single()
+        .maybeSingle()
 
       if (programmError || !programmData) {
         if (!cancelled) {
-          setError('Programm konnte nicht geladen werden.')
+          const { data: zuordnung } = await supabase
+            .from('coachie_programme')
+            .select('zugriff_bis')
+            .eq('coachie_id', coachie.id)
+            .eq('programm_id', programId)
+            .maybeSingle()
+
+          const abgelaufen =
+            zuordnung?.zugriff_bis && new Date(zuordnung.zugriff_bis) < new Date()
+
+          setError(
+            abgelaufen
+              ? 'Der Zugriff auf dieses Programm ist abgelaufen. Melde dich bei Marcel für eine Verlängerung.'
+              : 'Programm konnte nicht geladen werden.',
+          )
           setLoading(false)
         }
         return

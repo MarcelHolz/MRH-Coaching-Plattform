@@ -54,6 +54,7 @@ function formatDatum(iso) {
 export default function CoachieDashboardPage() {
   const { coachie } = useAuth()
   const [programme, setProgramme] = useState([])
+  const [abgelaufeneProgramme, setAbgelaufeneProgramme] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -68,7 +69,7 @@ export default function CoachieDashboardPage() {
 
       const { data: zuordnungen, error: zuordnungenError } = await supabase
         .from('coachie_programme')
-        .select('programm_id, programme(id, titel, beschreibung, aktiv)')
+        .select('programm_id, zugriff_bis, programme(id, titel, beschreibung, aktiv)')
         .eq('coachie_id', coachie.id)
 
       if (zuordnungenError) {
@@ -78,6 +79,15 @@ export default function CoachieDashboardPage() {
         }
         return
       }
+
+      // Ist zugriff_bis abgelaufen, blendet RLS das verknüpfte Programm
+      // serverseitig aus (programme kommt dann als null zurück) -- das
+      // ist der Fall, den wir dem Coachie explizit erklären, statt ihn
+      // stillschweigend wie ein deaktiviertes Programm zu behandeln.
+      const jetzt = new Date()
+      const abgelaufen = (zuordnungen ?? []).filter(
+        (z) => !z.programme && z.zugriff_bis && new Date(z.zugriff_bis) < jetzt,
+      ).length
 
       const aktiveProgramme = (zuordnungen ?? [])
         .map((z) => z.programme)
@@ -125,6 +135,7 @@ export default function CoachieDashboardPage() {
 
       if (!cancelled) {
         setProgramme(programmeMitFortschritt)
+        setAbgelaufeneProgramme(abgelaufen)
         setLoading(false)
       }
     }
@@ -160,6 +171,15 @@ export default function CoachieDashboardPage() {
       )[0]
     : null
 
+  const abgelaufenHinweis = abgelaufeneProgramme > 0 && (
+    <div className="mb-6 rounded-xl border border-mrh-orange/30 bg-mrh-orange/10 p-4 text-sm text-mrh-navy">
+      {abgelaufeneProgramme === 1
+        ? 'Der Zugriff auf eines deiner Programme ist abgelaufen.'
+        : `Der Zugriff auf ${abgelaufeneProgramme} deiner Programme ist abgelaufen.`}{' '}
+      Melde dich bei Marcel für eine Verlängerung.
+    </div>
+  )
+
   return (
     <div>
       {programme.length === 0 ? (
@@ -167,12 +187,14 @@ export default function CoachieDashboardPage() {
           <h1 className="mb-2 text-2xl font-semibold text-mrh-navy">
             Schön, dass du da bist{coachie?.name ? `, ${coachie.name}` : ''}.
           </h1>
+          {abgelaufenHinweis}
           <p className="text-mrh-grey">
             Noch kein Programm zugewiesen. Melde dich bei Marcel.
           </p>
         </div>
       ) : (
         <>
+          {abgelaufenHinweis}
           <div className="mb-8 overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-5">
