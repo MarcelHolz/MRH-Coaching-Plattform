@@ -38,7 +38,7 @@ export default function MaterialManager({ sessionId }) {
           session_id: sessionId,
           titel,
           datei_url: dateiUrl,
-          typ,
+          typ: typ || null,
         }),
       })
       setTitel('')
@@ -107,20 +107,29 @@ export default function MaterialManager({ sessionId }) {
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <input
-          type="url"
-          placeholder="Datei-URL"
+          type="text"
+          placeholder="Storage-Pfad (z. B. 03_Fuehrung/03.01/Workbook.pdf)"
           required
           value={dateiUrl}
           onChange={(e) => setDateiUrl(e.target.value)}
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
         />
-        <input
-          type="text"
-          placeholder="Typ (z. B. PDF)"
+        <select
           value={typ}
           onChange={(e) => setTyp(e.target.value)}
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-        />
+        >
+          <option value="">Typ wählen</option>
+          <option value="pdf">PDF</option>
+          <option value="text">Text</option>
+          <option value="audio">Audio</option>
+          <option value="datei">Sonstiges</option>
+        </select>
+        <p className="text-xs text-slate-400 sm:col-span-4">
+          Pfad relativ zum privaten Bucket „Programme“, z. B.
+          03_Fuehrung-Kommunikation/03.01/F1_Workbook.pdf -- kein volles
+          http(s)-Link mehr.
+        </p>
         <button
           type="submit"
           className="rounded-lg bg-mrh-navy px-3 py-1.5 text-sm font-medium text-white transition hover:bg-mrh-navy-dark sm:col-span-4"

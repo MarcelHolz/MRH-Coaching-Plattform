@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
+import { getSignedMaterialUrl } from '../lib/storage'
 
 const STATUS_OPTIONEN = [
   { value: 'offen', label: 'Offen' },
@@ -43,6 +44,77 @@ function formatDatum(iso) {
     month: 'long',
     year: 'numeric',
   })
+}
+
+function MaterialZeile({ material }) {
+  const [ladend, setLadend] = useState(false)
+  const [fehler, setFehler] = useState(false)
+  const [audioUrl, setAudioUrl] = useState(null)
+
+  async function signierteUrlOeffnen() {
+    setFehler(false)
+    setLadend(true)
+    try {
+      const url = await getSignedMaterialUrl(material.datei_url)
+      window.open(url, '_blank', 'noopener')
+    } catch {
+      setFehler(true)
+    } finally {
+      setLadend(false)
+    }
+  }
+
+  async function audioLaden() {
+    setFehler(false)
+    setLadend(true)
+    try {
+      const url = await getSignedMaterialUrl(material.datei_url)
+      setAudioUrl(url)
+    } catch {
+      setFehler(true)
+    } finally {
+      setLadend(false)
+    }
+  }
+
+  if (material.typ === 'audio') {
+    return (
+      <li>
+        {audioUrl ? (
+          <audio controls autoPlay src={audioUrl} className="w-full" />
+        ) : (
+          <button
+            type="button"
+            onClick={audioLaden}
+            disabled={ladend}
+            className="text-mrh-navy hover:underline disabled:opacity-50"
+          >
+            {ladend ? 'Lädt…' : `${material.titel} abspielen`}
+          </button>
+        )}
+        {fehler && (
+          <p className="text-xs text-red-600">Datei konnte nicht geladen werden.</p>
+        )}
+      </li>
+    )
+  }
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={signierteUrlOeffnen}
+        disabled={ladend}
+        className="text-mrh-navy hover:underline disabled:opacity-50"
+      >
+        {ladend ? 'Lädt…' : material.titel}
+        {material.typ ? ` (${material.typ})` : ''}
+      </button>
+      {fehler && (
+        <p className="text-xs text-red-600">Datei konnte nicht geladen werden.</p>
+      )}
+    </li>
+  )
 }
 
 function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle }) {
@@ -139,17 +211,7 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
               <p className="mb-1 text-sm font-medium text-slate-700">Materialien</p>
               <ul className="space-y-1 text-sm">
                 {session.materialien.map((material) => (
-                  <li key={material.id}>
-                    <a
-                      href={material.datei_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-mrh-navy hover:underline"
-                    >
-                      {material.titel}
-                      {material.typ ? ` (${material.typ})` : ''}
-                    </a>
-                  </li>
+                  <MaterialZeile key={material.id} material={material} />
                 ))}
               </ul>
             </div>
