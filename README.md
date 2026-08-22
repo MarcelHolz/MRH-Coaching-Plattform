@@ -234,7 +234,11 @@ Programme haben `zugriff_bis = NULL` und bleiben unbegrenzt zugänglich.
 Marcel kann `zugriff_bis` pro Zuordnung jederzeit manuell einsehen und
 anpassen (**Coachies** → bei der jeweiligen Programm-Zuordnung
 "Bearbeiten", z. B. für eine Kulanzverlängerung) — unabhängig davon, ob
-der Wert automatisch oder gar nicht gesetzt wurde.
+der Wert automatisch oder gar nicht gesetzt wurde. Ist für eine Zuordnung
+ein `zugriff_bis` gesetzt, zeigt die zugehörige Programm-Kachel im
+Coachie-Dashboard zusätzlich einen dezenten Hinweis "Zugriff bis
+TT.MM.JJJJ"; bei unbegrenztem Zugriff (`zugriff_bis = NULL`) bleibt die
+Kachel unverändert ohne Hinweis.
 
 ## Teaser-Programme
 
@@ -261,16 +265,23 @@ Adresse verwendet wurde). Verknüpfte Ergebnisse werden einmalig als
 Kopie gespeichert, nicht bei jedem Aufruf neu abgefragt.
 
 Jede Kachel zeigt zunächst nur den dominanten Typ; über "Vollständige
-Auswertung anzeigen" öffnet sich ein Diverging-Säulendiagramm
+Auswertung anzeigen" öffnet sich ein Säulendiagramm
 (`src/components/TestergebnisChart.jsx`) der vier Punktewerte
-(Dominant/Kreativ/Sachlich/Harmonisch — Werte können negativ sein, deshalb
-bewusst kein Radardiagramm, das eine nicht-negative Skala ab der Mitte
-voraussetzt), alle vier Säulen von einer gemeinsamen, durchgehenden
-Nulllinie aus. Die Farben entsprechen der Typ-Zuordnung der ursprünglichen
-Kurztest-App (`TRAIT_COLOR` in `src/lib/testergebnisse.js`, DISG-Konvention:
-Dominant=Rot, Kreativ=Gelb, Sachlich=Blau, Harmonisch=Grün) — Farbe codiert
-hier die Typ-Identität, nicht das Vorzeichen; das Vorzeichen liest man an
-Richtung (nach oben/unten) und direktem Zahlenlabel ab. Zusätzlich, beim
+(Dominant/Kreativ/Sachlich/Harmonisch), alle vier Säulen von einer
+gemeinsamen, durchgehenden Basislinie aus. Werte können negativ sein
+(Coaching-Vorbereitungstest) — statt divergierender Balken (nach oben
+*und* unten, wie ursprünglich umgesetzt) wird die Skala verschoben: der
+kleinste tatsächliche Wert wird als kleiner, aber sichtbarer Balken
+dargestellt, alle anderen proportional höher relativ zueinander (an
+mrh-quiz.vercel.app orientiert, dort für denselben Fall verwendet — die
+Seite war per Netzwerk-Sandbox nicht direkt einsehbar, die Umsetzung
+folgt der vom Nutzer beschriebenen Transformation). Kein Radardiagramm,
+das würde ohnehin eine nicht-negative Skala ab der Mitte voraussetzen.
+Das angezeigte Zahlenlabel bleibt immer der echte, unverschobene Wert
+(z. B. "-2") — nur die Balkenhöhe ist relativ. Die Farben entsprechen der
+Typ-Zuordnung der ursprünglichen Kurztest-App (`TRAIT_COLOR` in
+`src/lib/testergebnisse.js`, DISG-Konvention: Dominant=Rot, Kreativ=Gelb,
+Sachlich=Blau, Harmonisch=Grün). Zusätzlich, beim
 Coaching-Vorbereitungstest, eine Block-für-Block-Übersicht (je Block: am
 meisten/am wenigsten gewählter Typ). Beides steckt bereits vollständig in
 `ergebnis_daten` (`punkte_*`- bzw. `block_antworten`-Feld) — keine

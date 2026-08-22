@@ -1,62 +1,56 @@
 import { TRAIT_COLOR, TRAIT_LABEL, TRAIT_ORDER } from '../lib/testergebnisse'
 
-// Diverging Säulendiagramm für die vier Punktewerte eines Testergebnisses.
-// Werte können negativ sein (Coaching-Vorbereitungstest), deshalb kein
-// Radar-/Spinnendiagramm (das setzt eine nicht-negative Skala ab der Mitte
-// voraus) -- stattdessen Säulen je Merkmal, die von EINER gemeinsamen
-// Nulllinie aus nach oben (positiv) oder unten (negativ) wachsen. Farbe
-// codiert die Typ-Identität (siehe TRAIT_COLOR), nicht das Vorzeichen --
-// das Vorzeichen liest man an Richtung + direktem Zahlenlabel ab, beides
-// bereits vorhanden, Farbe ist also nie der einzige Vorzeichen-Hinweis.
+// Säulendiagramm für die vier Punktewerte eines Testergebnisses. Werte
+// können negativ sein (Coaching-Vorbereitungstest) -- statt divergierender
+// Balken (nach oben/unten) wird die Skala verschoben: der kleinste
+// tatsächliche Wert wird als kleiner, aber sichtbarer Balken (BASELINE_HEIGHT)
+// dargestellt, alle anderen proportional höher relativ zueinander. Kein
+// Radar-/Spinnendiagramm, weil das eine nicht-negative Skala ab der Mitte
+// voraussetzt. Farbe codiert die Typ-Identität (siehe TRAIT_COLOR); die
+// echten (nicht verschobenen) Werte stehen weiterhin als Zahlenlabel an
+// jeder Säule -- die Verschiebung verändert nur die Balkenhöhe, nie die
+// angezeigte Zahl.
 
 const CHART_WIDTH = 320
 const MARGIN_X = 8
 const COLUMN_WIDTH = 24
 const COLUMN_RADIUS = 4
 const PADDING_Y = 8
-const TOP_RESERVE = 92
-const BOTTOM_RESERVE = 92
-const VALUE_LABEL_RESERVE = 20
-const CATEGORY_LABEL_GAP = 8
+const BAR_AREA_HEIGHT = 90
+const VALUE_LABEL_RESERVE = 16
+const BASELINE_HEIGHT = 6
+const CATEGORY_LABEL_GAP = 3
 const CATEGORY_LABEL_HEIGHT = 14
 
 const CHART_HEIGHT =
-  PADDING_Y + TOP_RESERVE + BOTTOM_RESERVE + CATEGORY_LABEL_GAP + CATEGORY_LABEL_HEIGHT + PADDING_Y
+  PADDING_Y + BAR_AREA_HEIGHT + CATEGORY_LABEL_GAP + CATEGORY_LABEL_HEIGHT + PADDING_Y
 
-function roundedColumnPath(x, y, width, height, radius, roundTop) {
+function roundedColumnPath(x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height)
   if (r <= 0) {
     return `M ${x} ${y} H ${x + width} V ${y + height} H ${x} Z`
   }
-  if (roundTop) {
-    return [
-      `M ${x} ${y + r}`,
-      `A ${r} ${r} 0 0 1 ${x + r} ${y}`,
-      `H ${x + width - r}`,
-      `A ${r} ${r} 0 0 1 ${x + width} ${y + r}`,
-      `V ${y + height}`,
-      `H ${x} Z`,
-    ].join(' ')
-  }
   return [
-    `M ${x} ${y}`,
-    `H ${x + width}`,
-    `V ${y + height - r}`,
-    `A ${r} ${r} 0 0 1 ${x + width - r} ${y + height}`,
-    `H ${x + r}`,
-    `A ${r} ${r} 0 0 1 ${x} ${y + height - r} Z`,
+    `M ${x} ${y + r}`,
+    `A ${r} ${r} 0 0 1 ${x + r} ${y}`,
+    `H ${x + width - r}`,
+    `A ${r} ${r} 0 0 1 ${x + width} ${y + r}`,
+    `V ${y + height}`,
+    `H ${x} Z`,
   ].join(' ')
 }
 
 export default function TestergebnisChart({ punkte }) {
   const werte = TRAIT_ORDER.map((key) => punkte?.[key] ?? 0)
-  const domain = Math.max(1, ...werte.map((w) => Math.abs(w)))
+  const minWert = Math.min(...werte)
+  const verschobeneWerte = werte.map((w) => w - minWert)
+  const spanne = Math.max(1, ...verschobeneWerte)
 
   const columnAreaWidth = CHART_WIDTH - MARGIN_X * 2
   const slotWidth = columnAreaWidth / TRAIT_ORDER.length
-  const zeroY = PADDING_Y + TOP_RESERVE
-  const barMaxLength = Math.min(TOP_RESERVE, BOTTOM_RESERVE) - VALUE_LABEL_RESERVE
-  const categoryLabelY = zeroY + BOTTOM_RESERVE + CATEGORY_LABEL_GAP + CATEGORY_LABEL_HEIGHT - 2
+  const baselineY = PADDING_Y + BAR_AREA_HEIGHT
+  const verfuegbareHoehe = BAR_AREA_HEIGHT - VALUE_LABEL_RESERVE - BASELINE_HEIGHT
+  const categoryLabelY = baselineY + CATEGORY_LABEL_GAP + CATEGORY_LABEL_HEIGHT - 2
 
   return (
     <div>
@@ -68,39 +62,30 @@ export default function TestergebnisChart({ punkte }) {
       >
         <line
           x1={MARGIN_X}
-          y1={zeroY}
+          y1={baselineY}
           x2={CHART_WIDTH - MARGIN_X}
-          y2={zeroY}
+          y2={baselineY}
           stroke="#e2e8f0"
           strokeWidth={1}
         />
 
         {TRAIT_ORDER.map((key, i) => {
           const value = werte[i]
-          const barLength = (Math.abs(value) / domain) * barMaxLength
+          const barHeight =
+            BASELINE_HEIGHT + (verschobeneWerte[i] / spanne) * verfuegbareHoehe
           const columnCenterX = MARGIN_X + slotWidth * i + slotWidth / 2
           const columnX = columnCenterX - COLUMN_WIDTH / 2
-          const isPositive = value >= 0
-          const columnY = isPositive ? zeroY - barLength : zeroY
-          const path = roundedColumnPath(
-            columnX,
-            columnY,
-            COLUMN_WIDTH,
-            barLength,
-            COLUMN_RADIUS,
-            isPositive,
-          )
-          const valueLabelY = isPositive ? zeroY - barLength - 6 : zeroY + barLength + 15
+          const columnY = baselineY - barHeight
+          const path = roundedColumnPath(columnX, columnY, COLUMN_WIDTH, barHeight, COLUMN_RADIUS)
+          const valueLabelY = columnY - 6
 
           return (
             <g key={key}>
-              {barLength > 0 && (
-                <path d={path} fill={TRAIT_COLOR[key]}>
-                  <title>
-                    {TRAIT_LABEL[key]}: {value}
-                  </title>
-                </path>
-              )}
+              <path d={path} fill={TRAIT_COLOR[key]}>
+                <title>
+                  {TRAIT_LABEL[key]}: {value}
+                </title>
+              </path>
               <text
                 x={columnCenterX}
                 y={valueLabelY}
@@ -122,7 +107,7 @@ export default function TestergebnisChart({ punkte }) {
         })}
       </svg>
       <p className="mt-1 text-[11px] text-slate-400">
-        Säule nach oben = positiver Wert, nach unten = negativer Wert
+        Balkenhöhe zeigt die Werte im Verhältnis zueinander, nicht absolut
       </p>
     </div>
   )

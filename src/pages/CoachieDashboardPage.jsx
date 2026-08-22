@@ -92,8 +92,8 @@ export default function CoachieDashboardPage() {
       ).length
 
       const aktiveProgramme = (zuordnungen ?? [])
-        .map((z) => z.programme)
-        .filter((p) => p && p.aktiv)
+        .filter((z) => z.programme && z.programme.aktiv)
+        .map((z) => ({ ...z.programme, zugriff_bis: z.zugriff_bis }))
 
       const zugeordneteIds = new Set(
         (zuordnungen ?? []).map((z) => z.programm_id),
@@ -282,6 +282,11 @@ export default function CoachieDashboardPage() {
                   {letzteAktivitaetText && (
                     <p className="mt-1 text-xs text-mrh-grey">
                       Letzte Aktivität {letzteAktivitaetText}
+                    </p>
+                  )}
+                  {programm.zugriff_bis && (
+                    <p className="mt-1 text-xs text-mrh-grey">
+                      Zugriff bis {formatDatum(programm.zugriff_bis)}
                     </p>
                   )}
                 </Link>
