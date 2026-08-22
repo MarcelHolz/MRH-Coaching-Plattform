@@ -24,3 +24,32 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: #2c2a26;
 }
+
+/* Minimal-Styling für die einfache Markdown-Formatierung des
+   Einleitungstexts (fett/Überschrift/Liste/Absätze) -- bewusst ohne
+   @tailwindcss/typography, da nur diese vier Elemente vorkommen. Erbt
+   Textfarbe vom umgebenden Container, damit es sowohl im Navy-Header
+   (helle Schrift) als auch auf hellem Hintergrund passt. */
+.markdown-inhalt :where(h1, h2, h3) {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  margin-top: 0.75em;
+  margin-bottom: 0.25em;
+}
+.markdown-inhalt :where(h1, h2, h3):first-child {
+  margin-top: 0;
+}
+.markdown-inhalt p {
+  margin-bottom: 0.75em;
+}
+.markdown-inhalt ul {
+  margin-bottom: 0.75em;
+  padding-left: 1.25em;
+  list-style: disc;
+}
+.markdown-inhalt :where(p, ul):last-child {
+  margin-bottom: 0;
+}
+.markdown-inhalt strong {
+  font-weight: 600;
+}

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
 import { getSignedMaterialUrl } from '../lib/storage'
+import { renderMarkdown } from '../lib/markdown'
 
 const STATUS_OPTIONEN = [
   { value: 'offen', label: 'Offen' },
@@ -504,7 +505,12 @@ export default function CoachieProgramPage() {
       <div className="rounded-2xl bg-mrh-navy px-8 py-10 text-white">
         <h1 className="font-serif text-2xl font-semibold">{programm.titel}</h1>
         {programm.beschreibung && (
-          <p className="mt-2 text-sm text-white/70">{programm.beschreibung}</p>
+          <div
+            className="markdown-inhalt mt-2 text-sm text-white/70"
+            dangerouslySetInnerHTML={{
+              __html: renderMarkdown(programm.beschreibung),
+            }}
+          />
         )}
       </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
+import MarkdownFeld from './MarkdownFeld'
 
 export default function AdminProgrammePage() {
   const [programme, setProgramme] = useState([])
@@ -69,10 +70,12 @@ export default function AdminProgrammePage() {
   const [editZugriffsmonate, setEditZugriffsmonate] = useState('')
   const [editZielgruppeText, setEditZielgruppeText] = useState('')
   const [editAblaufSchritte, setEditAblaufSchritte] = useState(['', '', ''])
+  const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
     setEditingId(programm.id)
+    setEditBeschreibung(programm.beschreibung ?? '')
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -125,6 +128,7 @@ export default function AdminProgrammePage() {
             : null,
           zielgruppe_text: editZielgruppeText.trim() || null,
           ablauf_schritte: ablaufSchritte.length > 0 ? ablaufSchritte : null,
+          beschreibung: editBeschreibung,
         }),
       })
       setEditingId(null)
@@ -142,7 +146,7 @@ export default function AdminProgrammePage() {
 
       <form
         onSubmit={handleCreate}
-        className="mb-8 grid gap-3 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-[1fr_2fr_auto]"
+        className="mb-8 space-y-3 rounded-xl bg-white p-5 shadow-sm"
       >
         <input
           type="text"
@@ -150,14 +154,13 @@ export default function AdminProgrammePage() {
           required
           value={titel}
           onChange={(e) => setTitel(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
-        <input
-          type="text"
-          placeholder="Beschreibung"
+        <MarkdownFeld
           value={beschreibung}
-          onChange={(e) => setBeschreibung(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+          onChange={setBeschreibung}
+          placeholder="Einleitungstext (optional, mit **fett**, # Überschrift, - Liste)"
+          rows={3}
         />
         <button
           type="submit"
@@ -249,6 +252,17 @@ export default function AdminProgrammePage() {
                   onSubmit={handleUpdateVerkauf}
                   className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"
                 >
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Einleitungstext
+                    </label>
+                    <MarkdownFeld
+                      value={editBeschreibung}
+                      onChange={setEditBeschreibung}
+                      placeholder="Einleitungstext (optional, mit **fett**, # Überschrift, - Liste)"
+                      rows={4}
+                    />
+                  </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">
                       Preis in Euro
