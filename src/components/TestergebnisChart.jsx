@@ -6,10 +6,10 @@ import { TRAIT_COLOR, TRAIT_LABEL, TRAIT_ORDER } from '../lib/testergebnisse'
 // tatsächliche Wert wird als kleiner, aber sichtbarer Balken (BASELINE_HEIGHT)
 // dargestellt, alle anderen proportional höher relativ zueinander. Kein
 // Radar-/Spinnendiagramm, weil das eine nicht-negative Skala ab der Mitte
-// voraussetzt. Farbe codiert die Typ-Identität (siehe TRAIT_COLOR); die
-// echten (nicht verschobenen) Werte stehen weiterhin als Zahlenlabel an
-// jeder Säule -- die Verschiebung verändert nur die Balkenhöhe, nie die
-// angezeigte Zahl.
+// voraussetzt. Farbe codiert die Typ-Identität (siehe TRAIT_COLOR). Nur
+// die Balkenhöhe im Verhältnis zueinander ist sichtbar -- keine
+// absoluten Zahlenlabels (bewusst, auf Wunsch); die echten Werte stehen
+// weiterhin im aria-label für Screenreader.
 
 const CHART_WIDTH = 320
 const MARGIN_X = 8
@@ -17,7 +17,7 @@ const COLUMN_WIDTH = 24
 const COLUMN_RADIUS = 4
 const PADDING_Y = 8
 const BAR_AREA_HEIGHT = 90
-const VALUE_LABEL_RESERVE = 16
+const TOP_PADDING = 6
 const BASELINE_HEIGHT = 6
 const CATEGORY_LABEL_GAP = 3
 const CATEGORY_LABEL_HEIGHT = 14
@@ -49,7 +49,7 @@ export default function TestergebnisChart({ punkte }) {
   const columnAreaWidth = CHART_WIDTH - MARGIN_X * 2
   const slotWidth = columnAreaWidth / TRAIT_ORDER.length
   const baselineY = PADDING_Y + BAR_AREA_HEIGHT
-  const verfuegbareHoehe = BAR_AREA_HEIGHT - VALUE_LABEL_RESERVE - BASELINE_HEIGHT
+  const verfuegbareHoehe = BAR_AREA_HEIGHT - TOP_PADDING - BASELINE_HEIGHT
   const categoryLabelY = baselineY + CATEGORY_LABEL_GAP + CATEGORY_LABEL_HEIGHT - 2
 
   return (
@@ -77,7 +77,6 @@ export default function TestergebnisChart({ punkte }) {
           const columnX = columnCenterX - COLUMN_WIDTH / 2
           const columnY = baselineY - barHeight
           const path = roundedColumnPath(columnX, columnY, COLUMN_WIDTH, barHeight, COLUMN_RADIUS)
-          const valueLabelY = columnY - 6
 
           return (
             <g key={key}>
@@ -86,14 +85,6 @@ export default function TestergebnisChart({ punkte }) {
                   {TRAIT_LABEL[key]}: {value}
                 </title>
               </path>
-              <text
-                x={columnCenterX}
-                y={valueLabelY}
-                textAnchor="middle"
-                className="fill-slate-500 text-[11px] tabular-nums"
-              >
-                {value}
-              </text>
               <text
                 x={columnCenterX}
                 y={categoryLabelY}
