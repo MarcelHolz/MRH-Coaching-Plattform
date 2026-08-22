@@ -182,6 +182,16 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
             <p className="mb-4 text-sm text-mrh-grey">{session.beschreibung}</p>
           )}
 
+          {!embedUrl && session.bild_url && (
+            <div className="mb-4 overflow-hidden rounded-lg">
+              <img
+                src={session.bild_url}
+                alt=""
+                className="w-full object-cover"
+              />
+            </div>
+          )}
+
           {embedUrl && (
             <div className="mb-4 aspect-video overflow-hidden rounded-lg bg-black">
               <iframe

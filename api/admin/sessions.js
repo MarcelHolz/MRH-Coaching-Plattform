@@ -32,7 +32,7 @@ async function handleSessions(req, res, supabase) {
   }
 
   if (req.method === 'POST') {
-    const { programm_id, titel, beschreibung, video_url, workbook_url, reihenfolge } =
+    const { programm_id, titel, beschreibung, video_url, bild_url, reihenfolge } =
       req.body ?? {}
 
     if (!programm_id || !titel) {
@@ -47,7 +47,7 @@ async function handleSessions(req, res, supabase) {
         titel,
         beschreibung,
         video_url,
-        workbook_url,
+        bild_url,
         reihenfolge: reihenfolge ?? 0,
       })
       .select()

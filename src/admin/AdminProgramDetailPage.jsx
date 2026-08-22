@@ -11,14 +11,14 @@ export default function AdminProgramDetailPage() {
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
-  const [workbookUrl, setWorkbookUrl] = useState('')
+  const [bildUrl, setBildUrl] = useState('')
   const [expandedId, setExpandedId] = useState(null)
 
   const [editingId, setEditingId] = useState(null)
   const [editTitel, setEditTitel] = useState('')
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editVideoUrl, setEditVideoUrl] = useState('')
-  const [editWorkbookUrl, setEditWorkbookUrl] = useState('')
+  const [editBildUrl, setEditBildUrl] = useState('')
   const [editReihenfolge, setEditReihenfolge] = useState(0)
   const [editSubmitting, setEditSubmitting] = useState(false)
 
@@ -55,14 +55,14 @@ export default function AdminProgramDetailPage() {
           titel,
           beschreibung,
           video_url: videoUrl,
-          workbook_url: workbookUrl,
+          bild_url: bildUrl,
           reihenfolge: sessions.length,
         }),
       })
       setTitel('')
       setBeschreibung('')
       setVideoUrl('')
-      setWorkbookUrl('')
+      setBildUrl('')
       await loadSessions()
     } catch (err) {
       setError(err.message)
@@ -85,7 +85,7 @@ export default function AdminProgramDetailPage() {
     setEditTitel(session.titel)
     setEditBeschreibung(session.beschreibung ?? '')
     setEditVideoUrl(session.video_url ?? '')
-    setEditWorkbookUrl(session.workbook_url ?? '')
+    setEditBildUrl(session.bild_url ?? '')
     setEditReihenfolge(session.reihenfolge)
   }
 
@@ -105,7 +105,7 @@ export default function AdminProgramDetailPage() {
           titel: editTitel,
           beschreibung: editBeschreibung,
           video_url: editVideoUrl,
-          workbook_url: editWorkbookUrl,
+          bild_url: editBildUrl,
           reihenfolge: Number(editReihenfolge),
         }),
       })
@@ -183,9 +183,9 @@ export default function AdminProgramDetailPage() {
         />
         <input
           type="url"
-          placeholder="Workbook-URL"
-          value={workbookUrl}
-          onChange={(e) => setWorkbookUrl(e.target.value)}
+          placeholder="Bild-URL"
+          value={bildUrl}
+          onChange={(e) => setBildUrl(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <button
@@ -292,9 +292,9 @@ export default function AdminProgramDetailPage() {
                   />
                   <input
                     type="url"
-                    placeholder="Workbook-URL"
-                    value={editWorkbookUrl}
-                    onChange={(e) => setEditWorkbookUrl(e.target.value)}
+                    placeholder="Bild-URL"
+                    value={editBildUrl}
+                    onChange={(e) => setEditBildUrl(e.target.value)}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                   />
                   <button
