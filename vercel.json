@@ -4,5 +4,11 @@
       "source": "/((?!api/|@vite/|@react-refresh|@id/|@fs/|src/|node_modules/|.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/erinnerungen",
+      "schedule": "0 6 * * *"
+    }
   ]
 }

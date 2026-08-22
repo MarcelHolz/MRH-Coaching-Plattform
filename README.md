@@ -407,7 +407,8 @@ src/
   pages/         Coachie-Seiten (Login, Dashboard, Programmdetail)
 api/
   _lib/          adminAuth (HMAC-Token), supabaseAdmin (service_role Client),
-                 stripeClient (Stripe-SDK-Singleton)
+                 stripeClient (Stripe-SDK-Singleton), mailer (SMTP-Versand
+                 für die Erinnerungsautomation)
   admin/         Serverless Functions für Programme, Sessions (+Materialien
                  via ?resource=materials), Coachies (+Zuordnungen via
                  ?resource=assignments, +Einladung erneut senden via
@@ -415,6 +416,8 @@ api/
                  ?resource=suche), Fortschritt, Login
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
+  cron/          Tägliche Erinnerungsautomation bei Inaktivität
+                 (erinnerungen.js, per Vercel Cron ausgelöst)
   webhooks/      Stripe-Webhook (Signaturprüfung, Idempotenz)
 profil-quiz-edge-function/
                  Separates Deployment-Ziel (NICHT Teil der Coaching-
@@ -445,7 +448,34 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
 
-Ergebnis: 8 Functions (`admin/coachies.js`, `admin/login.js`,
+Ergebnis: 9 Functions (`admin/coachies.js`, `admin/login.js`,
 `admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
-`admin/testergebnisse.js`, `checkout.js`, `webhooks/stripe.js`) —
-deutlich unter dem Hobby-Limit von 12, ohne Funktionsverlust.
+`admin/testergebnisse.js`, `checkout.js`, `cron/erinnerungen.js`,
+`webhooks/stripe.js`) — weiterhin unter dem Hobby-Limit von 12, ohne
+Funktionsverlust.
+
+## Erinnerungsautomation bei Inaktivität
+
+Täglicher Vercel-Cron-Job (`vercel.json`, `0 6 * * *` UTC), der
+`api/cron/erinnerungen.js` aufruft. Vercel Cron ist auf dem Hobby-Plan mit
+maximal einer Ausführung pro Tag je Job nutzbar -- das deckt sich exakt mit
+der hier benötigten täglichen Prüfung, eine alternative Auslösung (z. B. bei
+jedem Admin-Login) ist daher nicht nötig.
+
+Prüft je Coachie, ob ein zugeordnetes, aktives Programm begonnen, aber noch
+nicht abgeschlossen ist und seit mindestens 7 Tagen keine Status-Änderung
+hatte. Verschickt in diesem Fall maximal eine Erinnerungsmail pro Coachie
+pro 7-Tage-Fenster (Feld `coachie_status.erinnerung_gesendet_am`) mit
+Programmname, Name der zuletzt bearbeiteten Session und Link zurück zur
+Plattform.
+
+Der Versand läuft über einen eigenen SMTP-Client (`api/_lib/mailer.js`,
+`nodemailer`) und **nicht** über die Supabase-Auth-Mails (Einladung/
+Passwort-Reset) -- deren feste Vorlagen erlauben keinen individuellen
+Inhalt. Dafür server-only in allen drei Umgebungen (Production/Preview/
+Development) zu setzen, siehe `.env.example`:
+
+- `CRON_SECRET` -- schützt die Route; Vercel schickt automatisch
+  `Authorization: Bearer $CRON_SECRET` bei jedem Cron-Aufruf.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` --
+  All-Inkl-Postfachzugang für `info@mrh-beratung.de`.
