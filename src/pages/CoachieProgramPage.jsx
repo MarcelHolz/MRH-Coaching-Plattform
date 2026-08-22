@@ -179,7 +179,12 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
       {open && (
         <div className="border-t border-slate-100 px-5 pb-5 pt-4">
           {session.beschreibung && (
-            <p className="mb-4 text-sm text-mrh-grey">{session.beschreibung}</p>
+            <div
+              className="markdown-inhalt mb-4 text-sm text-mrh-grey"
+              dangerouslySetInnerHTML={{
+                __html: renderMarkdown(session.beschreibung),
+              }}
+            />
           )}
 
           {!embedUrl && session.bild_url && (

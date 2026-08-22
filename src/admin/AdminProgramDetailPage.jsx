@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
 import MaterialManager from './MaterialManager'
+import MarkdownFeld from './MarkdownFeld'
 
 export default function AdminProgramDetailPage() {
   const { programId } = useParams()
@@ -167,13 +168,14 @@ export default function AdminProgramDetailPage() {
           onChange={(e) => setTitel(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
-        <input
-          type="text"
-          placeholder="Beschreibung"
-          value={beschreibung}
-          onChange={(e) => setBeschreibung(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-        />
+        <div className="sm:col-span-2">
+          <MarkdownFeld
+            value={beschreibung}
+            onChange={setBeschreibung}
+            placeholder="Beschreibung (optional, mit **fett**, # Überschrift, - Liste)"
+            rows={3}
+          />
+        </div>
         <input
           type="url"
           placeholder="Video-URL (YouTube)"
@@ -276,13 +278,14 @@ export default function AdminProgramDetailPage() {
                     onChange={(e) => setEditReihenfolge(e.target.value)}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                   />
-                  <input
-                    type="text"
-                    placeholder="Beschreibung"
-                    value={editBeschreibung}
-                    onChange={(e) => setEditBeschreibung(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
-                  />
+                  <div className="sm:col-span-2">
+                    <MarkdownFeld
+                      value={editBeschreibung}
+                      onChange={setEditBeschreibung}
+                      placeholder="Beschreibung (optional, mit **fett**, # Überschrift, - Liste)"
+                      rows={3}
+                    />
+                  </div>
                   <input
                     type="url"
                     placeholder="Video-URL (YouTube)"
