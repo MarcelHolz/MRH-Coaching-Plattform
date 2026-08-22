@@ -27,7 +27,7 @@ function ProgressRing({ prozent }) {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#d9772e"
+          stroke="#b9913f"
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={umfang}
@@ -189,7 +189,7 @@ export default function CoachieDashboardPage() {
     : null
 
   const abgelaufenHinweis = abgelaufeneProgramme > 0 && (
-    <div className="mb-6 rounded-xl border border-mrh-orange/30 bg-mrh-orange/10 p-4 text-sm text-mrh-navy">
+    <div className="mb-6 rounded-xl border border-mrh-gold/30 bg-mrh-gold/10 p-4 text-sm text-mrh-navy">
       {abgelaufeneProgramme === 1
         ? 'Der Zugriff auf eines deiner Programme ist abgelaufen.'
         : `Der Zugriff auf ${abgelaufeneProgramme} deiner Programme ist abgelaufen.`}{' '}
@@ -201,7 +201,7 @@ export default function CoachieDashboardPage() {
     <div>
       {programme.length === 0 ? (
         <div>
-          <h1 className="mb-2 text-2xl font-semibold text-mrh-navy">
+          <h1 className="mb-2 font-serif text-2xl font-semibold text-mrh-navy">
             Schön, dass du da bist{coachie?.name ? `, ${coachie.name}` : ''}.
           </h1>
           {abgelaufenHinweis}
@@ -221,7 +221,7 @@ export default function CoachieDashboardPage() {
                   className="hidden h-20 w-20 shrink-0 rounded-full object-cover object-top sm:block"
                 />
                 <div>
-                  <h1 className="text-2xl font-semibold text-mrh-navy">
+                  <h1 className="font-serif text-2xl font-semibold text-mrh-navy">
                     Schön, dass du da bist{coachie?.name ? `, ${coachie.name}` : ''}.
                   </h1>
                   <p className="mt-1 text-sm text-mrh-grey">Deine Programme im Überblick.</p>
@@ -232,7 +232,7 @@ export default function CoachieDashboardPage() {
             {aktivesProgramm && (
               <Link
                 to={`/coachie/programme/${aktivesProgramm.id}`}
-                className="flex items-center justify-center bg-mrh-orange py-4 text-sm font-semibold text-white transition hover:bg-mrh-orange-dark"
+                className="flex items-center justify-center bg-mrh-gold py-4 text-sm font-semibold text-white transition hover:bg-mrh-gold-dark"
               >
                 Programm fortsetzen
               </Link>
@@ -258,7 +258,7 @@ export default function CoachieDashboardPage() {
                   <span
                     className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                       begonnen
-                        ? 'bg-mrh-orange/15 text-mrh-orange-dark'
+                        ? 'bg-mrh-gold/15 text-mrh-gold-dark'
                         : 'bg-mrh-navy/10 text-mrh-navy'
                     }`}
                   >
@@ -272,7 +272,7 @@ export default function CoachieDashboardPage() {
                   </p>
                   <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-full rounded-full bg-mrh-orange transition-all"
+                      className="h-full rounded-full bg-mrh-gold transition-all"
                       style={{ width: `${prozent}%` }}
                     />
                   </div>
@@ -305,19 +305,19 @@ export default function CoachieDashboardPage() {
             {teaserProgramme.map((programm) => (
               <div
                 key={programm.id}
-                className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-5"
+                className="rounded-xl bg-mrh-black p-5 text-white"
               >
-                <span className="mb-3 inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                <span className="mb-3 inline-block rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-mrh-gold-soft">
                   Vorschau
                 </span>
-                <h3 className="mb-1 font-semibold text-slate-800">
+                <h3 className="mb-1 font-serif font-semibold text-white">
                   {programm.titel}
                 </h3>
-                <p className="mb-4 line-clamp-2 text-sm text-mrh-grey">
+                <p className="mb-4 line-clamp-2 text-sm text-white/70">
                   {programm.beschreibung}
                 </p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-mrh-navy">
+                  <span className="text-sm font-medium text-mrh-gold-soft">
                     {programm.preis_anzeigen
                       ? (formatPreis(programm.preis_cent) ?? 'Preis auf Anfrage')
                       : 'Preis auf Anfrage'}
@@ -325,7 +325,7 @@ export default function CoachieDashboardPage() {
                   {programm.oeffentlich_kaufbar && programm.slug && (
                     <a
                       href={`/kaufen/${programm.slug}`}
-                      className="rounded-lg border border-mrh-navy px-3 py-1.5 text-sm text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
+                      className="rounded-full bg-mrh-gold px-3 py-1.5 text-sm font-medium text-white transition hover:bg-mrh-gold-dark"
                     >
                       Mehr erfahren
                     </a>

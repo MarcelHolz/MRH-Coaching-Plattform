@@ -62,32 +62,32 @@ export default function KaufenPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-mrh-cream px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm">
-        {loading && <p className="text-mrh-grey">Lädt…</p>}
+      <div className="w-full max-w-md rounded-2xl bg-mrh-black p-8 text-white shadow-xl">
+        {loading && <p className="text-white/60">Lädt…</p>}
 
-        {!loading && error && <p className="text-red-600">{error}</p>}
+        {!loading && error && <p className="text-red-400">{error}</p>}
 
         {!loading && !error && programm && (
           <>
-            <h1 className="mb-2 text-2xl font-semibold text-mrh-navy">
+            <h1 className="mb-2 font-serif text-2xl font-semibold">
               {programm.titel}
             </h1>
             {programm.beschreibung && (
-              <p className="mb-6 text-sm text-mrh-grey">{programm.beschreibung}</p>
+              <p className="mb-6 text-sm text-white/70">{programm.beschreibung}</p>
             )}
             {programm.preis_cent != null && (
-              <p className="mb-6 text-3xl font-semibold text-mrh-navy">
+              <p className="mb-6 text-3xl font-semibold text-mrh-gold-soft">
                 {formatPreis(programm.preis_cent)}
               </p>
             )}
             <button
               onClick={handleKaufen}
               disabled={kaufLaeuft}
-              className="w-full rounded-lg bg-mrh-orange py-3 text-sm font-semibold text-white transition hover:bg-mrh-orange-dark disabled:opacity-50"
+              className="w-full rounded-full bg-gradient-to-br from-mrh-gold to-mrh-gold-dark py-3 text-sm font-semibold text-white shadow-lg shadow-mrh-gold-dark/40 transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
             >
               {kaufLaeuft ? 'Weiterleitung…' : 'Jetzt kaufen'}
             </button>
-            <p className="mt-4 text-xs text-mrh-grey">
+            <p className="mt-4 text-xs text-white/60">
               Weiterleitung zur sicheren Bezahlung über Stripe. Nach erfolgreicher
               Zahlung erhältst du eine E-Mail zum Festlegen deines Passworts.
             </p>

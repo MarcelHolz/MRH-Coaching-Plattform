@@ -1,12 +1,23 @@
 @import "tailwindcss";
 
+/* Akzentfarbe und Serif-Kursivschrift an das weiterentwickelte
+   MRH-Branding (mrh-beratung.de) angeglichen -- Werte 1:1 aus dem
+   kompilierten CSS der Live-Seite übernommen (app-DiRqed_w.css:
+   --color-gold/-deep/-soft, --color-black, --font-serif), nicht
+   geschätzt. Navy/Creme/Grey bleiben bewusst wie bisher (siehe
+   README-Abschnitt "Branding") -- die Live-Seite selbst nutzt inzwischen
+   gar kein Navy mehr (dort "ink" #121110 statt Navy), aber Navy soll
+   hier gezielt in Header/Struktur erhalten bleiben, kein 1:1-Abgleich. */
 @theme {
   --color-mrh-cream: #f7f3ec;
   --color-mrh-navy: #1f2a44;
   --color-mrh-navy-dark: #161d30;
-  --color-mrh-orange: #d9772e;
-  --color-mrh-orange-dark: #b26226;
+  --color-mrh-gold: #b9913f;
+  --color-mrh-gold-dark: #9c7831;
+  --color-mrh-gold-soft: #d9bc7a;
+  --color-mrh-black: #0c0b0a;
   --color-mrh-grey: #6b7280;
+  --font-serif: "Fraunces", Georgia, "Iowan Old Style", serif;
 }
 
 body {

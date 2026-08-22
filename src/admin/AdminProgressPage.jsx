@@ -10,7 +10,7 @@ const STATUS_LABEL = {
 const STATUS_FARBE = {
   offen: 'bg-slate-100 text-slate-600',
   in_bearbeitung: 'bg-amber-100 text-amber-700',
-  abgeschlossen: 'bg-mrh-orange/15 text-mrh-orange-dark',
+  abgeschlossen: 'bg-mrh-gold/15 text-mrh-gold-dark',
 }
 
 export default function AdminProgressPage() {

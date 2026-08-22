@@ -151,9 +151,27 @@ Farbpalette als Tailwind-Theme-Tokens in `src/index.css` (`@theme`):
 | Token | Wert | Verwendung |
 | --- | --- | --- |
 | `mrh-cream` | `#f7f3ec` | Seitenhintergrund |
-| `mrh-navy` / `mrh-navy-dark` | `#1f2a44` / `#161d30` | Header, Buttons, Überschriften |
-| `mrh-orange` / `mrh-orange-dark` | `#d9772e` / `#b26226` | Call-to-Action, Hervorhebungen, "abgeschlossen"-Badges |
+| `mrh-navy` / `mrh-navy-dark` | `#1f2a44` / `#161d30` | Header, Struktur, funktionale Buttons (Anmelden, Speichern, Navigation) |
+| `mrh-gold` / `mrh-gold-dark` / `mrh-gold-soft` | `#b9913f` / `#9c7831` / `#d9bc7a` | Akzentfarbe (vormals Orange) — Call-to-Action, Hervorhebungen, "abgeschlossen"-Badges |
+| `mrh-black` | `#0c0b0a` | Schwarze Kontrastflächen für Kauf-CTAs (Kaufseite, Programm-Upsell-Kacheln) |
 | `mrh-grey` | `#6b7280` | Metadaten, Zeitstempel, sekundäre Beschriftungen |
+
+**UX-Refresh nach mrh-beratung.de (Stand 22.08.2026):** Die Akzentfarbe
+wurde von Orange auf Gold/Bronze umgestellt und schwarze Kontrastflächen
+für Kauf-CTAs ergänzt, angeglichen an die inzwischen weiterentwickelte
+MRH-Website. Alle Werte stammen 1:1 aus dem kompilierten CSS der Live-Seite
+(`app-DiRqed_w.css`: `--color-gold`, `-deep`, `-soft`, `--color-black`),
+nicht geschätzt. **Navy bleibt bewusst erhalten** (Header, Struktur,
+funktionale Buttons) — die Live-Seite selbst nutzt inzwischen kein Navy
+mehr (dort "ink" `#121110` statt Navy), das ist hier also eine bewusste
+Abweichung, kein 1:1-Abgleich. Zusätzlich **Fraunces** (Serif, via Google
+Fonts in `index.html`, Schnitte 500/600 normal + italic) für
+Kernbotschaften/Zitate (`font-serif italic`, z. B. die Bildunterschrift auf
+Login-/Passwort-festlegen-Seite) sowie nicht-kursiv für Seiten-Überschriften
+(`font-serif`, z. B. Programmtitel) — Fließtext bleibt unverändert bei
+`system-ui`. Admin-Bereich bewusst zurückhaltend behandelt (nur die
+Akzentfarbe zieht über die bestehenden Badges mit, keine neuen
+Schwarz-/Serif-Elemente).
 
 **Bildmaterial**: `public/brand/` erwartet drei Dateien (Marcels Fotos von
 mrh-beratung.de), die aus Netzwerkgründen nicht automatisch geholt werden
@@ -163,7 +181,9 @@ Coachie-Dashboard und Programm-Detailseite normal, zeigen aber ein
 gebrochenes Bild-Icon statt Foto.
 
 **Einladungs-E-Mail**: `email-templates/invite.html` enthält das
-HTML-Template im MRH-Design (Creme/Navy/Orange). Unter Supabase Dashboard →
+HTML-Template im MRH-Design (Creme/Navy/Orange — noch nicht auf den
+Gold-Akzent umgestellt, da E-Mail-Templates nicht Teil dieses Refreshs
+waren; bei Bedarf separat nachziehen). Unter Supabase Dashboard →
 Authentication → Email Templates → **Invite user** den Inhalt der Datei
 einfügen (nutzt ausschließlich die Supabase-eigene Variable
 `{{ .ConfirmationURL }}`, keine weitere Konfiguration nötig).

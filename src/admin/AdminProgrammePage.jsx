@@ -175,7 +175,7 @@ export default function AdminProgrammePage() {
                       {programm.aktiv ? 'Aktiv' : 'Inaktiv'}
                     </span>
                     {programm.oeffentlich_kaufbar && (
-                      <span className="rounded-full bg-mrh-orange/15 px-2 py-0.5 text-xs font-medium text-mrh-orange-dark">
+                      <span className="rounded-full bg-mrh-gold/15 px-2 py-0.5 text-xs font-medium text-mrh-gold-dark">
                         Öffentlich kaufbar
                       </span>
                     )}

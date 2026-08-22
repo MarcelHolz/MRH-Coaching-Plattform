@@ -94,6 +94,11 @@ export default function SetPasswordPage() {
           alt=""
           className="h-full w-full object-cover"
         />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-mrh-navy/90 via-mrh-navy/40 to-transparent p-10 pt-24">
+          <p className="font-serif text-lg italic leading-snug text-white/90">
+            Der erste Schritt ist gemacht.
+          </p>
+        </div>
       </div>
     </div>
   )

@@ -150,7 +150,7 @@ export default function LoginPage() {
           className="h-full w-full object-cover"
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-mrh-navy/90 via-mrh-navy/40 to-transparent p-10 pt-24">
-          <p className="text-lg font-medium text-white">
+          <p className="font-serif text-lg italic leading-snug text-white/90">
             Klarheit ist der Anfang jeder guten Entscheidung.
           </p>
         </div>

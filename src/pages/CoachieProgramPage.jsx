@@ -13,7 +13,7 @@ const STATUS_OPTIONEN = [
 function StatusIcon({ status }) {
   if (status === 'abgeschlossen') {
     return (
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mrh-orange text-white">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mrh-gold text-white">
         <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
           <path
             fillRule="evenodd"
@@ -165,7 +165,7 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
                   className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                     auswahl === option.value
                       ? option.value === 'abgeschlossen'
-                        ? 'bg-mrh-orange text-white'
+                        ? 'bg-mrh-gold text-white'
                         : 'bg-mrh-navy text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
@@ -330,7 +330,7 @@ export default function CoachieProgramPage() {
       </Link>
 
       <div className="rounded-2xl bg-mrh-navy px-8 py-10 text-white">
-        <h1 className="text-2xl font-semibold">{programm.titel}</h1>
+        <h1 className="font-serif text-2xl font-semibold">{programm.titel}</h1>
         {programm.beschreibung && (
           <p className="mt-2 text-sm text-white/70">{programm.beschreibung}</p>
         )}
@@ -352,7 +352,7 @@ export default function CoachieProgramPage() {
               </p>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
                 <div
-                  className="h-full rounded-full bg-mrh-orange transition-all"
+                  className="h-full rounded-full bg-mrh-gold transition-all"
                   style={{ width: `${prozent}%` }}
                 />
               </div>
@@ -386,7 +386,7 @@ export default function CoachieProgramPage() {
                 <span
                   className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     begonnen
-                      ? 'bg-mrh-orange/15 text-mrh-orange-dark'
+                      ? 'bg-mrh-gold/15 text-mrh-gold-dark'
                       : 'bg-mrh-navy/10 text-mrh-navy'
                   }`}
                 >
