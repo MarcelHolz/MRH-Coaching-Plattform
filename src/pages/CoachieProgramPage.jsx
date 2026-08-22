@@ -548,9 +548,15 @@ export default function CoachieProgramPage() {
       {sessions.length === 0 ? (
         <p className="mt-6 text-mrh-grey">Noch keine Sessions hinterlegt.</p>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <div className="mb-6 mt-6">
+        // Eigene Grid-Items statt der früheren -mt-24-Überlappung: die
+        // Foto-/"Fortsetzen"-Karte steht am Desktop in einer eigenen
+        // Spalte (definierter gap-6-Abstand, keine Überlappung mehr
+        // möglich, unabhängig von der Länge des Einleitungstexts oben) und
+        // erscheint am Mobile dank order-* direkt nach Titel/
+        // Fortschrittsbalken, vor der Session-Liste.
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
+          <div className="order-1 lg:col-span-2">
+            <div className="mt-6">
               {zielText && (
                 <p className="mb-2 text-sm italic text-mrh-grey">
                   Dein Ziel: {zielText}
@@ -571,26 +577,10 @@ export default function CoachieProgramPage() {
                 />
               </div>
             </div>
-
-            <div className="space-y-3">
-              {sessions.map((session) => (
-                <SessionRow
-                  key={session.id}
-                  session={session}
-                  coachieId={coachie.id}
-                  status={statusMap[session.id]}
-                  onStatusChange={handleStatusChange}
-                  open={openId === session.id}
-                  onToggle={() =>
-                    setOpenId(openId === session.id ? null : session.id)
-                  }
-                />
-              ))}
-            </div>
           </div>
 
-          <div className="lg:col-span-1">
-            <div className="-mt-24 overflow-hidden rounded-xl bg-white shadow-lg">
+          <div className="order-2 lg:col-span-1 lg:row-span-2">
+            <div className="overflow-hidden rounded-xl bg-white shadow-lg">
               <img
                 src="/brand/marcel-hemd.webp"
                 alt=""
@@ -625,6 +615,24 @@ export default function CoachieProgramPage() {
                 </p>
                 <p className="text-sm text-slate-700">{sessions.length} Sessions</p>
               </div>
+            </div>
+          </div>
+
+          <div className="order-3 lg:col-span-2">
+            <div className="space-y-3">
+              {sessions.map((session) => (
+                <SessionRow
+                  key={session.id}
+                  session={session}
+                  coachieId={coachie.id}
+                  status={statusMap[session.id]}
+                  onStatusChange={handleStatusChange}
+                  open={openId === session.id}
+                  onToggle={() =>
+                    setOpenId(openId === session.id ? null : session.id)
+                  }
+                />
+              ))}
             </div>
           </div>
         </div>
