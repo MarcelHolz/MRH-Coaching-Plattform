@@ -301,12 +301,18 @@ export default function CoachieDashboardPage() {
                 >
                   <span
                     className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      begonnen
-                        ? 'bg-mrh-gold/15 text-mrh-gold-dark'
-                        : 'bg-mrh-navy/10 text-mrh-navy'
+                      prozent === 100
+                        ? 'bg-mrh-gold text-white'
+                        : begonnen
+                          ? 'bg-mrh-gold/15 text-mrh-gold-dark'
+                          : 'bg-mrh-navy/10 text-mrh-navy'
                     }`}
                   >
-                    {begonnen ? 'Begonnen' : 'Programm starten'}
+                    {prozent === 100
+                      ? 'Abgeschlossen'
+                      : begonnen
+                        ? 'Begonnen'
+                        : 'Programm starten'}
                   </span>
                   <h3 className="mb-1 font-semibold text-slate-800">
                     {programm.titel}

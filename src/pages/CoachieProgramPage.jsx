@@ -210,6 +210,7 @@ export default function CoachieProgramPage() {
   const [zielPromptAusgeblendet, setZielPromptAusgeblendet] = useState(false)
   const [zielEingabe, setZielEingabe] = useState('')
   const [zielSpeichert, setZielSpeichert] = useState(false)
+  const [erfolgAnzeigen, setErfolgAnzeigen] = useState(false)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -320,7 +321,27 @@ export default function CoachieProgramPage() {
   }, [autoStartErledigt, loading, sessions, statusMap, searchParams])
 
   function handleStatusChange(sessionId, newStatus) {
-    setStatusMap((prev) => ({ ...prev, [sessionId]: newStatus }))
+    setStatusMap((prev) => {
+      const updated = { ...prev, [sessionId]: newStatus }
+
+      // Abschluss-Moment (Punkt 5): Trigger ist ausschließlich der
+      // Übergang von <100% auf 100% Fortschritt in diesem Moment, kein
+      // eigenes DB-Feld -- ein bereits vorher abgeschlossenes Programm
+      // löst beim erneuten Öffnen die Ansicht daher nicht erneut aus.
+      if (sessions.length > 0) {
+        const vorher = sessions.filter(
+          (s) => prev[s.id]?.status === 'abgeschlossen',
+        ).length
+        const nachher = sessions.filter(
+          (s) => updated[s.id]?.status === 'abgeschlossen',
+        ).length
+        if (vorher < sessions.length && nachher === sessions.length) {
+          setErfolgAnzeigen(true)
+        }
+      }
+
+      return updated
+    })
   }
 
   async function handleZielSpeichern(event) {
@@ -352,6 +373,43 @@ export default function CoachieProgramPage() {
 
   if (error) {
     return <p className="text-red-600">{error}</p>
+  }
+
+  if (erfolgAnzeigen) {
+    return (
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <span className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-mrh-gold text-white">
+          <svg viewBox="0 0 20 20" fill="currentColor" className="h-8 w-8">
+            <path
+              fillRule="evenodd"
+              d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.8 6.8-6.8a1 1 0 0 1 1.4 0Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </span>
+        <h1 className="mb-3 font-serif text-3xl font-semibold text-mrh-navy">
+          Geschafft{coachie?.name ? `, ${coachie.name}` : ''}!
+        </h1>
+        <p className="mb-6 text-mrh-grey">
+          Du hast {programm?.titel} vollständig abgeschlossen -- herzlichen
+          Glückwunsch.
+        </p>
+        {zielText && (
+          <div className="mb-8 rounded-xl bg-mrh-navy/5 p-5 text-left">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-mrh-grey">
+              Dein Ziel war
+            </p>
+            <p className="font-serif italic text-mrh-navy">&bdquo;{zielText}&ldquo;</p>
+          </div>
+        )}
+        <Link
+          to="/coachie"
+          className="inline-block rounded-lg bg-mrh-navy px-6 py-3 text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
+        >
+          Zurück zum Dashboard
+        </Link>
+      </div>
+    )
   }
 
   const abgeschlossen = sessions.filter(
@@ -479,12 +537,18 @@ export default function CoachieProgramPage() {
               <div className="p-5">
                 <span
                   className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    begonnen
-                      ? 'bg-mrh-gold/15 text-mrh-gold-dark'
-                      : 'bg-mrh-navy/10 text-mrh-navy'
+                    prozent === 100
+                      ? 'bg-mrh-gold text-white'
+                      : begonnen
+                        ? 'bg-mrh-gold/15 text-mrh-gold-dark'
+                        : 'bg-mrh-navy/10 text-mrh-navy'
                   }`}
                 >
-                  {begonnen ? 'Begonnen' : 'Programm starten'}
+                  {prozent === 100
+                    ? 'Abgeschlossen'
+                    : begonnen
+                      ? 'Begonnen'
+                      : 'Programm starten'}
                 </span>
                 {naechsteSession && (
                   <button
