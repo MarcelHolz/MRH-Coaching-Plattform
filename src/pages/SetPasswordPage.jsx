@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { invite, supabase } from '../lib/supabaseClient'
+import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
 
 export default function SetPasswordPage() {
   const navigate = useNavigate()
@@ -31,7 +31,7 @@ export default function SetPasswordPage() {
       return
     }
 
-    invite.active = false
+    pendingPasswordSetup.active = false
     navigate('/coachie', { replace: true })
   }
 

@@ -96,6 +96,29 @@ vercel dev
 4. Unter **Programme** die zugehörigen Sessions (inkl. Video, Workbook,
    Materialien) anlegen und aktivieren.
 
+### Passwort vergessen / zurücksetzen
+
+Der Einladungslink (`inviteUserByEmail`) funktioniert nur einmalig, bevor
+ein Coachie bereits ein eigenes Passwort gesetzt hat — "Einladung erneut
+senden" hilft danach nicht mehr weiter. Für aktive Coachies gibt es
+stattdessen zwei Wege, denselben `supabase.auth.resetPasswordForEmail`-
+Mechanismus auszulösen (Supabase-Standard-Passwort-Reset, kein
+Custom-Code-Pfad):
+
+- **Coachie selbst:** Login-Seite → "Passwort vergessen?" → E-Mail
+  eingeben. Bewusst dieselbe Bestätigungsmeldung unabhängig davon, ob die
+  E-Mail existiert (verhindert, registrierte Adressen über das
+  Login-Formular zu erraten).
+- **Admin-Fallback:** **Coachies** → bei einem bereits aktiven Coachie
+  "Passwort-Reset senden".
+
+Beide Wege führen zur bereits vorhandenen `/passwort-festlegen`-Seite
+(`SetPasswordPage`) — sie war zuvor nur für Einladungslinks (`type=invite`
+im URL-Hash) vorgesehen, erkennt jetzt zusätzlich Passwort-Reset-Links
+(`type=recovery`) und schickt den Coachie in beiden Fällen dorthin, statt
+direkt eingeloggt ins Dashboard (siehe `pendingPasswordSetup` in
+`src/lib/supabaseClient.js`, vormals `invite`).
+
 ### `APP_URL` korrekt setzen (Einladungslinks)
 
 `api/admin/coachies.js` (Standard- und `?resource=resend`-Zweig) und
@@ -161,6 +184,11 @@ weiterhin ausschließlich manuell zugeordnet.
    RLS-Policies für abgelaufenen Zugriff). Wurde gegen den aktuellen
    Live-Stand von Schema und Policies geprüft, aber bewusst nicht
    automatisch angewendet — bitte vor dem Ausführen selbst durchlesen.
+   Diese Policies sind live geprüft aktiv (`programme`/`sessions`/
+   `session_material` blenden abgelaufene Zuordnungen bereits
+   serverseitig aus, nicht nur im Frontend).
+2. `supabase_migrations/standard_zugriffsmonate.sql` ausführen (neue,
+   optionale Spalte `programme.standard_zugriffsmonate`).
 2. Für jedes zu verkaufende Programm in Stripe ein **Produkt + Price**
    anlegen (Modus **Payment**, nicht Subscription — Einmalzahlung).
    Stripe Invoicing/automatische Zahlungsbelege aktivieren.
@@ -192,13 +220,21 @@ Webhook `checkout.session.completed` → neuer Coachie wird angelegt und
 erhält dieselbe Einladungs-E-Mail wie beim manuellen Einladen (bereits
 bestehende Coachies bekommen keine erneute Einladung, nur die neue
 Zuordnung) → `coachie_programme.zugriff_bis` wird automatisch auf
-Kaufdatum + 36 Monate gesetzt.
+Kaufdatum + `programme.standard_zugriffsmonate` gesetzt, sofern das
+Programm einen Wert dafür hat (einstellbar im Admin-Bereich unter
+**Programme → Verkauf einrichten** → "Standardzugriff (Monate)"). Ohne
+gesetzten Wert bleibt der Zugriff auch bei automatischen Käufen
+unbegrenzt.
 
 Nach Ablauf von `zugriff_bis` blendet die Datenbank (nicht nur das
 Frontend) das Programm inklusive Sessions und Materialien für diesen
 Coachie automatisch aus; er sieht stattdessen einen Hinweis mit
 Kontaktmöglichkeit für eine Verlängerung. Manuell von Marcel zugeordnete
 Programme haben `zugriff_bis = NULL` und bleiben unbegrenzt zugänglich.
+Marcel kann `zugriff_bis` pro Zuordnung jederzeit manuell einsehen und
+anpassen (**Coachies** → bei der jeweiligen Programm-Zuordnung
+"Bearbeiten", z. B. für eine Kulanzverlängerung) — unabhängig davon, ob
+der Wert automatisch oder gar nicht gesetzt wurde.
 
 ## Teaser-Programme
 
@@ -225,13 +261,20 @@ Adresse verwendet wurde). Verknüpfte Ergebnisse werden einmalig als
 Kopie gespeichert, nicht bei jedem Aufruf neu abgefragt.
 
 Jede Kachel zeigt zunächst nur den dominanten Typ; über "Vollständige
-Auswertung anzeigen" öffnet sich ein Diverging-Balkendiagramm der vier
-Punktewerte (Dominant/Kreativ/Sachlich/Harmonisch — Werte können negativ
-sein, deshalb bewusst kein Radardiagramm) sowie, beim
-Coaching-Vorbereitungstest zusätzlich, eine Block-für-Block-Übersicht
-(je Block: am meisten/am wenigsten gewählter Typ). Beides steckt bereits
-vollständig in `ergebnis_daten` (`punkte_*`- bzw. `block_antworten`-Feld) —
-keine zusätzliche Migration nötig. **Nicht** enthalten sind die
+Auswertung anzeigen" öffnet sich ein Diverging-Säulendiagramm
+(`src/components/TestergebnisChart.jsx`) der vier Punktewerte
+(Dominant/Kreativ/Sachlich/Harmonisch — Werte können negativ sein, deshalb
+bewusst kein Radardiagramm, das eine nicht-negative Skala ab der Mitte
+voraussetzt), alle vier Säulen von einer gemeinsamen, durchgehenden
+Nulllinie aus. Die Farben entsprechen der Typ-Zuordnung der ursprünglichen
+Kurztest-App (`TRAIT_COLOR` in `src/lib/testergebnisse.js`, DISG-Konvention:
+Dominant=Rot, Kreativ=Gelb, Sachlich=Blau, Harmonisch=Grün) — Farbe codiert
+hier die Typ-Identität, nicht das Vorzeichen; das Vorzeichen liest man an
+Richtung (nach oben/unten) und direktem Zahlenlabel ab. Zusätzlich, beim
+Coaching-Vorbereitungstest, eine Block-für-Block-Übersicht (je Block: am
+meisten/am wenigsten gewählter Typ). Beides steckt bereits vollständig in
+`ergebnis_daten` (`punkte_*`- bzw. `block_antworten`-Feld) — keine
+zusätzliche Migration nötig. **Nicht** enthalten sind die
 Fließtext-Interpretationen aus dem per E-Mail versendeten PDF-Bericht
 (die werden dort offenbar zur Versandzeit generiert und nirgends
 persistiert, auch nicht im Profil-Quiz-Projekt selbst) — das PDF lässt

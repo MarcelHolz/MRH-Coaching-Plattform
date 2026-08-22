@@ -144,6 +144,35 @@ async function handleResend(req, res, supabase) {
   res.status(200).json({ ok: true })
 }
 
+async function handlePasswortReset(req, res, supabase) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
+  const { email } = req.body ?? {}
+
+  if (!email) {
+    res.status(400).json({ error: 'email ist erforderlich.' })
+    return
+  }
+
+  const appUrl =
+    process.env.APP_URL ||
+    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${appUrl}/passwort-festlegen`,
+  })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ ok: true })
+}
+
 async function handleAssignments(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('coachie_programme').select('*')
@@ -186,6 +215,38 @@ async function handleAssignments(req, res, supabase) {
     return
   }
 
+  if (req.method === 'PATCH') {
+    const { id, zugriff_bis } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    // zugriff_bis darf explizit auf null gesetzt werden (Kulanz: Ablauf
+    // aufheben) -- deshalb Prüfung auf "im Body vorhanden", nicht auf
+    // Wahrheitswert.
+    if (!('zugriff_bis' in (req.body ?? {}))) {
+      res.status(400).json({ error: 'zugriff_bis ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('coachie_programme')
+      .update({ zugriff_bis })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ assignment: data })
+    return
+  }
+
   if (req.method === 'DELETE') {
     const { id } = req.query
 
@@ -219,6 +280,11 @@ export default async function handler(req, res) {
 
   if (resource === 'resend') {
     await handleResend(req, res, supabase)
+    return
+  }
+
+  if (resource === 'passwort-reset') {
+    await handlePasswortReset(req, res, supabase)
     return
   }
 

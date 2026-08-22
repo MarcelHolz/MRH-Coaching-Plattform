@@ -19,8 +19,13 @@ export default function AdminCoachiesPage() {
 
   const [resendingId, setResendingId] = useState(null)
   const [resendMessage, setResendMessage] = useState('')
+  const [resetSendingId, setResetSendingId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+
+  const [editingZugriffId, setEditingZugriffId] = useState(null)
+  const [editingZugriffValue, setEditingZugriffValue] = useState('')
+  const [zugriffSpeichertId, setZugriffSpeichertId] = useState(null)
 
   async function loadAll() {
     setLoading(true)
@@ -112,6 +117,61 @@ export default function AdminCoachiesPage() {
     } finally {
       setResendingId(null)
     }
+  }
+
+  async function handlePasswortReset(coachie) {
+    setError('')
+    setResendMessage('')
+    setResetSendingId(coachie.id)
+    try {
+      await adminFetch('/api/admin/coachies?resource=passwort-reset', {
+        method: 'POST',
+        body: JSON.stringify({ email: coachie.email }),
+      })
+      setResendMessage(`Passwort-Reset-Link an ${coachie.email} gesendet.`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setResetSendingId(null)
+    }
+  }
+
+  function startZugriffEdit(zuordnung) {
+    setEditingZugriffId(zuordnung.id)
+    setEditingZugriffValue(
+      zuordnung.zugriff_bis ? zuordnung.zugriff_bis.slice(0, 10) : '',
+    )
+  }
+
+  async function handleZugriffBisSave(zuordnungId) {
+    setError('')
+    setZugriffSpeichertId(zuordnungId)
+    try {
+      await adminFetch('/api/admin/coachies?resource=assignments', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          id: zuordnungId,
+          zugriff_bis: editingZugriffValue
+            ? new Date(editingZugriffValue).toISOString()
+            : null,
+        }),
+      })
+      setEditingZugriffId(null)
+      await loadAll()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setZugriffSpeichertId(null)
+    }
+  }
+
+  function formatZugriffBis(iso) {
+    if (!iso) return 'unbegrenzt'
+    return new Date(iso).toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
   }
 
   async function handleDelete(coachie) {
@@ -263,6 +323,15 @@ export default function AdminCoachiesPage() {
                         : 'Einladung erneut senden'}
                     </button>
                     <button
+                      onClick={() => handlePasswortReset(coachie)}
+                      disabled={resetSendingId === coachie.id}
+                      className="text-sm text-mrh-navy hover:underline disabled:opacity-50"
+                    >
+                      {resetSendingId === coachie.id
+                        ? 'Sendet…'
+                        : 'Passwort-Reset senden'}
+                    </button>
+                    <button
                       onClick={() => handleDelete(coachie)}
                       disabled={deletingId === coachie.id}
                       className="text-sm text-red-600 hover:underline disabled:opacity-50"
@@ -271,24 +340,66 @@ export default function AdminCoachiesPage() {
                     </button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-1.5">
                   {eigeneZuordnungen.map((z) => {
                     const programm = programme.find(
                       (p) => p.id === z.programm_id,
                     )
+                    const bearbeitetGerade = editingZugriffId === z.id
                     return (
-                      <span
+                      <div
                         key={z.id}
-                        className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600"
+                        className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-600"
                       >
-                        {programm?.titel ?? 'Unbekannt'}
+                        <span className="font-medium text-slate-700">
+                          {programm?.titel ?? 'Unbekannt'}
+                        </span>
+                        {bearbeitetGerade ? (
+                          <>
+                            <input
+                              type="date"
+                              value={editingZugriffValue}
+                              onChange={(e) =>
+                                setEditingZugriffValue(e.target.value)
+                              }
+                              className="rounded border border-slate-300 px-2 py-0.5 text-xs focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                            />
+                            <button
+                              onClick={() => handleZugriffBisSave(z.id)}
+                              disabled={zugriffSpeichertId === z.id}
+                              className="text-mrh-navy hover:underline disabled:opacity-50"
+                            >
+                              {zugriffSpeichertId === z.id
+                                ? 'Speichert…'
+                                : 'Speichern'}
+                            </button>
+                            <button
+                              onClick={() => setEditingZugriffId(null)}
+                              className="text-slate-400 hover:underline"
+                            >
+                              Abbrechen
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-slate-400">
+                              Zugriff bis: {formatZugriffBis(z.zugriff_bis)}
+                            </span>
+                            <button
+                              onClick={() => startZugriffEdit(z)}
+                              className="text-mrh-navy hover:underline"
+                            >
+                              Bearbeiten
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => handleUnassign(z.id)}
-                          className="text-slate-400 hover:text-red-600"
+                          className="ml-auto text-slate-400 hover:text-red-600"
                         >
-                          ×
+                          × Zuordnung entfernen
                         </button>
-                      </span>
+                      </div>
                     )
                   })}
                   {eigeneZuordnungen.length === 0 && (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { invite } from '../lib/supabaseClient'
+import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
@@ -11,8 +11,13 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  const [zeigeVergessen, setZeigeVergessen] = useState(false)
+  const [vergessenEmail, setVergessenEmail] = useState('')
+  const [vergessenSubmitting, setVergessenSubmitting] = useState(false)
+  const [vergessenGesendet, setVergessenGesendet] = useState(false)
+
   if (isAuthenticated) {
-    const redirectTo = invite.active
+    const redirectTo = pendingPasswordSetup.active
       ? '/passwort-festlegen'
       : (location.state?.from ?? '/coachie')
     return <Navigate to={redirectTo} replace />
@@ -29,6 +34,19 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function handleVergessenSubmit(event) {
+    event.preventDefault()
+    setVergessenSubmitting(true)
+    // Bewusst keine Fehlermeldung bei unbekannter E-Mail -- immer dieselbe
+    // Bestätigung, damit sich nicht per Login-Formular herausfinden lässt,
+    // welche E-Mail-Adressen als Coachie registriert sind.
+    await supabase.auth.resetPasswordForEmail(vergessenEmail, {
+      redirectTo: `${window.location.origin}/passwort-festlegen`,
+    })
+    setVergessenSubmitting(false)
+    setVergessenGesendet(true)
   }
 
   return (
@@ -76,6 +94,52 @@ export default function LoginPage() {
               {submitting ? 'Anmelden…' : 'Anmelden'}
             </button>
           </form>
+
+          {!zeigeVergessen ? (
+            <button
+              onClick={() => setZeigeVergessen(true)}
+              className="mt-4 text-sm text-mrh-navy hover:underline"
+            >
+              Passwort vergessen?
+            </button>
+          ) : vergessenGesendet ? (
+            <p className="mt-4 text-sm text-slate-600">
+              Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde
+              gerade ein Link zum Zurücksetzen des Passworts verschickt.
+              Bitte E-Mails (auch Spam-Ordner) prüfen.
+            </p>
+          ) : (
+            <form onSubmit={handleVergessenSubmit} className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  E-Mail für Passwort-Reset
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={vergessenEmail}
+                  onChange={(e) => setVergessenEmail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={vergessenSubmitting}
+                  className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
+                >
+                  {vergessenSubmitting ? 'Sendet…' : 'Link senden'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZeigeVergessen(false)}
+                  className="text-sm text-slate-500 hover:underline"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 

@@ -127,15 +127,30 @@ export default async function handler(req, res) {
     coachieId = neuerCoachie.id
   }
 
-  const zugriffBis = new Date()
-  zugriffBis.setMonth(zugriffBis.getMonth() + 36)
+  const { data: programm, error: programmError } = await supabase
+    .from('programme')
+    .select('standard_zugriffsmonate')
+    .eq('id', programmId)
+    .maybeSingle()
+
+  if (programmError) {
+    res.status(500).json({ error: programmError.message })
+    return
+  }
+
+  let zugriffBis = null
+  if (programm?.standard_zugriffsmonate) {
+    const datum = new Date()
+    datum.setMonth(datum.getMonth() + programm.standard_zugriffsmonate)
+    zugriffBis = datum.toISOString()
+  }
 
   const { error: assignmentError } = await supabase.from('coachie_programme').upsert(
     {
       coachie_id: coachieId,
       programm_id: programmId,
       zugewiesen_am: new Date().toISOString(),
-      zugriff_bis: zugriffBis.toISOString(),
+      zugriff_bis: zugriffBis,
     },
     { onConflict: 'coachie_id,programm_id' },
   )

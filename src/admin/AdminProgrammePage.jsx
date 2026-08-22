@@ -66,6 +66,7 @@ export default function AdminProgrammePage() {
   const [editKaufbar, setEditKaufbar] = useState(false)
   const [editTeaser, setEditTeaser] = useState(false)
   const [editPreisAnzeigen, setEditPreisAnzeigen] = useState(true)
+  const [editZugriffsmonate, setEditZugriffsmonate] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
@@ -78,6 +79,11 @@ export default function AdminProgrammePage() {
     setEditKaufbar(programm.oeffentlich_kaufbar ?? false)
     setEditTeaser(programm.teaser_aktiv ?? false)
     setEditPreisAnzeigen(programm.preis_anzeigen ?? true)
+    setEditZugriffsmonate(
+      programm.standard_zugriffsmonate != null
+        ? String(programm.standard_zugriffsmonate)
+        : '',
+    )
   }
 
   function cancelEdit() {
@@ -99,6 +105,9 @@ export default function AdminProgrammePage() {
           oeffentlich_kaufbar: editKaufbar,
           teaser_aktiv: editTeaser,
           preis_anzeigen: editPreisAnzeigen,
+          standard_zugriffsmonate: editZugriffsmonate
+            ? Math.round(Number(editZugriffsmonate))
+            : null,
         }),
       })
       setEditingId(null)
@@ -260,6 +269,24 @@ export default function AdminProgrammePage() {
                       onChange={(e) => setEditSlug(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Standardzugriff (Monate)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="leer = unbegrenzt"
+                      value={editZugriffsmonate}
+                      onChange={(e) => setEditZugriffsmonate(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                    <p className="mt-1 text-xs text-slate-400">
+                      Gilt nur für automatische Käufe über /kaufen/…; manuell
+                      zugeordnete Programme bleiben unbegrenzt.
+                    </p>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
                     <input

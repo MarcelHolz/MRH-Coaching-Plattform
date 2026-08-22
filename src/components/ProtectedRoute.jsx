@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { invite } from '../lib/supabaseClient'
+import { pendingPasswordSetup } from '../lib/supabaseClient'
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth()
@@ -18,7 +18,7 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />
   }
 
-  if (invite.active && location.pathname !== '/passwort-festlegen') {
+  if (pendingPasswordSetup.active && location.pathname !== '/passwort-festlegen') {
     return <Navigate to="/passwort-festlegen" replace />
   }
 
