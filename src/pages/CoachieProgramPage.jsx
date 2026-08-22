@@ -206,6 +206,10 @@ export default function CoachieProgramPage() {
   const [error, setError] = useState('')
   const [openId, setOpenId] = useState(null)
   const [autoStartErledigt, setAutoStartErledigt] = useState(false)
+  const [zielText, setZielText] = useState(null)
+  const [zielPromptAusgeblendet, setZielPromptAusgeblendet] = useState(false)
+  const [zielEingabe, setZielEingabe] = useState('')
+  const [zielSpeichert, setZielSpeichert] = useState(false)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -271,6 +275,13 @@ export default function CoachieProgramPage() {
         statusListe = statusData ?? []
       }
 
+      const { data: zuordnungData } = await supabase
+        .from('coachie_programme')
+        .select('ziel_text')
+        .eq('coachie_id', coachie.id)
+        .eq('programm_id', programId)
+        .maybeSingle()
+
       if (!cancelled) {
         setProgramm(programmData)
         setSessions(
@@ -282,6 +293,7 @@ export default function CoachieProgramPage() {
         setStatusMap(
           Object.fromEntries(statusListe.map((s) => [s.session_id, s])),
         )
+        setZielText(zuordnungData?.ziel_text ?? null)
         setLoading(false)
       }
     }
@@ -311,6 +323,29 @@ export default function CoachieProgramPage() {
     setStatusMap((prev) => ({ ...prev, [sessionId]: newStatus }))
   }
 
+  async function handleZielSpeichern(event) {
+    event.preventDefault()
+    const wert = zielEingabe.trim()
+    setZielSpeichert(true)
+
+    const { error: zielError } = await supabase
+      .from('coachie_programme')
+      .update({ ziel_text: wert || null })
+      .eq('coachie_id', coachie.id)
+      .eq('programm_id', programId)
+
+    setZielSpeichert(false)
+
+    if (!zielError) {
+      setZielText(wert || null)
+      setZielPromptAusgeblendet(true)
+    }
+  }
+
+  function handleZielUeberspringen() {
+    setZielPromptAusgeblendet(true)
+  }
+
   if (loading) {
     return <p className="text-mrh-grey">Lädt…</p>
   }
@@ -335,6 +370,7 @@ export default function CoachieProgramPage() {
   const naechsteSession = sessions.find(
     (s) => statusMap[s.id]?.status !== 'abgeschlossen',
   )
+  const zielPromptSichtbar = !begonnen && !zielText && !zielPromptAusgeblendet
 
   return (
     <div>
@@ -352,12 +388,54 @@ export default function CoachieProgramPage() {
         )}
       </div>
 
+      {zielPromptSichtbar && (
+        <form
+          onSubmit={handleZielSpeichern}
+          className="mt-6 rounded-xl border border-mrh-gold/30 bg-mrh-gold/10 p-5"
+        >
+          <p className="mb-2 font-serif text-lg font-semibold text-mrh-navy">
+            Was soll sich für dich verändert haben, wenn du hier fertig bist?
+          </p>
+          <p className="mb-3 text-sm text-mrh-grey">
+            Ganz kurz reicht. Optional -- du kannst auch ohne Antwort starten.
+          </p>
+          <textarea
+            value={zielEingabe}
+            onChange={(e) => setZielEingabe(e.target.value)}
+            placeholder="Dein Ziel (optional)"
+            rows={2}
+            className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+          />
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              disabled={zielSpeichert}
+              className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
+            >
+              {zielSpeichert ? 'Speichert…' : 'Ziel speichern & starten'}
+            </button>
+            <button
+              type="button"
+              onClick={handleZielUeberspringen}
+              className="text-sm text-mrh-grey hover:underline"
+            >
+              Überspringen
+            </button>
+          </div>
+        </form>
+      )}
+
       {sessions.length === 0 ? (
         <p className="mt-6 text-mrh-grey">Noch keine Sessions hinterlegt.</p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="mb-6 mt-6">
+              {zielText && (
+                <p className="mb-2 text-sm italic text-mrh-grey">
+                  Dein Ziel: {zielText}
+                </p>
+              )}
               {letzteAktivitaetText && (
                 <p className="text-xs text-mrh-grey">
                   Letzte Aktivität {letzteAktivitaetText}
