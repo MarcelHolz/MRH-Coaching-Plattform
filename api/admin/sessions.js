@@ -112,7 +112,10 @@ async function handleMaterials(req, res, supabase) {
   if (req.method === 'GET') {
     const { session_id } = req.query
 
-    let query = supabase.from('session_material').select('*')
+    let query = supabase
+      .from('session_material')
+      .select('*')
+      .order('reihenfolge', { ascending: true })
 
     if (session_id) {
       query = query.eq('session_id', session_id)
@@ -130,7 +133,7 @@ async function handleMaterials(req, res, supabase) {
   }
 
   if (req.method === 'POST') {
-    const { session_id, titel, datei_url, typ } = req.body ?? {}
+    const { session_id, titel, datei_url, typ, reihenfolge } = req.body ?? {}
 
     if (!session_id || !titel || !datei_url) {
       res
@@ -141,7 +144,7 @@ async function handleMaterials(req, res, supabase) {
 
     const { data, error } = await supabase
       .from('session_material')
-      .insert({ session_id, titel, datei_url, typ })
+      .insert({ session_id, titel, datei_url, typ, reihenfolge: reihenfolge ?? 0 })
       .select()
       .single()
 
@@ -151,6 +154,30 @@ async function handleMaterials(req, res, supabase) {
     }
 
     res.status(201).json({ material: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, ...updates } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('session_material')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ material: data })
     return
   }
 

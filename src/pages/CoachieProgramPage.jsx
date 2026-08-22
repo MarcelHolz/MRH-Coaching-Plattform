@@ -332,6 +332,10 @@ export default function CoachieProgramPage() {
         .select('*, session_material(*)')
         .eq('programm_id', programId)
         .order('reihenfolge', { ascending: true })
+        .order('reihenfolge', {
+          ascending: true,
+          referencedTable: 'session_material',
+        })
 
       if (sessionsError) {
         if (!cancelled) {
