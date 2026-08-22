@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { formatPreis } from '../lib/preis'
@@ -53,12 +53,14 @@ function formatDatum(iso) {
 }
 
 export default function CoachieDashboardPage() {
-  const { coachie } = useAuth()
+  const { coachie, istErsterLogin, konsumiereErstenLogin } = useAuth()
   const [programme, setProgramme] = useState([])
   const [teaserProgramme, setTeaserProgramme] = useState([])
   const [abgelaufeneProgramme, setAbgelaufeneProgramme] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [ersterLoginRedirect, setErsterLoginRedirect] = useState(null)
+  const [naechsterSchrittProgramm, setNaechsterSchrittProgramm] = useState(null)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -71,7 +73,9 @@ export default function CoachieDashboardPage() {
 
       const { data: zuordnungen, error: zuordnungenError } = await supabase
         .from('coachie_programme')
-        .select('programm_id, zugriff_bis, programme(id, titel, beschreibung, aktiv)')
+        .select(
+          'programm_id, zugriff_bis, zugewiesen_am, programme(id, titel, beschreibung, aktiv)',
+        )
         .eq('coachie_id', coachie.id)
 
       if (zuordnungenError) {
@@ -93,7 +97,11 @@ export default function CoachieDashboardPage() {
 
       const aktiveProgramme = (zuordnungen ?? [])
         .filter((z) => z.programme && z.programme.aktiv)
-        .map((z) => ({ ...z.programme, zugriff_bis: z.zugriff_bis }))
+        .map((z) => ({
+          ...z.programme,
+          zugriff_bis: z.zugriff_bis,
+          zugewiesen_am: z.zugewiesen_am,
+        }))
 
       const zugeordneteIds = new Set(
         (zuordnungen ?? []).map((z) => z.programm_id),
@@ -153,6 +161,24 @@ export default function CoachieDashboardPage() {
         setProgramme(programmeMitFortschritt)
         setTeaserProgramme(teaserOhneEigene)
         setAbgelaufeneProgramme(abgelaufen)
+
+        // Aktives Onboarding: nur beim allerersten Login auswerten, danach
+        // sofort konsumieren, damit spätere Besuche des Dashboards (z. B.
+        // über "Zurück zur Übersicht") nicht erneut umgeleitet werden.
+        if (istErsterLogin) {
+          if (programmeMitFortschritt.length === 1) {
+            setErsterLoginRedirect(
+              `/coachie/programme/${programmeMitFortschritt[0].id}?start=1`,
+            )
+          } else if (programmeMitFortschritt.length > 1) {
+            const zuletztZugeordnet = [...programmeMitFortschritt].sort((a, b) =>
+              (b.zugewiesen_am ?? '').localeCompare(a.zugewiesen_am ?? ''),
+            )[0]
+            setNaechsterSchrittProgramm(zuletztZugeordnet)
+          }
+          konsumiereErstenLogin()
+        }
+
         setLoading(false)
       }
     }
@@ -163,6 +189,10 @@ export default function CoachieDashboardPage() {
       cancelled = true
     }
   }, [coachie])
+
+  if (ersterLoginRedirect) {
+    return <Navigate to={ersterLoginRedirect} replace />
+  }
 
   if (loading) {
     return <p className="text-mrh-grey">Lädt…</p>
@@ -224,7 +254,21 @@ export default function CoachieDashboardPage() {
                   <h1 className="font-serif text-2xl font-semibold text-mrh-navy">
                     Schön, dass du da bist{coachie?.name ? `, ${coachie.name}` : ''}.
                   </h1>
-                  <p className="mt-1 text-sm text-mrh-grey">Deine Programme im Überblick.</p>
+                  <p className="mt-1 text-sm text-mrh-grey">
+                    {naechsterSchrittProgramm ? (
+                      <>
+                        Dein nächster Schritt:{' '}
+                        <Link
+                          to={`/coachie/programme/${naechsterSchrittProgramm.id}`}
+                          className="font-medium text-mrh-gold-dark hover:underline"
+                        >
+                          {naechsterSchrittProgramm.titel}
+                        </Link>
+                      </>
+                    ) : (
+                      'Deine Programme im Überblick.'
+                    )}
+                  </p>
                 </div>
               </div>
               <ProgressRing prozent={gesamtProzent} />

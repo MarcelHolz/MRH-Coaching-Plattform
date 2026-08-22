@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
@@ -198,12 +198,14 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
 export default function CoachieProgramPage() {
   const { programId } = useParams()
   const { coachie } = useAuth()
+  const [searchParams] = useSearchParams()
   const [programm, setProgramm] = useState(null)
   const [sessions, setSessions] = useState([])
   const [statusMap, setStatusMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [openId, setOpenId] = useState(null)
+  const [autoStartErledigt, setAutoStartErledigt] = useState(false)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -290,6 +292,20 @@ export default function CoachieProgramPage() {
       cancelled = true
     }
   }, [coachie, programId])
+
+  useEffect(() => {
+    // Aktives Onboarding (Punkt 1): direkter Sprung in die erste offene
+    // Session, wenn von der Dashboard-Weiterleitung mit ?start=1 verlinkt.
+    if (autoStartErledigt || loading) return
+    if (searchParams.get('start') !== '1') return
+    if (sessions.length === 0) return
+
+    const ziel =
+      sessions.find((s) => statusMap[s.id]?.status !== 'abgeschlossen') ??
+      sessions[0]
+    setOpenId(ziel.id)
+    setAutoStartErledigt(true)
+  }, [autoStartErledigt, loading, sessions, statusMap, searchParams])
 
   function handleStatusChange(sessionId, newStatus) {
     setStatusMap((prev) => ({ ...prev, [sessionId]: newStatus }))

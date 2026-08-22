@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [coachie, setCoachie] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [istErsterLogin, setIstErsterLogin] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -45,6 +46,23 @@ export function AuthProvider({ children }) {
         }
         setCoachie(data ?? null)
         setLoading(false)
+
+        // Erster Login erkennen: kein bisheriger Zeitstempel vorhanden.
+        // Wird einmalig gesetzt und nie wieder verändert (siehe Migration
+        // erster_login.sql). istErsterLogin bleibt für diese Sitzung bis
+        // zum Konsum durch die Dashboard-Weiterleitung bestehen.
+        if (data && !data.erster_login_am) {
+          setIstErsterLogin(true)
+          supabase
+            .from('coachies')
+            .update({ erster_login_am: new Date().toISOString() })
+            .eq('id', session.user.id)
+            .then(({ error: updateError }) => {
+              if (updateError) {
+                console.error('Fehler beim Setzen von erster_login_am:', updateError)
+              }
+            })
+        }
       })
 
     return () => {
@@ -66,11 +84,17 @@ export function AuthProvider({ children }) {
     setCoachie(null)
   }
 
+  function konsumiereErstenLogin() {
+    setIstErsterLogin(false)
+  }
+
   const value = {
     session,
     coachie,
     loading,
     isAuthenticated: !!session,
+    istErsterLogin,
+    konsumiereErstenLogin,
     login,
     logout,
   }
