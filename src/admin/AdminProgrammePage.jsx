@@ -67,6 +67,8 @@ export default function AdminProgrammePage() {
   const [editTeaser, setEditTeaser] = useState(false)
   const [editPreisAnzeigen, setEditPreisAnzeigen] = useState(true)
   const [editZugriffsmonate, setEditZugriffsmonate] = useState('')
+  const [editZielgruppeText, setEditZielgruppeText] = useState('')
+  const [editAblaufSchritte, setEditAblaufSchritte] = useState(['', '', ''])
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
@@ -84,6 +86,15 @@ export default function AdminProgrammePage() {
         ? String(programm.standard_zugriffsmonate)
         : '',
     )
+    setEditZielgruppeText(programm.zielgruppe_text ?? '')
+    const schritte = Array.isArray(programm.ablauf_schritte)
+      ? programm.ablauf_schritte
+      : []
+    setEditAblaufSchritte([
+      schritte[0] ?? '',
+      schritte[1] ?? '',
+      schritte[2] ?? '',
+    ])
   }
 
   function cancelEdit() {
@@ -95,6 +106,10 @@ export default function AdminProgrammePage() {
     setError('')
     setEditSubmitting(true)
     try {
+      const ablaufSchritte = editAblaufSchritte
+        .map((schritt) => schritt.trim())
+        .filter(Boolean)
+
       await adminFetch('/api/admin/programme', {
         method: 'PATCH',
         body: JSON.stringify({
@@ -108,6 +123,8 @@ export default function AdminProgrammePage() {
           standard_zugriffsmonate: editZugriffsmonate
             ? Math.round(Number(editZugriffsmonate))
             : null,
+          zielgruppe_text: editZielgruppeText.trim() || null,
+          ablauf_schritte: ablaufSchritte.length > 0 ? ablaufSchritte : null,
         }),
       })
       setEditingId(null)
@@ -287,6 +304,39 @@ export default function AdminProgrammePage() {
                       Gilt nur für automatische Käufe über /kaufen/…; manuell
                       zugeordnete Programme bleiben unbegrenzt.
                     </p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Zielgruppen-Satz (&bdquo;Für wen ist das&ldquo;)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="z. B. Für Unternehmer, die klare Entscheidungen wollen"
+                      value={editZielgruppeText}
+                      onChange={(e) => setEditZielgruppeText(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      So läuft es ab (bis zu drei Schritte)
+                    </label>
+                    <div className="space-y-2">
+                      {editAblaufSchritte.map((schritt, index) => (
+                        <input
+                          key={index}
+                          type="text"
+                          placeholder={`Schritt ${index + 1} (optional)`}
+                          value={schritt}
+                          onChange={(e) => {
+                            const naechsteSchritte = [...editAblaufSchritte]
+                            naechsteSchritte[index] = e.target.value
+                            setEditAblaufSchritte(naechsteSchritte)
+                          }}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                        />
+                      ))}
+                    </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
                     <input

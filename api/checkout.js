@@ -18,7 +18,9 @@ async function handleVorschau(req, res, supabase) {
 
   const { data, error } = await supabase
     .from('programme')
-    .select('titel, beschreibung, preis_cent, slug')
+    .select(
+      'titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate',
+    )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
     .eq('aktiv', true)
