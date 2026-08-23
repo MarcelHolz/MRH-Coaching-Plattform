@@ -71,11 +71,13 @@ export default function AdminProgrammePage() {
   const [editZielgruppeText, setEditZielgruppeText] = useState('')
   const [editAblaufSchritte, setEditAblaufSchritte] = useState(['', '', ''])
   const [editBeschreibung, setEditBeschreibung] = useState('')
+  const [editBildUrl, setEditBildUrl] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
     setEditingId(programm.id)
     setEditBeschreibung(programm.beschreibung ?? '')
+    setEditBildUrl(programm.bild_url ?? '')
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -129,6 +131,7 @@ export default function AdminProgrammePage() {
           zielgruppe_text: editZielgruppeText.trim() || null,
           ablauf_schritte: ablaufSchritte.length > 0 ? ablaufSchritte : null,
           beschreibung: editBeschreibung,
+          bild_url: editBildUrl || null,
         }),
       })
       setEditingId(null)
@@ -261,6 +264,18 @@ export default function AdminProgrammePage() {
                       onChange={setEditBeschreibung}
                       placeholder="Einleitungstext (optional, mit **fett**, # Überschrift, - Liste)"
                       rows={4}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Bild-URL (kleines Vorschaubild auf der Kurskarte)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={editBildUrl}
+                      onChange={(e) => setEditBildUrl(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
                   </div>
                   <div>

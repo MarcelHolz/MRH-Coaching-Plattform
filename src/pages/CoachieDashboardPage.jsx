@@ -74,7 +74,7 @@ export default function CoachieDashboardPage() {
       const { data: zuordnungen, error: zuordnungenError } = await supabase
         .from('coachie_programme')
         .select(
-          'programm_id, zugriff_bis, zugewiesen_am, programme(id, titel, beschreibung, aktiv)',
+          'programm_id, zugriff_bis, zugewiesen_am, programme(id, titel, beschreibung, aktiv, bild_url)',
         )
         .eq('coachie_id', coachie.id)
 
@@ -109,7 +109,9 @@ export default function CoachieDashboardPage() {
 
       const { data: teaser } = await supabase
         .from('programme')
-        .select('id, titel, beschreibung, preis_cent, preis_anzeigen, slug, oeffentlich_kaufbar')
+        .select(
+          'id, titel, beschreibung, preis_cent, preis_anzeigen, slug, oeffentlich_kaufbar, bild_url',
+        )
         .eq('teaser_aktiv', true)
         .eq('aktiv', true)
 
@@ -299,24 +301,35 @@ export default function CoachieDashboardPage() {
                   to={`/coachie/programme/${programm.id}`}
                   className="rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md"
                 >
-                  <span
-                    className={`mb-3 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      prozent === 100
-                        ? 'bg-mrh-gold text-white'
-                        : begonnen
-                          ? 'bg-mrh-gold/15 text-mrh-gold-dark'
-                          : 'bg-mrh-navy/10 text-mrh-navy'
-                    }`}
-                  >
-                    {prozent === 100
-                      ? 'Abgeschlossen'
-                      : begonnen
-                        ? 'Begonnen'
-                        : 'Programm starten'}
-                  </span>
-                  <h3 className="mb-1 font-semibold text-slate-800">
-                    {programm.titel}
-                  </h3>
+                  <div className="mb-3 flex items-start gap-3">
+                    {programm.bild_url && (
+                      <img
+                        src={programm.bild_url}
+                        alt=""
+                        className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`mb-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          prozent === 100
+                            ? 'bg-mrh-gold text-white'
+                            : begonnen
+                              ? 'bg-mrh-gold/15 text-mrh-gold-dark'
+                              : 'bg-mrh-navy/10 text-mrh-navy'
+                        }`}
+                      >
+                        {prozent === 100
+                          ? 'Abgeschlossen'
+                          : begonnen
+                            ? 'Begonnen'
+                            : 'Programm starten'}
+                      </span>
+                      <h3 className="font-semibold text-slate-800">
+                        {programm.titel}
+                      </h3>
+                    </div>
+                  </div>
                   <p className="mb-4 line-clamp-2 text-sm text-mrh-grey">
                     {programm.beschreibung}
                   </p>
@@ -357,12 +370,23 @@ export default function CoachieDashboardPage() {
                 key={programm.id}
                 className="rounded-xl bg-mrh-black p-5 text-white"
               >
-                <span className="mb-3 inline-block rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-mrh-gold-soft">
-                  Vorschau
-                </span>
-                <h3 className="mb-1 font-serif font-semibold text-white">
-                  {programm.titel}
-                </h3>
+                <div className="mb-3 flex items-start gap-3">
+                  {programm.bild_url && (
+                    <img
+                      src={programm.bild_url}
+                      alt=""
+                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="mb-2 inline-block rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-mrh-gold-soft">
+                      Vorschau
+                    </span>
+                    <h3 className="font-serif font-semibold text-white">
+                      {programm.titel}
+                    </h3>
+                  </div>
+                </div>
                 <p className="mb-4 line-clamp-2 text-sm text-white/70">
                   {programm.beschreibung}
                 </p>

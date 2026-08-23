@@ -274,6 +274,34 @@ Supabase SQL Editor ausführen (neue Spalten + eine zusätzliche,
 rein additive RLS-Policy). Danach im Admin-Bereich unter **Programme →
 Verkauf einrichten** die beiden neuen Schalter setzen.
 
+## Module (Strukturebene zwischen Programm und Session)
+
+Optionale Gruppierungsebene: eine `sessions`-Zeile kann per `modul_id`
+einem Eintrag in `module` zugeordnet werden, muss aber nicht (`NULL` =
+Session liegt direkt unter dem Programm, z. B. eine Willkommens-Session
+vor den eigentlichen Modulen).
+
+Anzeigereihenfolge im Coachie-Bereich: erst alle modullosen Sessions in
+ihrer `reihenfolge`, danach die Module in ihrer eigenen `reihenfolge`
+mit ihren Sessions darunter (siehe `ordneSessionsNachModul` in
+`CoachieProgramPage.jsx` — dieselbe Funktion bestimmt auch, welche
+Session als Nächstes drankommt, z. B. für den "Fortsetzen"-Button).
+Ein Modul wird wie eine Kurskarte dargestellt (optionales Bild, Titel,
+Beschreibung, eigener Fortschrittsbalken, Sessions-Anzahl,
+Status-Badge) und klappt beim Anklicken die enthaltenen Sessions in
+der unveränderten Session-Ansicht auf. Die Fortschrittsberechnung für
+das gesamte Programm bleibt unabhängig von der Modul-Zugehörigkeit auf
+Basis aller Sessions.
+
+Verwaltung im Admin-Bereich unter **Programme → Sessions verwalten**
+(`ModuleManager.jsx`, oberhalb der Sessions-Liste): Module anlegen,
+bearbeiten, per Auf/Ab neu sortieren; die Session-Formulare bekommen
+zusätzlich eine Modul-Auswahl (oder "Kein Modul").
+
+Einmalige Einrichtung: `supabase_migrations/modul_ebene.sql` im
+Supabase SQL Editor ausführen (neue Tabelle `module`, neue Spalten
+`sessions.modul_id` und `programme.bild_url`, rein additiv).
+
 ## Testergebnisse ("Meine Auswertungen")
 
 Coachies sehen ihre verknüpften Kurztest-Ergebnisse (aus dem separaten
@@ -410,10 +438,11 @@ api/
                  stripeClient (Stripe-SDK-Singleton), mailer (SMTP-Versand
                  für die Erinnerungsautomation)
   admin/         Serverless Functions für Programme, Sessions (+Materialien
-                 via ?resource=materials), Coachies (+Zuordnungen via
-                 ?resource=assignments, +Einladung erneut senden via
-                 ?resource=resend), Testergebnisse (+Suche via
-                 ?resource=suche), Fortschritt, Login
+                 via ?resource=materials, +Module via ?resource=module),
+                 Coachies (+Zuordnungen via ?resource=assignments,
+                 +Einladung erneut senden via ?resource=resend),
+                 Testergebnisse (+Suche via ?resource=suche), Fortschritt,
+                 Login
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
   cron/          Tägliche Erinnerungsautomation bei Inaktivität
@@ -442,7 +471,7 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   (Einladung erneut senden), `?resource=assignments`
   (Programm-Zuordnungen).
 - `api/admin/sessions.js` — Standard (Sessions), `?resource=materials`
-  (Session-Materialien).
+  (Session-Materialien), `?resource=module` (Modul-Ebene).
 - `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
   `?resource=suche` (Profil-Quiz-Suche).
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals

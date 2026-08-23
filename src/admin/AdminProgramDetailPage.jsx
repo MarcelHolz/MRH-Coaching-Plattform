@@ -3,16 +3,19 @@ import { Link, useParams } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
 import MaterialManager from './MaterialManager'
 import MarkdownFeld from './MarkdownFeld'
+import ModuleManager from './ModuleManager'
 
 export default function AdminProgramDetailPage() {
   const { programId } = useParams()
   const [sessions, setSessions] = useState([])
+  const [module, setModule] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [bildUrl, setBildUrl] = useState('')
+  const [modulId, setModulId] = useState('')
   const [expandedId, setExpandedId] = useState(null)
 
   const [editingId, setEditingId] = useState(null)
@@ -20,6 +23,7 @@ export default function AdminProgramDetailPage() {
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editVideoUrl, setEditVideoUrl] = useState('')
   const [editBildUrl, setEditBildUrl] = useState('')
+  const [editModulId, setEditModulId] = useState('')
   const [editReihenfolge, setEditReihenfolge] = useState(0)
   const [editSubmitting, setEditSubmitting] = useState(false)
 
@@ -40,8 +44,22 @@ export default function AdminProgramDetailPage() {
     }
   }
 
+  async function loadModule() {
+    try {
+      const data = await adminFetch(
+        `/api/admin/sessions?resource=module&programm_id=${programId}`,
+      )
+      setModule(
+        (data.module ?? []).sort((a, b) => a.reihenfolge - b.reihenfolge),
+      )
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   useEffect(() => {
     loadSessions()
+    loadModule()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programId])
 
@@ -57,6 +75,7 @@ export default function AdminProgramDetailPage() {
           beschreibung,
           video_url: videoUrl,
           bild_url: bildUrl,
+          modul_id: modulId || null,
           reihenfolge: sessions.length,
         }),
       })
@@ -64,6 +83,7 @@ export default function AdminProgramDetailPage() {
       setBeschreibung('')
       setVideoUrl('')
       setBildUrl('')
+      setModulId('')
       await loadSessions()
     } catch (err) {
       setError(err.message)
@@ -87,6 +107,7 @@ export default function AdminProgramDetailPage() {
     setEditBeschreibung(session.beschreibung ?? '')
     setEditVideoUrl(session.video_url ?? '')
     setEditBildUrl(session.bild_url ?? '')
+    setEditModulId(session.modul_id ?? '')
     setEditReihenfolge(session.reihenfolge)
   }
 
@@ -107,6 +128,7 @@ export default function AdminProgramDetailPage() {
           beschreibung: editBeschreibung,
           video_url: editVideoUrl,
           bild_url: editBildUrl,
+          modul_id: editModulId || null,
           reihenfolge: Number(editReihenfolge),
         }),
       })
@@ -156,6 +178,8 @@ export default function AdminProgramDetailPage() {
         Sessions verwalten
       </h1>
 
+      <ModuleManager programId={programId} module={module} onChange={loadModule} />
+
       <form
         onSubmit={handleCreate}
         className="mb-8 grid gap-3 rounded-xl bg-white p-5 shadow-sm sm:grid-cols-2"
@@ -190,6 +214,18 @@ export default function AdminProgramDetailPage() {
           onChange={(e) => setBildUrl(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
+        <select
+          value={modulId}
+          onChange={(e) => setModulId(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
+        >
+          <option value="">Kein Modul (direkt unter dem Programm)</option>
+          {module.map((modul) => (
+            <option key={modul.id} value={modul.id}>
+              {modul.titel}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark sm:col-span-2"
@@ -211,6 +247,13 @@ export default function AdminProgramDetailPage() {
                   <h2 className="font-semibold text-slate-800">
                     {session.titel}
                   </h2>
+                  {session.modul_id && (
+                    <p className="text-xs text-mrh-gold-dark">
+                      Modul:{' '}
+                      {module.find((m) => m.id === session.modul_id)?.titel ??
+                        '–'}
+                    </p>
+                  )}
                   {session.beschreibung && (
                     <p className="text-sm text-slate-500">
                       {session.beschreibung}
@@ -300,6 +343,18 @@ export default function AdminProgramDetailPage() {
                     onChange={(e) => setEditBildUrl(e.target.value)}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                   />
+                  <select
+                    value={editModulId}
+                    onChange={(e) => setEditModulId(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
+                  >
+                    <option value="">Kein Modul (direkt unter dem Programm)</option>
+                    {module.map((modul) => (
+                      <option key={modul.id} value={modul.id}>
+                        {modul.titel}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="submit"
                     disabled={editSubmitting}

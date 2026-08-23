@@ -38,6 +38,19 @@ function StatusIcon({ status }) {
   return <span className="h-6 w-6 shrink-0 rounded-full border-2 border-slate-300" />
 }
 
+// Kanonische Reihenfolge für "nächste offene Session"-Logik (Fortsetzen-
+// Button, Auto-Start bei ?start=1): erst modullose Sessions, danach die
+// Module in ihrer Reihenfolge -- exakt dieselbe Regel wie für die
+// Anzeige, damit "nächste Session" nicht die rohe, programmweite
+// reihenfolge-Spalte nutzt, die Modul-Zugehörigkeit ignoriert.
+function ordneSessionsNachModul(sessions, module) {
+  const modulLose = sessions.filter((s) => !s.modul_id)
+  const inModulen = module.flatMap((modul) =>
+    sessions.filter((s) => s.modul_id === modul.id),
+  )
+  return [...modulLose, ...inModulen]
+}
+
 function formatDatum(iso) {
   if (!iso) return null
   return new Date(iso).toLocaleDateString('de-DE', {
@@ -273,16 +286,118 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
   )
 }
 
+function ModulKarte({
+  modul,
+  sessions,
+  statusMap,
+  coachieId,
+  onStatusChange,
+  open,
+  onToggle,
+  openSessionId,
+  onToggleSession,
+}) {
+  const abgeschlossen = sessions.filter(
+    (s) => statusMap[s.id]?.status === 'abgeschlossen',
+  ).length
+  const prozent =
+    sessions.length > 0 ? Math.round((abgeschlossen / sessions.length) * 100) : 0
+  const begonnen = sessions.some((s) => statusMap[s.id])
+
+  return (
+    <div className="rounded-xl bg-white shadow-sm">
+      <button
+        onClick={onToggle}
+        className="flex w-full items-start gap-3 px-5 py-4 text-left"
+      >
+        {modul.bild_url && (
+          <img
+            src={modul.bild_url}
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-lg object-cover"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <span
+            className={`mb-1 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              prozent === 100
+                ? 'bg-mrh-gold text-white'
+                : begonnen
+                  ? 'bg-mrh-gold/15 text-mrh-gold-dark'
+                  : 'bg-mrh-navy/10 text-mrh-navy'
+            }`}
+          >
+            {prozent === 100
+              ? 'Abgeschlossen'
+              : begonnen
+                ? 'Begonnen'
+                : 'Noch nicht begonnen'}
+          </span>
+          <p className="font-semibold text-slate-800">{modul.titel}</p>
+          {modul.beschreibung && (
+            <p className="mt-1 line-clamp-2 text-sm text-mrh-grey">
+              {modul.beschreibung}
+            </p>
+          )}
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-mrh-gold transition-all"
+              style={{ width: `${prozent}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-mrh-grey">
+            {abgeschlossen} von {sessions.length} Sessions abgeschlossen
+          </p>
+        </div>
+        <svg
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className={`mt-1 h-4 w-4 shrink-0 text-mrh-grey transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.2 7.2a1 1 0 0 1 1.4 0L10 10.6l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 8.6a1 1 0 0 1 0-1.4Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="space-y-3 border-t border-slate-100 p-5">
+          {sessions.map((session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              coachieId={coachieId}
+              status={statusMap[session.id]}
+              onStatusChange={onStatusChange}
+              open={openSessionId === session.id}
+              onToggle={() => onToggleSession(session.id)}
+            />
+          ))}
+          {sessions.length === 0 && (
+            <p className="text-sm text-mrh-grey">
+              Noch keine Sessions in diesem Modul.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CoachieProgramPage() {
   const { programId } = useParams()
   const { coachie } = useAuth()
   const [searchParams] = useSearchParams()
   const [programm, setProgramm] = useState(null)
   const [sessions, setSessions] = useState([])
+  const [module, setModule] = useState([])
   const [statusMap, setStatusMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [openId, setOpenId] = useState(null)
+  const [offenesModulId, setOffenesModulId] = useState(null)
   const [autoStartErledigt, setAutoStartErledigt] = useState(false)
   const [zielText, setZielText] = useState(null)
   const [zielPromptAusgeblendet, setZielPromptAusgeblendet] = useState(false)
@@ -365,6 +480,12 @@ export default function CoachieProgramPage() {
         .eq('programm_id', programId)
         .maybeSingle()
 
+      const { data: modulData } = await supabase
+        .from('module')
+        .select('*')
+        .eq('programm_id', programId)
+        .order('reihenfolge', { ascending: true })
+
       if (!cancelled) {
         setProgramm(programmData)
         setSessions(
@@ -373,6 +494,7 @@ export default function CoachieProgramPage() {
             materialien: s.session_material,
           })),
         )
+        setModule(modulData ?? [])
         setStatusMap(
           Object.fromEntries(statusListe.map((s) => [s.session_id, s])),
         )
@@ -395,12 +517,14 @@ export default function CoachieProgramPage() {
     if (searchParams.get('start') !== '1') return
     if (sessions.length === 0) return
 
+    const geordnet = ordneSessionsNachModul(sessions, module)
     const ziel =
-      sessions.find((s) => statusMap[s.id]?.status !== 'abgeschlossen') ??
-      sessions[0]
+      geordnet.find((s) => statusMap[s.id]?.status !== 'abgeschlossen') ??
+      geordnet[0]
     setOpenId(ziel.id)
+    if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
     setAutoStartErledigt(true)
-  }, [autoStartErledigt, loading, sessions, statusMap, searchParams])
+  }, [autoStartErledigt, loading, sessions, module, statusMap, searchParams])
 
   function handleStatusChange(sessionId, newStatus) {
     setStatusMap((prev) => {
@@ -507,10 +631,21 @@ export default function CoachieProgramPage() {
       .sort()
       .at(-1),
   )
-  const naechsteSession = sessions.find(
+  // Anzeige- und Fortsetzen-Reihenfolge: erst modullose Sessions in ihrer
+  // Reihenfolge, danach die Module in ihrer Reihenfolge mit ihren
+  // Sessions darunter (ordneSessionsNachModul). Fortschritt/Prozent oben
+  // bleiben unverändert auf Basis aller Sessions, unabhängig von dieser
+  // Gruppierung.
+  const naechsteSession = ordneSessionsNachModul(sessions, module).find(
     (s) => statusMap[s.id]?.status !== 'abgeschlossen',
   )
   const zielPromptSichtbar = !begonnen && !zielText && !zielPromptAusgeblendet
+
+  const modulLoseSessions = sessions.filter((s) => !s.modul_id)
+  const moduleMitSessions = module.map((modul) => ({
+    ...modul,
+    sessions: sessions.filter((s) => s.modul_id === modul.id),
+  }))
 
   return (
     <div>
@@ -629,7 +764,12 @@ export default function CoachieProgramPage() {
                 </span>
                 {naechsteSession && (
                   <button
-                    onClick={() => setOpenId(naechsteSession.id)}
+                    onClick={() => {
+                      setOpenId(naechsteSession.id)
+                      if (naechsteSession.modul_id) {
+                        setOffenesModulId(naechsteSession.modul_id)
+                      }
+                    }}
                     className="block w-full rounded-lg bg-mrh-navy py-2 text-center text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
                   >
                     Fortsetzen
@@ -645,7 +785,7 @@ export default function CoachieProgramPage() {
 
           <div className="order-3 lg:col-span-2">
             <div className="space-y-3">
-              {sessions.map((session) => (
+              {modulLoseSessions.map((session) => (
                 <SessionRow
                   key={session.id}
                   session={session}
@@ -655,6 +795,24 @@ export default function CoachieProgramPage() {
                   open={openId === session.id}
                   onToggle={() =>
                     setOpenId(openId === session.id ? null : session.id)
+                  }
+                />
+              ))}
+              {moduleMitSessions.map((modul) => (
+                <ModulKarte
+                  key={modul.id}
+                  modul={modul}
+                  sessions={modul.sessions}
+                  statusMap={statusMap}
+                  coachieId={coachie.id}
+                  onStatusChange={handleStatusChange}
+                  open={offenesModulId === modul.id}
+                  onToggle={() =>
+                    setOffenesModulId(offenesModulId === modul.id ? null : modul.id)
+                  }
+                  openSessionId={openId}
+                  onToggleSession={(id) =>
+                    setOpenId(openId === id ? null : id)
                   }
                 />
               ))}
