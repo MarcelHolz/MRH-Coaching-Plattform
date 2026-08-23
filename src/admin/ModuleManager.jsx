@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { adminFetch } from '../lib/adminFetch'
+import BildUpload from './BildUpload'
 
 export default function ModuleManager({ programId, module, onChange }) {
   const [titel, setTitel] = useState('')
@@ -172,13 +173,16 @@ export default function ModuleManager({ programId, module, onChange }) {
                   onChange={(e) => setEditTitel(e.target.value)}
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                 />
-                <input
-                  type="url"
-                  placeholder="Bild-URL"
-                  value={editBildUrl}
-                  onChange={(e) => setEditBildUrl(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="url"
+                    placeholder="Bild-URL (oder Bild hochladen)"
+                    value={editBildUrl}
+                    onChange={(e) => setEditBildUrl(e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                  />
+                  <BildUpload onUploaded={setEditBildUrl} />
+                </div>
                 <input
                   type="text"
                   placeholder="Beschreibung"
@@ -211,13 +215,16 @@ export default function ModuleManager({ programId, module, onChange }) {
           onChange={(e) => setTitel(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
-        <input
-          type="url"
-          placeholder="Bild-URL (optional)"
-          value={bildUrl}
-          onChange={(e) => setBildUrl(e.target.value)}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="url"
+            placeholder="Bild-URL (optional, oder Bild hochladen)"
+            value={bildUrl}
+            onChange={(e) => setBildUrl(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+          />
+          <BildUpload onUploaded={setBildUrl} />
+        </div>
         <input
           type="text"
           placeholder="Beschreibung (optional)"

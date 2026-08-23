@@ -302,6 +302,24 @@ Einmalige Einrichtung: `supabase_migrations/modul_ebene.sql` im
 Supabase SQL Editor ausführen (neue Tabelle `module`, neue Spalten
 `sessions.modul_id` und `programme.bild_url`, rein additiv).
 
+### Bild-Upload für Programm-/Modul-Vorschaubilder
+
+Die Bild-URL-Felder (Programm "Verkauf einrichten" und Modul) erlauben
+neben manueller URL-Eingabe auch einen direkten Datei-Upload
+(`BildUpload.jsx`, max. 5 MB, JPG/PNG/WEBP). Ablauf: der Browser fragt
+über die admin-geschützte Route `api/admin/programme.js
+?resource=bild-upload` ein Einweg-Upload-Token an (per service_role
+erzeugt, `createSignedUploadUrl`), lädt die Datei damit direkt zu
+Supabase Storage hoch (`uploadToSignedUrl`, läuft nicht durch unsere
+Serverless Function) und übernimmt die resultierende öffentliche URL
+automatisch ins Textfeld.
+
+Einmalige Einrichtung: `supabase_migrations/programm_bilder_bucket.sql`
+im Supabase SQL Editor ausführen -- legt den neuen, öffentlichen
+Storage-Bucket `programm-bilder` an (getrennt vom privaten Bucket
+`Programme` fürs Kursmaterial), inkl. serverseitigem 5-MB-/
+Format-Limit auf Supabase-Ebene.
+
 ## Testergebnisse ("Meine Auswertungen")
 
 Coachies sehen ihre verknüpften Kurztest-Ergebnisse (aus dem separaten

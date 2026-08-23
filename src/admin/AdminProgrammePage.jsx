@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
 import MarkdownFeld from './MarkdownFeld'
+import BildUpload from './BildUpload'
 
 export default function AdminProgrammePage() {
   const [programme, setProgramme] = useState([])
@@ -270,13 +271,23 @@ export default function AdminProgrammePage() {
                     <label className="mb-1 block text-xs font-medium text-slate-600">
                       Bild-URL (kleines Vorschaubild auf der Kurskarte)
                     </label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      value={editBildUrl}
-                      onChange={(e) => setEditBildUrl(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://... (oder Bild hochladen)"
+                        value={editBildUrl}
+                        onChange={(e) => setEditBildUrl(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                      />
+                      <BildUpload onUploaded={setEditBildUrl} />
+                    </div>
+                    {editBildUrl && (
+                      <img
+                        src={editBildUrl}
+                        alt=""
+                        className="mt-2 h-16 w-16 rounded-lg object-cover"
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">
