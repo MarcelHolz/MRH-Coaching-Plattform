@@ -61,6 +61,27 @@ export default function AdminProgrammePage() {
     }
   }
 
+  async function handleDelete(programm) {
+    if (
+      !window.confirm(
+        `"${programm.titel}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`,
+      )
+    ) {
+      return
+    }
+
+    setError('')
+    try {
+      await adminFetch('/api/admin/programme', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: programm.id }),
+      })
+      await loadProgramme()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   const [editingId, setEditingId] = useState(null)
   const [editPreis, setEditPreis] = useState('')
   const [editStripePriceId, setEditStripePriceId] = useState('')
@@ -247,6 +268,12 @@ export default function AdminProgrammePage() {
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm transition hover:bg-slate-50"
                   >
                     {programm.aktiv ? 'Deaktivieren' : 'Aktivieren'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(programm)}
+                    className="rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-600 transition hover:bg-red-50"
+                  >
+                    Löschen
                   </button>
                 </div>
               </div>
