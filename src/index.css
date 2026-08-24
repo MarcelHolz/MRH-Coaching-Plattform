@@ -53,3 +53,28 @@ body {
 .markdown-inhalt strong {
   font-weight: 600;
 }
+.markdown-inhalt img {
+  margin-bottom: 0.75em;
+  border-radius: 0.5rem;
+  max-width: 100%;
+}
+
+/* Hervorheben-Box (> Text, "Hervorheben"-Button in MarkdownFeld.jsx) --
+   Praxisimpuls/Merksatz-Kasten im Corporate Design. Halbtransparenter
+   Gold-Ton statt fixer Hintergrundfarbe, damit die Box sowohl im
+   Navy-Header (helle Schrift) als auch auf hellem Hintergrund erkennbar
+   bleibt. */
+.markdown-inhalt blockquote {
+  margin: 0.75em 0;
+  padding: 0.75em 1em;
+  border-left: 3px solid var(--color-mrh-gold);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-mrh-gold) 14%, transparent);
+  font-style: italic;
+}
+.markdown-inhalt blockquote p {
+  margin-bottom: 0;
+}
+.markdown-inhalt blockquote:last-child {
+  margin-bottom: 0;
+}
