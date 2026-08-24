@@ -274,6 +274,52 @@ Supabase SQL Editor ausführen (neue Spalten + eine zusätzliche,
 rein additive RLS-Policy). Danach im Admin-Bereich unter **Programme →
 Verkauf einrichten** die beiden neuen Schalter setzen.
 
+## Module (Strukturebene zwischen Programm und Session)
+
+Optionale Gruppierungsebene: eine `sessions`-Zeile kann per `modul_id`
+einem Eintrag in `module` zugeordnet werden, muss aber nicht (`NULL` =
+Session liegt direkt unter dem Programm, z. B. eine Willkommens-Session
+vor den eigentlichen Modulen).
+
+Anzeigereihenfolge im Coachie-Bereich: erst alle modullosen Sessions in
+ihrer `reihenfolge`, danach die Module in ihrer eigenen `reihenfolge`
+mit ihren Sessions darunter (siehe `ordneSessionsNachModul` in
+`CoachieProgramPage.jsx` — dieselbe Funktion bestimmt auch, welche
+Session als Nächstes drankommt, z. B. für den "Fortsetzen"-Button).
+Ein Modul wird wie eine Kurskarte dargestellt (optionales Bild, Titel,
+Beschreibung, eigener Fortschrittsbalken, Sessions-Anzahl,
+Status-Badge) und klappt beim Anklicken die enthaltenen Sessions in
+der unveränderten Session-Ansicht auf. Die Fortschrittsberechnung für
+das gesamte Programm bleibt unabhängig von der Modul-Zugehörigkeit auf
+Basis aller Sessions.
+
+Verwaltung im Admin-Bereich unter **Programme → Sessions verwalten**
+(`ModuleManager.jsx`, oberhalb der Sessions-Liste): Module anlegen,
+bearbeiten, per Auf/Ab neu sortieren; die Session-Formulare bekommen
+zusätzlich eine Modul-Auswahl (oder "Kein Modul").
+
+Einmalige Einrichtung: `supabase_migrations/modul_ebene.sql` im
+Supabase SQL Editor ausführen (neue Tabelle `module`, neue Spalten
+`sessions.modul_id` und `programme.bild_url`, rein additiv).
+
+### Bild-Upload für Programm-/Modul-Vorschaubilder
+
+Die Bild-URL-Felder (Programm "Verkauf einrichten" und Modul) erlauben
+neben manueller URL-Eingabe auch einen direkten Datei-Upload
+(`BildUpload.jsx`, max. 5 MB, JPG/PNG/WEBP). Ablauf: der Browser fragt
+über die admin-geschützte Route `api/admin/programme.js
+?resource=bild-upload` ein Einweg-Upload-Token an (per service_role
+erzeugt, `createSignedUploadUrl`), lädt die Datei damit direkt zu
+Supabase Storage hoch (`uploadToSignedUrl`, läuft nicht durch unsere
+Serverless Function) und übernimmt die resultierende öffentliche URL
+automatisch ins Textfeld.
+
+Einmalige Einrichtung: `supabase_migrations/programm_bilder_bucket.sql`
+im Supabase SQL Editor ausführen -- legt den neuen, öffentlichen
+Storage-Bucket `programm-bilder` an (getrennt vom privaten Bucket
+`Programme` fürs Kursmaterial), inkl. serverseitigem 5-MB-/
+Format-Limit auf Supabase-Ebene.
+
 ## Testergebnisse ("Meine Auswertungen")
 
 Coachies sehen ihre verknüpften Kurztest-Ergebnisse (aus dem separaten
@@ -395,6 +441,70 @@ Struktur ist bewusst so angelegt (eigenes `test_typ`-Feld, eigene
 Tabelle), dass sie sich später um Zertifikate erweitern lässt, ohne
 etwas Bestehendes umbauen zu müssen.
 
+## Produktagent (eigenständige Kursanlage als Entwurf)
+
+Ein externer Produktagent kann über eine eigene API-Route (`api/agent/
+inhalte.js`) selbstständig Kurse (Programm/Modul/Session) anlegen,
+bearbeiten und löschen. Freigabe bleibt exklusiv dem Admin-Bereich
+vorbehalten: neue Programme landen immer mit `aktiv = false`, unabhängig
+davon, was der Agent im Request-Body schickt, und der Agent kann ein
+Programm (bzw. dessen Module/Sessions) nach der Freigabe (`aktiv = true`,
+per "Aktivieren"-Button unter **Programme**) nicht mehr bearbeiten oder
+löschen — die Route prüft das vor jedem Update/Delete serverseitig.
+
+**Warum keine eigene Postgres-Rolle mit Supabase-JWT:** Dieses Projekt
+hat genau dieses Muster bereits für die Profil-Quiz-Anbindung versucht
+und wieder verworfen (siehe `supabase_migrations/profil_quiz_reader.sql`
+/ `_v2.sql`) — im aktuellen Supabase-Dashboard lässt sich kein zweiter
+HS256-Standby-Signing-Key mehr anlegen (nur noch "Rotate"), ohne den
+sich kein selbst signiertes JWT mit eigenem Rollen-Claim ausstellen
+lässt, das PostgREST akzeptiert. Stattdessen: dieselbe Route nutzt
+intern `service_role` (wie alle `api/admin/*`-Routen) und ist nach außen
+über ein selbst vergebenes Secret im Header abgesichert, kein
+Supabase-JWT nötig.
+
+### Einmalige Einrichtung
+
+1. Secret erzeugen:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+2. In Vercel als `AGENT_CONTENT_SECRET` eintragen, server-only, alle drei
+   Umgebungen (Production/Preview/Development).
+3. Dem Agenten denselben Wert geben — er schickt ihn bei jedem Request
+   als Header `x-agent-secret`.
+
+Falls zuvor schon `agent_content_rolle.sql` (frühere Version dieses
+Features, mittlerweile aus dem Repo entfernt) im SQL Editor ausgeführt
+wurde: zusätzlich `supabase_migrations/agent_content_rolle_rueckbau.sql`
+ausführen (räumt die verworfene Rolle/Policies wieder auf). War die
+vorherige Migration nie ausgeführt, ist diese Datei ein reines No-Op.
+
+### API
+
+Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
+
+- `GET/POST/PATCH/DELETE /api/agent/inhalte` — Programme (Felder:
+  `titel`, `beschreibung`, `bild_url`).
+- `GET/POST/PATCH/DELETE /api/agent/inhalte?resource=module` — Module
+  (Felder: `programm_id`, `titel`, `beschreibung`, `bild_url`,
+  `reihenfolge`).
+- `GET/POST/PATCH/DELETE /api/agent/inhalte?resource=sessions` —
+  Sessions (Felder: `programm_id`, `modul_id` optional, `titel`,
+  `beschreibung`, `video_url`, `bild_url`, `reihenfolge`).
+
+Beispiel — neues Entwurfsprogramm anlegen:
+
+```bash
+curl -i -X POST "https://app.mrh-beratung.de/api/agent/inhalte" \
+  -H "x-agent-secret: <Secret>" \
+  -H "Content-Type: application/json" \
+  -d '{"titel": "Neuer Kurs", "beschreibung": "Kurzbeschreibung"}'
+```
+
+`PATCH`/`DELETE` auf ein bereits veröffentlichtes Programm (bzw. dessen
+Module/Sessions) antworten mit `409` statt die Freigabe zu umgehen.
+
 ## Projektstruktur
 
 ```
@@ -406,14 +516,19 @@ src/
   lib/           Supabase-Client, adminFetch-Helper, YouTube-Embed-Utility
   pages/         Coachie-Seiten (Login, Dashboard, Programmdetail)
 api/
-  _lib/          adminAuth (HMAC-Token), supabaseAdmin (service_role Client),
+  _lib/          adminAuth (HMAC-Token), agentAuth (Secret-Header für den
+                 Produktagenten), supabaseAdmin (service_role Client),
                  stripeClient (Stripe-SDK-Singleton), mailer (SMTP-Versand
                  für die Erinnerungsautomation)
   admin/         Serverless Functions für Programme, Sessions (+Materialien
-                 via ?resource=materials), Coachies (+Zuordnungen via
-                 ?resource=assignments, +Einladung erneut senden via
-                 ?resource=resend), Testergebnisse (+Suche via
-                 ?resource=suche), Fortschritt, Login
+                 via ?resource=materials, +Module via ?resource=module),
+                 Coachies (+Zuordnungen via ?resource=assignments,
+                 +Einladung erneut senden via ?resource=resend),
+                 Testergebnisse (+Suche via ?resource=suche), Fortschritt,
+                 Login
+  agent/         Secret-geschützte Route für den Produktagenten
+                 (inhalte.js, Programme + ?resource=module/sessions),
+                 siehe README-Abschnitt "Produktagent"
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
   cron/          Tägliche Erinnerungsautomation bei Inaktivität
@@ -442,17 +557,20 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   (Einladung erneut senden), `?resource=assignments`
   (Programm-Zuordnungen).
 - `api/admin/sessions.js` — Standard (Sessions), `?resource=materials`
-  (Session-Materialien).
+  (Session-Materialien), `?resource=module` (Modul-Ebene).
 - `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
   `?resource=suche` (Profil-Quiz-Suche).
+- `api/agent/inhalte.js` — Standard (Programme), `?resource=module`,
+  `?resource=sessions` (Produktagent, siehe README-Abschnitt
+  "Produktagent").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
 
-Ergebnis: 9 Functions (`admin/coachies.js`, `admin/login.js`,
+Ergebnis: 10 Functions (`admin/coachies.js`, `admin/login.js`,
 `admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
-`admin/testergebnisse.js`, `checkout.js`, `cron/erinnerungen.js`,
-`webhooks/stripe.js`) — weiterhin unter dem Hobby-Limit von 12, ohne
-Funktionsverlust.
+`admin/testergebnisse.js`, `agent/inhalte.js`, `checkout.js`,
+`cron/erinnerungen.js`, `webhooks/stripe.js`) — weiterhin unter dem
+Hobby-Limit von 12, ohne Funktionsverlust.
 
 ## Erinnerungsautomation bei Inaktivität
 

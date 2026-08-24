@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
 import MarkdownFeld from './MarkdownFeld'
+import BildUpload from './BildUpload'
 
 export default function AdminProgrammePage() {
   const [programme, setProgramme] = useState([])
@@ -71,11 +72,13 @@ export default function AdminProgrammePage() {
   const [editZielgruppeText, setEditZielgruppeText] = useState('')
   const [editAblaufSchritte, setEditAblaufSchritte] = useState(['', '', ''])
   const [editBeschreibung, setEditBeschreibung] = useState('')
+  const [editBildUrl, setEditBildUrl] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
     setEditingId(programm.id)
     setEditBeschreibung(programm.beschreibung ?? '')
+    setEditBildUrl(programm.bild_url ?? '')
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -129,6 +132,7 @@ export default function AdminProgrammePage() {
           zielgruppe_text: editZielgruppeText.trim() || null,
           ablauf_schritte: ablaufSchritte.length > 0 ? ablaufSchritte : null,
           beschreibung: editBeschreibung,
+          bild_url: editBildUrl || null,
         }),
       })
       setEditingId(null)
@@ -262,6 +266,28 @@ export default function AdminProgrammePage() {
                       placeholder="Einleitungstext (optional, mit **fett**, # Überschrift, - Liste)"
                       rows={4}
                     />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Bild-URL (kleines Vorschaubild auf der Kurskarte)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://... (oder Bild hochladen)"
+                        value={editBildUrl}
+                        onChange={(e) => setEditBildUrl(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                      />
+                      <BildUpload onUploaded={setEditBildUrl} />
+                    </div>
+                    {editBildUrl && (
+                      <img
+                        src={editBildUrl}
+                        alt=""
+                        className="mt-2 h-16 w-16 rounded-lg object-cover"
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">
