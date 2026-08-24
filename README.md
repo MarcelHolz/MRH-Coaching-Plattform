@@ -441,6 +441,70 @@ Struktur ist bewusst so angelegt (eigenes `test_typ`-Feld, eigene
 Tabelle), dass sie sich später um Zertifikate erweitern lässt, ohne
 etwas Bestehendes umbauen zu müssen.
 
+## Produktagent (eigenständige Kursanlage als Entwurf)
+
+Ein externer Produktagent kann über eine eigene API-Route (`api/agent/
+inhalte.js`) selbstständig Kurse (Programm/Modul/Session) anlegen,
+bearbeiten und löschen. Freigabe bleibt exklusiv dem Admin-Bereich
+vorbehalten: neue Programme landen immer mit `aktiv = false`, unabhängig
+davon, was der Agent im Request-Body schickt, und der Agent kann ein
+Programm (bzw. dessen Module/Sessions) nach der Freigabe (`aktiv = true`,
+per "Aktivieren"-Button unter **Programme**) nicht mehr bearbeiten oder
+löschen — die Route prüft das vor jedem Update/Delete serverseitig.
+
+**Warum keine eigene Postgres-Rolle mit Supabase-JWT:** Dieses Projekt
+hat genau dieses Muster bereits für die Profil-Quiz-Anbindung versucht
+und wieder verworfen (siehe `supabase_migrations/profil_quiz_reader.sql`
+/ `_v2.sql`) — im aktuellen Supabase-Dashboard lässt sich kein zweiter
+HS256-Standby-Signing-Key mehr anlegen (nur noch "Rotate"), ohne den
+sich kein selbst signiertes JWT mit eigenem Rollen-Claim ausstellen
+lässt, das PostgREST akzeptiert. Stattdessen: dieselbe Route nutzt
+intern `service_role` (wie alle `api/admin/*`-Routen) und ist nach außen
+über ein selbst vergebenes Secret im Header abgesichert, kein
+Supabase-JWT nötig.
+
+### Einmalige Einrichtung
+
+1. Secret erzeugen:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+2. In Vercel als `AGENT_CONTENT_SECRET` eintragen, server-only, alle drei
+   Umgebungen (Production/Preview/Development).
+3. Dem Agenten denselben Wert geben — er schickt ihn bei jedem Request
+   als Header `x-agent-secret`.
+
+Falls zuvor schon `agent_content_rolle.sql` (frühere Version dieses
+Features, mittlerweile aus dem Repo entfernt) im SQL Editor ausgeführt
+wurde: zusätzlich `supabase_migrations/agent_content_rolle_rueckbau.sql`
+ausführen (räumt die verworfene Rolle/Policies wieder auf). War die
+vorherige Migration nie ausgeführt, ist diese Datei ein reines No-Op.
+
+### API
+
+Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
+
+- `GET/POST/PATCH/DELETE /api/agent/inhalte` — Programme (Felder:
+  `titel`, `beschreibung`, `bild_url`).
+- `GET/POST/PATCH/DELETE /api/agent/inhalte?resource=module` — Module
+  (Felder: `programm_id`, `titel`, `beschreibung`, `bild_url`,
+  `reihenfolge`).
+- `GET/POST/PATCH/DELETE /api/agent/inhalte?resource=sessions` —
+  Sessions (Felder: `programm_id`, `modul_id` optional, `titel`,
+  `beschreibung`, `video_url`, `bild_url`, `reihenfolge`).
+
+Beispiel — neues Entwurfsprogramm anlegen:
+
+```bash
+curl -i -X POST "https://app.mrh-beratung.de/api/agent/inhalte" \
+  -H "x-agent-secret: <Secret>" \
+  -H "Content-Type: application/json" \
+  -d '{"titel": "Neuer Kurs", "beschreibung": "Kurzbeschreibung"}'
+```
+
+`PATCH`/`DELETE` auf ein bereits veröffentlichtes Programm (bzw. dessen
+Module/Sessions) antworten mit `409` statt die Freigabe zu umgehen.
+
 ## Projektstruktur
 
 ```
@@ -452,7 +516,8 @@ src/
   lib/           Supabase-Client, adminFetch-Helper, YouTube-Embed-Utility
   pages/         Coachie-Seiten (Login, Dashboard, Programmdetail)
 api/
-  _lib/          adminAuth (HMAC-Token), supabaseAdmin (service_role Client),
+  _lib/          adminAuth (HMAC-Token), agentAuth (Secret-Header für den
+                 Produktagenten), supabaseAdmin (service_role Client),
                  stripeClient (Stripe-SDK-Singleton), mailer (SMTP-Versand
                  für die Erinnerungsautomation)
   admin/         Serverless Functions für Programme, Sessions (+Materialien
@@ -461,6 +526,9 @@ api/
                  +Einladung erneut senden via ?resource=resend),
                  Testergebnisse (+Suche via ?resource=suche), Fortschritt,
                  Login
+  agent/         Secret-geschützte Route für den Produktagenten
+                 (inhalte.js, Programme + ?resource=module/sessions),
+                 siehe README-Abschnitt "Produktagent"
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
   cron/          Tägliche Erinnerungsautomation bei Inaktivität
@@ -492,14 +560,17 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   (Session-Materialien), `?resource=module` (Modul-Ebene).
 - `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
   `?resource=suche` (Profil-Quiz-Suche).
+- `api/agent/inhalte.js` — Standard (Programme), `?resource=module`,
+  `?resource=sessions` (Produktagent, siehe README-Abschnitt
+  "Produktagent").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
 
-Ergebnis: 9 Functions (`admin/coachies.js`, `admin/login.js`,
+Ergebnis: 10 Functions (`admin/coachies.js`, `admin/login.js`,
 `admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
-`admin/testergebnisse.js`, `checkout.js`, `cron/erinnerungen.js`,
-`webhooks/stripe.js`) — weiterhin unter dem Hobby-Limit von 12, ohne
-Funktionsverlust.
+`admin/testergebnisse.js`, `agent/inhalte.js`, `checkout.js`,
+`cron/erinnerungen.js`, `webhooks/stripe.js`) — weiterhin unter dem
+Hobby-Limit von 12, ohne Funktionsverlust.
 
 ## Erinnerungsautomation bei Inaktivität
 
