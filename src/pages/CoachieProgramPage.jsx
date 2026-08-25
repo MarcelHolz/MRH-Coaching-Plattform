@@ -335,7 +335,9 @@ function ModulKarte({
           </span>
           <p className="font-semibold text-slate-800">{modul.titel}</p>
           {modul.beschreibung && (
-            <p className="mt-1 line-clamp-2 text-sm text-mrh-grey">
+            <p
+              className={`mt-1 text-sm text-mrh-grey ${open ? '' : 'line-clamp-2'}`}
+            >
               {modul.beschreibung}
             </p>
           )}
