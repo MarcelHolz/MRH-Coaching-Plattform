@@ -124,5 +124,63 @@ export default async function handler(req, res) {
     return
   }
 
+  if (req.method === 'DELETE') {
+    const { id } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const [sessions, module, zuordnungen] = await Promise.all([
+      supabase.from('sessions').select('id').eq('programm_id', id),
+      supabase.from('module').select('id').eq('programm_id', id),
+      supabase.from('coachie_programme').select('id').eq('programm_id', id),
+    ])
+
+    const firstError = [sessions, module, zuordnungen].find(
+      (result) => result.error,
+    )
+
+    if (firstError) {
+      res.status(500).json({ error: firstError.error.message })
+      return
+    }
+
+    const abhaengigkeiten = []
+    if (sessions.data.length > 0) {
+      abhaengigkeiten.push(
+        `${sessions.data.length} Session${sessions.data.length === 1 ? '' : 's'}`,
+      )
+    }
+    if (module.data.length > 0) {
+      abhaengigkeiten.push(
+        `${module.data.length} Modul${module.data.length === 1 ? '' : 'e'}`,
+      )
+    }
+    if (zuordnungen.data.length > 0) {
+      abhaengigkeiten.push(
+        `${zuordnungen.data.length} Coachie-Zuordnung${zuordnungen.data.length === 1 ? '' : 'en'}`,
+      )
+    }
+
+    if (abhaengigkeiten.length > 0) {
+      res.status(409).json({
+        error: `Programm hat noch ${abhaengigkeiten.join(', ')}. Bitte zuerst entfernen.`,
+      })
+      return
+    }
+
+    const { error } = await supabase.from('programme').delete().eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
