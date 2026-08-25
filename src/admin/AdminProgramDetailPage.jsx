@@ -366,7 +366,7 @@ export default function AdminProgramDetailPage() {
               )}
 
               {expandedId === session.id && (
-                <MaterialManager sessionId={session.id} />
+                <MaterialManager sessionId={session.id} programmId={programId} />
               )}
             </div>
           ))}

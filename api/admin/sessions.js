@@ -3,8 +3,61 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions).
 // ?resource=materials spricht die frühere materials.js an, ?resource=module
-// verwaltet die neue Modul-Ebene zwischen Programm und Session, sonst
-// (default) das bisherige Verhalten dieser Datei für Sessions.
+// verwaltet die neue Modul-Ebene zwischen Programm und Session,
+// ?resource=material-upload erzeugt Upload-Tokens für den privaten Bucket
+// "Programme" (siehe storage_policy_pro_programm.sql), sonst (default) das
+// bisherige Verhalten dieser Datei für Sessions.
+
+const MATERIAL_BUCKET = 'Programme'
+
+// contentType -> Dateiendung, zugleich serverseitige Whitelist erlaubter
+// Materialformate (Workbooks/Skripte als PDF, Bilder, Audio-Aufzeichnungen).
+const ERLAUBTE_MATERIAL_TYPEN = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+}
+
+// Einweg-Upload-Token für Session-Materialien, analog zu
+// handleBildUploadUrl in api/admin/programme.js, aber gegen den privaten
+// Bucket "Programme" statt den öffentlichen "programm-bilder". Der Pfad
+// beginnt mit der programm_id als oberstem Ordner, da die Storage-Policy
+// darüber den Lese-Zugriff der Coachies steuert.
+async function handleMaterialUploadUrl(req, res, supabase) {
+  const { programm_id, contentType, dateiname } = req.body ?? {}
+
+  if (!programm_id) {
+    res.status(400).json({ error: 'programm_id ist erforderlich.' })
+    return
+  }
+
+  const endung = ERLAUBTE_MATERIAL_TYPEN[contentType]
+  if (!endung) {
+    res
+      .status(400)
+      .json({ error: 'Nur PDF, JPG, PNG, MP3 oder WAV sind erlaubt.' })
+    return
+  }
+
+  const sichererDateiname = String(dateiname || `datei.${endung}`).replace(
+    /[^a-zA-Z0-9._-]/g,
+    '_',
+  )
+  const pfad = `${programm_id}/materialien/${Date.now()}-${sichererDateiname}`
+
+  const { data, error } = await supabase.storage
+    .from(MATERIAL_BUCKET)
+    .createSignedUploadUrl(pfad)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ pfad: data.path, token: data.token })
+}
 
 async function handleSessions(req, res, supabase) {
   if (req.method === 'GET') {
@@ -326,6 +379,11 @@ export default async function handler(req, res) {
 
   if (resource === 'module') {
     await handleModule(req, res, supabase)
+    return
+  }
+
+  if (resource === 'material-upload' && req.method === 'POST') {
+    await handleMaterialUploadUrl(req, res, supabase)
     return
   }
 
