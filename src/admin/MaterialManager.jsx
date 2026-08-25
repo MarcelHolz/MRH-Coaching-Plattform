@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { adminFetch } from '../lib/adminFetch'
+import MaterialUpload from './MaterialUpload'
 
 const TYP_OPTIONEN = [
   { value: '', label: 'Typ wählen' },
   { value: 'pdf', label: 'PDF' },
+  { value: 'bild', label: 'Bild (PNG/JPEG)' },
   { value: 'text', label: 'Text' },
   { value: 'audio', label: 'Audio' },
   { value: 'datei', label: 'Sonstiges' },
 ]
 
-export default function MaterialManager({ sessionId }) {
+export default function MaterialManager({ sessionId, programmId }) {
   const [materialien, setMaterialien] = useState([])
   const [loading, setLoading] = useState(true)
   const [titel, setTitel] = useState('')
@@ -247,14 +249,17 @@ export default function MaterialManager({ sessionId }) {
           onChange={(e) => setTitel(e.target.value)}
           className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
-        <input
-          type="text"
-          placeholder="Storage-Pfad (z. B. <programm-id>/03.01/Workbook.pdf)"
-          required
-          value={dateiUrl}
-          onChange={(e) => setDateiUrl(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
-        />
+        <div className="flex items-center gap-2 sm:col-span-2">
+          <input
+            type="text"
+            placeholder="Storage-Pfad (z. B. <programm-id>/03.01/Workbook.pdf)"
+            required
+            value={dateiUrl}
+            onChange={(e) => setDateiUrl(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+          />
+          <MaterialUpload programmId={programmId} onUploaded={setDateiUrl} />
+        </div>
         <select
           value={typ}
           onChange={(e) => setTyp(e.target.value)}
