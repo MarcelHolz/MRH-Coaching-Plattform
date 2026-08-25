@@ -29,11 +29,38 @@ export default async function handler(req, res) {
     return
   }
 
+  // Abschlussquote pro Session, rein aggregiert (keine Coachie-Namen/-IDs
+  // im Ergebnis) -- "gestartet" zählt alle Coachies mit je einer
+  // Zuordnung zum Programm der Session (auch mit abgelaufenem
+  // zugriff_bis, siehe Aufgabenstellung), "abgeschlossen" nur die davon
+  // mit Status "abgeschlossen" für genau diese Session.
+  const sessionStats = sessions.data.map((session) => {
+    const coachieIds = new Set(
+      assignments.data
+        .filter((a) => a.programm_id === session.programm_id)
+        .map((a) => a.coachie_id),
+    )
+    const gestartet = coachieIds.size
+
+    const abgeschlossen = status.data.filter(
+      (s) =>
+        s.session_id === session.id &&
+        s.status === 'abgeschlossen' &&
+        coachieIds.has(s.coachie_id),
+    ).length
+
+    const quote =
+      gestartet > 0 ? Math.round((abgeschlossen / gestartet) * 100) : 0
+
+    return { session_id: session.id, gestartet, abgeschlossen, quote }
+  })
+
   res.status(200).json({
     coachies: coachies.data,
     programme: programme.data,
     assignments: assignments.data,
     sessions: sessions.data,
     status: status.data,
+    sessionStats,
   })
 }

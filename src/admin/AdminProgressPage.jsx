@@ -13,11 +13,23 @@ const STATUS_FARBE = {
   abgeschlossen: 'bg-mrh-gold/15 text-mrh-gold-dark',
 }
 
+// Ab dieser Quote gilt ein Übergang zwischen zwei Sessions als auffälliger
+// Abbruchpunkt -- rein visuelle Schwelle für die rote Einfärbung des
+// Balkens, keine harte Grenze.
+const QUOTE_WARNSCHWELLE = 50
+
+function quoteFarbe(quote) {
+  if (quote >= 75) return 'bg-mrh-gold'
+  if (quote >= QUOTE_WARNSCHWELLE) return 'bg-amber-400'
+  return 'bg-red-400'
+}
+
 export default function AdminProgressPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filterCoachie, setFilterCoachie] = useState('')
+  const [ansicht, setAnsicht] = useState('coachies')
 
   useEffect(() => {
     adminFetch('/api/admin/progress')
@@ -31,6 +43,7 @@ export default function AdminProgressPage() {
   const assignments = data?.assignments ?? []
   const sessions = data?.sessions ?? []
   const status = data?.status ?? []
+  const sessionStats = data?.sessionStats ?? []
 
   const sichtbareCoachies = filterCoachie
     ? coachies.filter((c) => c.id === filterCoachie)
@@ -45,6 +58,85 @@ export default function AdminProgressPage() {
         Fortschrittsübersicht
       </h1>
 
+      <div className="mb-6 flex gap-2">
+        <button
+          onClick={() => setAnsicht('coachies')}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            ansicht === 'coachies'
+              ? 'bg-mrh-navy text-white'
+              : 'border border-slate-300 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          Pro Coachie
+        </button>
+        <button
+          onClick={() => setAnsicht('sessions')}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            ansicht === 'sessions'
+              ? 'bg-mrh-navy text-white'
+              : 'border border-slate-300 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          Abschlussquote pro Session
+        </button>
+      </div>
+
+      {ansicht === 'sessions' && (
+        <div className="mb-6 space-y-6">
+          {programme.map((programm) => {
+            const programmSessions = sessions
+              .filter((s) => s.programm_id === programm.id)
+              .sort((a, b) => a.reihenfolge - b.reihenfolge)
+
+            if (programmSessions.length === 0) return null
+
+            return (
+              <div key={programm.id} className="rounded-xl bg-white p-5 shadow-sm">
+                <h2 className="mb-3 font-semibold text-slate-800">
+                  {programm.titel}
+                </h2>
+                <div className="space-y-2">
+                  {programmSessions.map((session) => {
+                    const stats = sessionStats.find(
+                      (s) => s.session_id === session.id,
+                    )
+                    const quote = stats?.quote ?? 0
+
+                    return (
+                      <div key={session.id} className="flex items-center gap-3">
+                        <span className="w-48 shrink-0 truncate text-sm text-slate-700">
+                          {session.titel}
+                        </span>
+                        <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-full rounded-full transition-all ${quoteFarbe(quote)}`}
+                            style={{ width: `${quote}%` }}
+                          />
+                        </div>
+                        <span className="w-28 shrink-0 text-right text-xs text-slate-500">
+                          {quote}%
+                          {stats && (
+                            <>
+                              {' '}
+                              ({stats.abgeschlossen}/{stats.gestartet})
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+          {programme.every(
+            (p) => sessions.filter((s) => s.programm_id === p.id).length === 0,
+          ) && <p className="text-sm text-slate-400">Keine Sessions vorhanden.</p>}
+        </div>
+      )}
+
+      {ansicht === 'coachies' && (
+        <>
       <div className="mb-6">
         <select
           value={filterCoachie}
@@ -121,6 +213,8 @@ export default function AdminProgressPage() {
           )
         })}
       </div>
+        </>
+      )}
     </div>
   )
 }
