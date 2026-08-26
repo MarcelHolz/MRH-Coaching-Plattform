@@ -31,15 +31,33 @@ export default async function handler(req, res) {
     return
   }
 
-  const [{ data: coachie }, { data: programm }, { data: sessions }] =
+  const [{ data: coachie }, { data: programm }, { data: sessions }, { data: zuordnung }] =
     await Promise.all([
       supabase.from('coachies').select('name').eq('id', coachieId).maybeSingle(),
       supabase.from('programme').select('titel').eq('id', programmId).maybeSingle(),
       supabase.from('sessions').select('id').eq('programm_id', programmId),
+      supabase
+        .from('coachie_programme')
+        .select('id')
+        .eq('coachie_id', coachieId)
+        .eq('programm_id', programmId)
+        .maybeSingle(),
     ])
 
   if (!programm) {
     res.status(404).json({ error: 'Programm nicht gefunden.' })
+    return
+  }
+
+  // coachie_status wird nur über coachie_id = auth.uid() geschützt, nicht
+  // über eine Zuordnung zum Programm -- ohne diese Prüfung könnte ein
+  // Coachie mit direkt (z. B. per REST-Aufruf) gesetzten Status-Einträgen
+  // für fremde session_ids ein Zertifikat für ein Programm erschleichen,
+  // dem er nie zugeordnet war. Freemium-Vorschauen (siehe
+  // freemium_programme.sql) haben ebenfalls keine coachie_programme-Zeile
+  // und fallen damit korrekt hier raus.
+  if (!zuordnung) {
+    res.status(403).json({ error: 'Keine Zuordnung zu diesem Programm.' })
     return
   }
 
