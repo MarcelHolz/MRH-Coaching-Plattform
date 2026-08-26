@@ -88,18 +88,21 @@ export default function AdminProgrammePage() {
   const [editSlug, setEditSlug] = useState('')
   const [editKaufbar, setEditKaufbar] = useState(false)
   const [editTeaser, setEditTeaser] = useState(false)
+  const [editFreemium, setEditFreemium] = useState(false)
   const [editPreisAnzeigen, setEditPreisAnzeigen] = useState(true)
   const [editZugriffsmonate, setEditZugriffsmonate] = useState('')
   const [editZielgruppeText, setEditZielgruppeText] = useState('')
   const [editAblaufSchritte, setEditAblaufSchritte] = useState(['', '', ''])
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editBildUrl, setEditBildUrl] = useState('')
+  const [editTrailerVideoUrl, setEditTrailerVideoUrl] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
     setEditingId(programm.id)
     setEditBeschreibung(programm.beschreibung ?? '')
     setEditBildUrl(programm.bild_url ?? '')
+    setEditTrailerVideoUrl(programm.trailer_video_url ?? '')
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -107,6 +110,7 @@ export default function AdminProgrammePage() {
     setEditSlug(programm.slug ?? '')
     setEditKaufbar(programm.oeffentlich_kaufbar ?? false)
     setEditTeaser(programm.teaser_aktiv ?? false)
+    setEditFreemium(programm.freemium_aktiv ?? false)
     setEditPreisAnzeigen(programm.preis_anzeigen ?? true)
     setEditZugriffsmonate(
       programm.standard_zugriffsmonate != null
@@ -146,6 +150,7 @@ export default function AdminProgrammePage() {
           slug: editSlug || null,
           oeffentlich_kaufbar: editKaufbar,
           teaser_aktiv: editTeaser,
+          freemium_aktiv: editFreemium,
           preis_anzeigen: editPreisAnzeigen,
           standard_zugriffsmonate: editZugriffsmonate
             ? Math.round(Number(editZugriffsmonate))
@@ -154,6 +159,7 @@ export default function AdminProgrammePage() {
           ablauf_schritte: ablaufSchritte.length > 0 ? ablaufSchritte : null,
           beschreibung: editBeschreibung,
           bild_url: editBildUrl || null,
+          trailer_video_url: editTrailerVideoUrl.trim() || null,
         }),
       })
       setEditingId(null)
@@ -227,6 +233,11 @@ export default function AdminProgrammePage() {
                     {programm.teaser_aktiv && (
                       <span className="rounded-full bg-mrh-navy/10 px-2 py-0.5 text-xs font-medium text-mrh-navy">
                         Teaser
+                      </span>
+                    )}
+                    {programm.freemium_aktiv && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        Freemium
                       </span>
                     )}
                   </div>
@@ -315,6 +326,18 @@ export default function AdminProgrammePage() {
                         className="mt-2 h-16 w-16 rounded-lg object-cover"
                       />
                     )}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Trailer-Video (YouTube-Link, für die Verkaufsseite)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      value={editTrailerVideoUrl}
+                      onChange={(e) => setEditTrailerVideoUrl(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">
@@ -422,6 +445,16 @@ export default function AdminProgrammePage() {
                       className="rounded border-slate-300"
                     />
                     Als Teaser zeigen (nicht zugeordneten Coachies als Vorschau)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={editFreemium}
+                      onChange={(e) => setEditFreemium(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Freemium (erste Session für alle eingeloggten Coachies
+                    kostenlos zugänglich)
                   </label>
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     <input

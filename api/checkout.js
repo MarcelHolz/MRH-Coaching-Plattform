@@ -19,7 +19,7 @@ async function handleVorschau(req, res, supabase) {
   const { data, error } = await supabase
     .from('programme')
     .select(
-      'titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate',
+      'id, titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate, bild_url, trailer_video_url',
     )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
@@ -36,7 +36,41 @@ async function handleVorschau(req, res, supabase) {
     return
   }
 
-  res.status(200).json({ programm: data })
+  // Modulübersicht (Titel + Anzahl Sessions je Modul) für die
+  // großzügigere Verkaufsseite -- rein informativ, keine Inhalte.
+  const [module, sessions, testimonials] = await Promise.all([
+    supabase
+      .from('module')
+      .select('id, titel')
+      .eq('programm_id', data.id)
+      .order('reihenfolge', { ascending: true }),
+    supabase.from('sessions').select('id, modul_id').eq('programm_id', data.id),
+    // Nur freigegebene Testimonials, ohne Coachie-Namen -- eine echte
+    // Namensnennung braucht zusätzliche, hier bewusst nicht vorhandene
+    // Einwilligung und wird bislang manuell mit dem Coachie geklärt
+    // (siehe TestimonialFormPage.jsx), nicht automatisch angezeigt.
+    supabase
+      .from('testimonials')
+      .select('text')
+      .eq('programm_id', data.id)
+      .eq('freigegeben', true)
+      .order('erstellt_am', { ascending: false }),
+  ])
+
+  const modulUebersicht = (module.data ?? []).map((modul) => ({
+    titel: modul.titel,
+    sessionAnzahl: (sessions.data ?? []).filter((s) => s.modul_id === modul.id)
+      .length,
+  }))
+
+  res.status(200).json({
+    programm: {
+      ...data,
+      modulUebersicht,
+      gesamtSessionAnzahl: (sessions.data ?? []).length,
+      testimonials: testimonials.data ?? [],
+    },
+  })
 }
 
 async function handleCheckoutSession(req, res, supabase) {

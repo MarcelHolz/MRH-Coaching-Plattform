@@ -52,6 +52,72 @@ async function handleBildUploadUrl(req, res, supabase) {
   })
 }
 
+// Admin-Sichtung eingereichter Testimonials (Feature 2) -- Coachies
+// legen sie per RLS direkt an (siehe testimonials.sql,
+// TestimonialFormPage.jsx), hier nur Lesen/Freigeben/Ablehnen mit
+// service_role. Keine automatische Freigabe, siehe Aufgabenstellung.
+async function handleTestimonials(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('testimonials')
+      .select('*, coachies(name), programme(titel)')
+      .order('erstellt_am', { ascending: false })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ testimonials: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, freigegeben } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('testimonials')
+      .update({ freigegeben })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ testimonial: data })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { error } = await supabase.from('testimonials').delete().eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
   if (!requireAdmin(req, res)) return
 
@@ -59,6 +125,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST' && req.query.resource === 'bild-upload') {
     await handleBildUploadUrl(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'testimonials') {
+    await handleTestimonials(req, res, supabase)
     return
   }
 

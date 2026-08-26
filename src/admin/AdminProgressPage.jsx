@@ -122,6 +122,11 @@ export default function AdminProgressPage() {
                             </>
                           )}
                         </span>
+                        <span className="w-20 shrink-0 text-right text-xs text-mrh-gold-dark">
+                          {stats?.durchschnittBewertung != null
+                            ? `★ ${stats.durchschnittBewertung} (${stats.anzahlBewertungen})`
+                            : '–'}
+                        </span>
                       </div>
                     )
                   })}

@@ -52,7 +52,25 @@ export default async function handler(req, res) {
     const quote =
       gestartet > 0 ? Math.round((abgeschlossen / gestartet) * 100) : 0
 
-    return { session_id: session.id, gestartet, abgeschlossen, quote }
+    const bewertungen = status.data
+      .filter((s) => s.session_id === session.id && s.bewertung != null)
+      .map((s) => s.bewertung)
+    const durchschnittBewertung =
+      bewertungen.length > 0
+        ? Math.round(
+            (bewertungen.reduce((sum, b) => sum + b, 0) / bewertungen.length) *
+              10,
+          ) / 10
+        : null
+
+    return {
+      session_id: session.id,
+      gestartet,
+      abgeschlossen,
+      quote,
+      durchschnittBewertung,
+      anzahlBewertungen: bewertungen.length,
+    }
   })
 
   res.status(200).json({

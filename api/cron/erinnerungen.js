@@ -14,6 +14,12 @@ import { sendMail } from '../_lib/mailer.js'
 // nur eine Mail verschickt (das zuletzt bearbeitete Programm), und maximal
 // eine pro Coachie pro 7-Tage-Fenster (geprüft über alle Programme hinweg
 // anhand von erinnerung_gesendet_am).
+//
+// Zusätzlich (Feature 2, Testimonial-Sammelmechanismus): derselbe Lauf
+// prüft pro Coachie/Programm-Zuordnung, ob inzwischen alle Sessions
+// abgeschlossen sind, und verschickt dann einmalig eine Einladung zum
+// Testimonial-Formular (testimonial_email_gesendet_am in
+// coachie_programme verhindert Mehrfachversand, siehe testimonials.sql).
 
 const SIEBEN_TAGE_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -118,6 +124,66 @@ async function ermittleKandidat(supabase, coachieId, jetzt) {
   return kandidat
 }
 
+// Testimonial-Einladung (Feature 2): pro Coachie/Programm-Zuordnung
+// prüfen, ob inzwischen alle Sessions abgeschlossen sind und noch keine
+// Einladungsmail verschickt wurde (testimonial_email_gesendet_am,
+// siehe testimonials.sql). Anders als die Inaktivitäts-Erinnerung kann
+// das pro Lauf mehrere Programme pro Coachie betreffen -- jedes fertige
+// Programm bekommt eine eigene Einladung.
+async function ermittleTestimonialKandidaten(supabase, coachieId) {
+  const { data: zuordnungen } = await supabase
+    .from('coachie_programme')
+    .select('programm_id, testimonial_email_gesendet_am, programme(titel)')
+    .eq('coachie_id', coachieId)
+
+  const kandidaten = []
+
+  for (const zuordnung of zuordnungen ?? []) {
+    if (zuordnung.testimonial_email_gesendet_am || !zuordnung.programme) continue
+
+    const { data: sessions } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('programm_id', zuordnung.programm_id)
+
+    const sessionIds = (sessions ?? []).map((s) => s.id)
+    if (sessionIds.length === 0) continue
+
+    const { data: statusListe } = await supabase
+      .from('coachie_status')
+      .select('status')
+      .eq('coachie_id', coachieId)
+      .in('session_id', sessionIds)
+
+    const abgeschlossen = (statusListe ?? []).filter(
+      (s) => s.status === 'abgeschlossen',
+    ).length
+
+    if (abgeschlossen === sessionIds.length) {
+      kandidaten.push({
+        programmId: zuordnung.programm_id,
+        programmTitel: zuordnung.programme.titel,
+      })
+    }
+  }
+
+  return kandidaten
+}
+
+function testimonialEinladungsText(coachie, kandidat, appUrl) {
+  const anrede = coachie.name ? `Hallo ${coachie.name},` : 'Hallo,'
+
+  return [
+    anrede,
+    '',
+    `du hast "${kandidat.programmTitel}" komplett abgeschlossen -- herzlichen Glückwunsch!`,
+    '',
+    `Magst du kurz teilen, wie es für dich war? Das hilft anderen bei der Entscheidung: ${appUrl}/coachie/testimonial/${kandidat.programmId}`,
+    '',
+    'Nur wenn du möchtest -- ganz ohne Verpflichtung, und natürlich prüfen wir jeden Text, bevor er irgendwo erscheint.',
+  ].join('\n')
+}
+
 export default async function handler(req, res) {
   const erwarteteAuth = `Bearer ${process.env.CRON_SECRET}`
   if (!process.env.CRON_SECRET || req.headers.authorization !== erwarteteAuth) {
@@ -139,32 +205,59 @@ export default async function handler(req, res) {
   }
 
   let versendet = 0
+  let testimonialEinladungenVersendet = 0
   const fehler = []
 
   for (const coachie of coachies ?? []) {
     try {
       const kandidat = await ermittleKandidat(supabase, coachie.id, jetzt)
-      if (!kandidat || !coachie.email) continue
+      if (kandidat && coachie.email) {
+        await sendMail({
+          to: coachie.email,
+          subject: `${coachie.name ? coachie.name + ', d' : 'D'}ein Programm wartet auf dich`,
+          text: erinnerungsText(coachie, kandidat, appUrl),
+        })
 
-      await sendMail({
-        to: coachie.email,
-        subject: `${coachie.name ? coachie.name + ', d' : 'D'}ein Programm wartet auf dich`,
-        text: erinnerungsText(coachie, kandidat, appUrl),
-      })
+        await supabase
+          .from('coachie_status')
+          .update({ erinnerung_gesendet_am: jetzt.toISOString() })
+          .eq('coachie_id', coachie.id)
+          .eq('session_id', kandidat.sessionId)
 
-      await supabase
-        .from('coachie_status')
-        .update({ erinnerung_gesendet_am: jetzt.toISOString() })
-        .eq('coachie_id', coachie.id)
-        .eq('session_id', kandidat.sessionId)
+        versendet += 1
+      }
 
-      versendet += 1
+      if (coachie.email) {
+        const testimonialKandidaten = await ermittleTestimonialKandidaten(
+          supabase,
+          coachie.id,
+        )
+
+        for (const testimonialKandidat of testimonialKandidaten) {
+          await sendMail({
+            to: coachie.email,
+            subject: `Herzlichen Glückwunsch zum Abschluss von "${testimonialKandidat.programmTitel}"`,
+            text: testimonialEinladungsText(coachie, testimonialKandidat, appUrl),
+          })
+
+          await supabase
+            .from('coachie_programme')
+            .update({ testimonial_email_gesendet_am: jetzt.toISOString() })
+            .eq('coachie_id', coachie.id)
+            .eq('programm_id', testimonialKandidat.programmId)
+
+          testimonialEinladungenVersendet += 1
+        }
+      }
     } catch (err) {
       fehler.push({ coachie_id: coachie.id, message: err.message })
     }
   }
 
-  res
-    .status(200)
-    .json({ geprueft: (coachies ?? []).length, versendet, fehler })
+  res.status(200).json({
+    geprueft: (coachies ?? []).length,
+    versendet,
+    testimonialEinladungenVersendet,
+    fehler,
+  })
 }

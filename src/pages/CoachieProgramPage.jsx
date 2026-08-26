@@ -131,9 +131,38 @@ function MaterialZeile({ material }) {
   )
 }
 
+// Kleine, überspringbare Sternebewertung -- erscheint nur, wenn die
+// Session als abgeschlossen markiert wird (Kurzfeedback, kein Zwang:
+// wer keinen Stern anklickt, speichert einfach ohne Bewertung).
+function Sternebewertung({ wert, onChange }) {
+  return (
+    <div className="mb-3 flex items-center gap-1">
+      <span className="mr-1 text-xs text-mrh-grey">
+        Wie war diese Session? (optional)
+      </span>
+      {[1, 2, 3, 4, 5].map((stern) => (
+        <button
+          key={stern}
+          type="button"
+          onClick={() => onChange(wert === stern ? null : stern)}
+          aria-label={`${stern} Sterne`}
+          className={`text-lg leading-none transition ${
+            wert != null && stern <= wert
+              ? 'text-mrh-gold'
+              : 'text-slate-300 hover:text-mrh-gold-soft'
+          }`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle }) {
   const [auswahl, setAuswahl] = useState(status?.status ?? 'offen')
   const [notiz, setNotiz] = useState(status?.notiz ?? '')
+  const [bewertung, setBewertung] = useState(status?.bewertung ?? null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -152,6 +181,7 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
           session_id: session.id,
           status: auswahl,
           notiz,
+          bewertung: auswahl === 'abgeschlossen' ? bewertung : null,
           aktualisiert_am: new Date().toISOString(),
         },
         { onConflict: 'coachie_id,session_id' },
@@ -265,6 +295,9 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
                 </button>
               ))}
             </div>
+            {auswahl === 'abgeschlossen' && (
+              <Sternebewertung wert={bewertung} onChange={setBewertung} />
+            )}
             <textarea
               value={notiz}
               onChange={(e) => setNotiz(e.target.value)}
@@ -282,6 +315,56 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Lädt das PDF-Zertifikat (api/certificate.js) authentifiziert per
+// Access-Token herunter -- der erste coachie-authentifizierte
+// Backend-Aufruf dieser App, alle anderen Coachie-Schreibzugriffe laufen
+// direkt über den Supabase-Client mit RLS.
+function ZertifikatButton({ programmId, programmTitel, accessToken }) {
+  const [laedt, setLaedt] = useState(false)
+  const [fehler, setFehler] = useState('')
+
+  async function handleDownload() {
+    setLaedt(true)
+    setFehler('')
+    try {
+      const response = await fetch(`/api/certificate?programm_id=${programmId}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+
+      if (!response.ok) {
+        throw new Error('Zertifikat konnte nicht erstellt werden.')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Zertifikat-${programmTitel}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setFehler('Zertifikat konnte nicht heruntergeladen werden.')
+    } finally {
+      setLaedt(false)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={handleDownload}
+        disabled={laedt}
+        className="rounded-lg border border-mrh-gold px-4 py-2 text-sm font-medium text-mrh-gold-dark transition hover:bg-mrh-gold/10 disabled:opacity-50"
+      >
+        {laedt ? 'Erstellt Zertifikat…' : 'Zertifikat herunterladen'}
+      </button>
+      {fehler && <p className="mt-2 text-xs text-red-600">{fehler}</p>}
     </div>
   )
 }
@@ -390,7 +473,7 @@ function ModulKarte({
 
 export default function CoachieProgramPage() {
   const { programId } = useParams()
-  const { coachie } = useAuth()
+  const { coachie, session } = useAuth()
   const [searchParams] = useSearchParams()
   const [programm, setProgramm] = useState(null)
   const [sessions, setSessions] = useState([])
@@ -402,6 +485,7 @@ export default function CoachieProgramPage() {
   const [offenesModulId, setOffenesModulId] = useState(null)
   const [autoStartErledigt, setAutoStartErledigt] = useState(false)
   const [zielText, setZielText] = useState(null)
+  const [hatZuordnung, setHatZuordnung] = useState(true)
   const [zielPromptAusgeblendet, setZielPromptAusgeblendet] = useState(false)
   const [zielEingabe, setZielEingabe] = useState('')
   const [zielSpeichert, setZielSpeichert] = useState(false)
@@ -501,6 +585,7 @@ export default function CoachieProgramPage() {
           Object.fromEntries(statusListe.map((s) => [s.session_id, s])),
         )
         setZielText(zuordnungData?.ziel_text ?? null)
+        setHatZuordnung(zuordnungData != null)
         setLoading(false)
       }
     }
@@ -536,7 +621,10 @@ export default function CoachieProgramPage() {
       // Übergang von <100% auf 100% Fortschritt in diesem Moment, kein
       // eigenes DB-Feld -- ein bereits vorher abgeschlossenes Programm
       // löst beim erneuten Öffnen die Ansicht daher nicht erneut aus.
-      if (sessions.length > 0) {
+      // Nur mit echter Zuordnung: ohne coachie_programme sieht ein
+      // Freemium-Besucher per RLS nur die eine freigegebene Session, die
+      // dann fälschlich als "ganzes Programm abgeschlossen" gälte.
+      if (sessions.length > 0 && hatZuordnung) {
         const vorher = sessions.filter(
           (s) => prev[s.id]?.status === 'abgeschlossen',
         ).length
@@ -610,12 +698,21 @@ export default function CoachieProgramPage() {
             <p className="font-serif italic text-mrh-navy">&bdquo;{zielText}&ldquo;</p>
           </div>
         )}
-        <Link
-          to="/coachie"
-          className="inline-block rounded-lg bg-mrh-navy px-6 py-3 text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
-        >
-          Zurück zum Dashboard
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            to="/coachie"
+            className="inline-block rounded-lg bg-mrh-navy px-6 py-3 text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
+          >
+            Zurück zum Dashboard
+          </Link>
+          {hatZuordnung && session?.access_token && (
+            <ZertifikatButton
+              programmId={programId}
+              programmTitel={programm?.titel ?? 'Programm'}
+              accessToken={session.access_token}
+            />
+          )}
+        </div>
       </div>
     )
   }
@@ -669,6 +766,13 @@ export default function CoachieProgramPage() {
           />
         )}
       </div>
+
+      {!hatZuordnung && programm.freemium_aktiv && (
+        <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          Du siehst hier die erste Session kostenlos als Vorschau. Für den
+          vollständigen Zugriff auf alle Sessions melde dich bei Marcel.
+        </div>
+      )}
 
       {zielPromptSichtbar && (
         <form
@@ -738,6 +842,15 @@ export default function CoachieProgramPage() {
                   style={{ width: `${prozent}%` }}
                 />
               </div>
+              {prozent === 100 && hatZuordnung && session?.access_token && (
+                <div className="mt-4">
+                  <ZertifikatButton
+                    programmId={programId}
+                    programmTitel={programm.titel}
+                    accessToken={session.access_token}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
