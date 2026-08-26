@@ -75,7 +75,7 @@ export default function CoachieDashboardPage() {
       const { data: zuordnungen, error: zuordnungenError } = await supabase
         .from('coachie_programme')
         .select(
-          'programm_id, zugriff_bis, zugewiesen_am, programme(id, titel, beschreibung, aktiv, bild_url)',
+          'programm_id, zugriff_bis, zugewiesen_am, programme(id, titel, beschreibung, aktiv, bild_url, coach_foto_url, begruessung_text)',
         )
         .eq('coachie_id', coachie.id)
 
@@ -296,6 +296,24 @@ export default function CoachieDashboardPage() {
               </Link>
             )}
           </div>
+
+          {aktivesProgramm &&
+            (aktivesProgramm.coach_foto_url || aktivesProgramm.begruessung_text) && (
+              <div className="mb-8 flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm">
+                {aktivesProgramm.coach_foto_url && (
+                  <img
+                    src={aktivesProgramm.coach_foto_url}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded-full object-cover"
+                  />
+                )}
+                {aktivesProgramm.begruessung_text && (
+                  <p className="font-serif italic text-mrh-navy">
+                    &bdquo;{aktivesProgramm.begruessung_text}&ldquo;
+                  </p>
+                )}
+              </div>
+            )}
 
           <h2 className="mb-4 text-lg font-semibold text-mrh-navy">Deine Programme</h2>
           <div className="grid gap-4 sm:grid-cols-2">
