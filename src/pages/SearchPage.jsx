@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 // Rein clientseitige Suche über bereits für den Coachie zugängliche
 // Inhalte: die drei Tabellen werden ungefiltert abgefragt, RLS liefert
@@ -9,32 +10,44 @@ import { supabase } from '../lib/supabaseClient'
 // API-Route nötig. Bei der überschaubaren Datenmenge reicht ein simples
 // includes()-Filtern, keine Fuzzy-Suche/Volltextindex nötig.
 export default function SearchPage() {
+  const { coachie } = useAuth()
   const [programme, setProgramme] = useState([])
   const [module, setModule] = useState([])
   const [sessions, setSessions] = useState([])
+  const [lesezeichenIds, setLesezeichenIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
 
   useEffect(() => {
+    if (!coachie?.id) return
+
     let cancelled = false
 
     async function load() {
       setLoading(true)
       setError('')
 
-      const [{ data: p, error: pErr }, { data: m, error: mErr }, { data: s, error: sErr }] =
-        await Promise.all([
-          supabase.from('programme').select('id, titel'),
-          supabase.from('module').select('id, titel, programm_id, reihenfolge'),
-          supabase
-            .from('sessions')
-            .select('id, titel, beschreibung, programm_id, modul_id, reihenfolge'),
-        ])
+      const [
+        { data: p, error: pErr },
+        { data: m, error: mErr },
+        { data: s, error: sErr },
+        { data: l, error: lErr },
+      ] = await Promise.all([
+        supabase.from('programme').select('id, titel'),
+        supabase.from('module').select('id, titel, programm_id, reihenfolge'),
+        supabase
+          .from('sessions')
+          .select('id, titel, beschreibung, programm_id, modul_id, reihenfolge'),
+        supabase
+          .from('session_lesezeichen')
+          .select('session_id')
+          .eq('coachie_id', coachie.id),
+      ])
 
       if (cancelled) return
 
-      if (pErr || mErr || sErr) {
+      if (pErr || mErr || sErr || lErr) {
         setError('Suche konnte nicht geladen werden.')
         setLoading(false)
         return
@@ -43,6 +56,7 @@ export default function SearchPage() {
       setProgramme(p ?? [])
       setModule(m ?? [])
       setSessions(s ?? [])
+      setLesezeichenIds(new Set((l ?? []).map((eintrag) => eintrag.session_id)))
       setLoading(false)
     }
 
@@ -51,7 +65,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [coachie])
 
   const programmTitel = useMemo(
     () => Object.fromEntries(programme.map((p) => [p.id, p.titel])),
@@ -116,6 +130,20 @@ export default function SearchPage() {
     return treffer
   }, [query, sessions, module, programme, programmTitel, zugaenglicheProgrammIds])
 
+  // "Meine Lesezeichen" als Standardansicht, solange kein Suchbegriff
+  // eingegeben ist -- Filter statt eigenem Dashboard-Bereich (siehe
+  // Aufgabenstellung, "oder als Filter in der Suche").
+  const lesezeichenSessions = useMemo(
+    () =>
+      sessions
+        .filter((s) => lesezeichenIds.has(s.id))
+        .map((session) => ({
+          session,
+          programmTitel: programmTitel[session.programm_id] ?? '',
+        })),
+    [sessions, lesezeichenIds, programmTitel],
+  )
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">Suche</h1>
@@ -150,6 +178,34 @@ export default function SearchPage() {
                 </p>
               </Link>
             ))
+          )}
+        </div>
+      )}
+
+      {!loading && !error && !query.trim() && (
+        <div>
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-mrh-grey">
+            Meine Lesezeichen
+          </h2>
+          {lesezeichenSessions.length === 0 ? (
+            <p className="text-sm text-mrh-grey">
+              Noch keine Lesezeichen -- markiere Sessions mit dem ☆-Symbol.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {lesezeichenSessions.map(({ session, programmTitel: pTitel }) => (
+                <Link
+                  key={session.id}
+                  to={`/coachie/programme/${session.programm_id}?session=${session.id}`}
+                  className="block rounded-xl bg-white p-4 shadow-sm transition hover:shadow-md"
+                >
+                  <p className="font-medium text-slate-800">
+                    ★ {session.titel}
+                  </p>
+                  <p className="text-xs text-mrh-grey">{pTitel}</p>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
       )}

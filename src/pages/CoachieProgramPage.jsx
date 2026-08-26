@@ -160,7 +160,16 @@ function Sternebewertung({ wert, onChange }) {
   )
 }
 
-function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle }) {
+function SessionRow({
+  session,
+  coachieId,
+  status,
+  onStatusChange,
+  open,
+  onToggle,
+  istLesezeichen,
+  onToggleLesezeichen,
+}) {
   const [auswahl, setAuswahl] = useState(status?.status ?? 'offen')
   const [notiz, setNotiz] = useState(status?.notiz ?? '')
   const [bewertung, setBewertung] = useState(status?.bewertung ?? null)
@@ -202,24 +211,35 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
 
   return (
     <div className="rounded-xl bg-white shadow-sm">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left"
-      >
-        <StatusIcon status={status?.status ?? 'offen'} />
-        <span className="flex-1 font-medium text-slate-800">{session.titel}</span>
-        <svg
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`h-4 w-4 shrink-0 text-mrh-grey transition-transform ${open ? 'rotate-180' : ''}`}
+      <div className="flex w-full items-center gap-3 px-5 py-4">
+        <button
+          onClick={() => onToggleLesezeichen(session.id)}
+          aria-label={
+            istLesezeichen ? 'Lesezeichen entfernen' : 'Lesezeichen setzen'
+          }
+          className="shrink-0 text-lg text-mrh-gold-dark"
         >
-          <path
-            fillRule="evenodd"
-            d="M5.2 7.2a1 1 0 0 1 1.4 0L10 10.6l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 8.6a1 1 0 0 1 0-1.4Z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
+          {istLesezeichen ? '★' : '☆'}
+        </button>
+        <button
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-3 text-left"
+        >
+          <StatusIcon status={status?.status ?? 'offen'} />
+          <span className="flex-1 font-medium text-slate-800">{session.titel}</span>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className={`h-4 w-4 shrink-0 text-mrh-grey transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.2 7.2a1 1 0 0 1 1.4 0L10 10.6l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 8.6a1 1 0 0 1 0-1.4Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
 
       {open && (
         <div className="border-t border-slate-100 px-5 pb-5 pt-4">
@@ -381,6 +401,8 @@ function ModulKarte({
   onToggle,
   openSessionId,
   onToggleSession,
+  lesezeichenSet,
+  onToggleLesezeichen,
 }) {
   const abgeschlossen = sessions.filter(
     (s) => statusMap[s.id]?.status === 'abgeschlossen',
@@ -471,6 +493,8 @@ function ModulKarte({
               onStatusChange={onStatusChange}
               open={openSessionId === session.id}
               onToggle={() => onToggleSession(session.id)}
+              istLesezeichen={lesezeichenSet.has(session.id)}
+              onToggleLesezeichen={onToggleLesezeichen}
             />
           ))}
           {sessions.length === 0 && (
@@ -503,6 +527,7 @@ export default function CoachieProgramPage() {
   const [zielEingabe, setZielEingabe] = useState('')
   const [zielSpeichert, setZielSpeichert] = useState(false)
   const [erfolgAnzeigen, setErfolgAnzeigen] = useState(false)
+  const [lesezeichenSet, setLesezeichenSet] = useState(new Set())
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -561,6 +586,7 @@ export default function CoachieProgramPage() {
 
       const sessionIds = (sessionsData ?? []).map((s) => s.id)
       let statusListe = []
+      let lesezeichenListe = []
 
       if (sessionIds.length > 0) {
         const { data: statusData } = await supabase
@@ -570,6 +596,14 @@ export default function CoachieProgramPage() {
           .in('session_id', sessionIds)
 
         statusListe = statusData ?? []
+
+        const { data: lesezeichenData } = await supabase
+          .from('session_lesezeichen')
+          .select('session_id')
+          .eq('coachie_id', coachie.id)
+          .in('session_id', sessionIds)
+
+        lesezeichenListe = lesezeichenData ?? []
       }
 
       const { data: zuordnungData } = await supabase
@@ -599,6 +633,7 @@ export default function CoachieProgramPage() {
         )
         setZielText(zuordnungData?.ziel_text ?? null)
         setHatZuordnung(zuordnungData != null)
+        setLesezeichenSet(new Set(lesezeichenListe.map((l) => l.session_id)))
         setLoading(false)
       }
     }
@@ -640,6 +675,39 @@ export default function CoachieProgramPage() {
     setOpenId(ziel.id)
     if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
   }, [loading, sessions, searchParams])
+
+  async function handleToggleLesezeichen(sessionId) {
+    const istGesetzt = lesezeichenSet.has(sessionId)
+
+    // Optimistisch umschalten, bei Fehler zurückrollen -- kein neuer
+    // API-Endpunkt nötig, direkter Supabase-Client-Zugriff mit RLS
+    // ("coachie verwaltet eigene Lesezeichen", session_lesezeichen.sql).
+    setLesezeichenSet((prev) => {
+      const next = new Set(prev)
+      if (istGesetzt) next.delete(sessionId)
+      else next.add(sessionId)
+      return next
+    })
+
+    const { error: lesezeichenError } = istGesetzt
+      ? await supabase
+          .from('session_lesezeichen')
+          .delete()
+          .eq('coachie_id', coachie.id)
+          .eq('session_id', sessionId)
+      : await supabase
+          .from('session_lesezeichen')
+          .insert({ coachie_id: coachie.id, session_id: sessionId })
+
+    if (lesezeichenError) {
+      setLesezeichenSet((prev) => {
+        const next = new Set(prev)
+        if (istGesetzt) next.add(sessionId)
+        else next.delete(sessionId)
+        return next
+      })
+    }
+  }
 
   function handleStatusChange(sessionId, newStatus) {
     setStatusMap((prev) => {
@@ -939,6 +1007,8 @@ export default function CoachieProgramPage() {
                   onToggle={() =>
                     setOpenId(openId === session.id ? null : session.id)
                   }
+                  istLesezeichen={lesezeichenSet.has(session.id)}
+                  onToggleLesezeichen={handleToggleLesezeichen}
                 />
               ))}
               {moduleMitSessions.map((modul) => (
@@ -957,6 +1027,8 @@ export default function CoachieProgramPage() {
                   onToggleSession={(id) =>
                     setOpenId(openId === id ? null : id)
                   }
+                  lesezeichenSet={lesezeichenSet}
+                  onToggleLesezeichen={handleToggleLesezeichen}
                 />
               ))}
             </div>
