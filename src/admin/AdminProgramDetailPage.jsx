@@ -15,6 +15,7 @@ export default function AdminProgramDetailPage() {
   const [beschreibung, setBeschreibung] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
   const [bildUrl, setBildUrl] = useState('')
+  const [dauerMinuten, setDauerMinuten] = useState('')
   const [modulId, setModulId] = useState('')
   const [expandedId, setExpandedId] = useState(null)
 
@@ -23,6 +24,7 @@ export default function AdminProgramDetailPage() {
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editVideoUrl, setEditVideoUrl] = useState('')
   const [editBildUrl, setEditBildUrl] = useState('')
+  const [editDauerMinuten, setEditDauerMinuten] = useState('')
   const [editModulId, setEditModulId] = useState('')
   const [editReihenfolge, setEditReihenfolge] = useState(0)
   const [editSubmitting, setEditSubmitting] = useState(false)
@@ -75,6 +77,7 @@ export default function AdminProgramDetailPage() {
           beschreibung,
           video_url: videoUrl,
           bild_url: bildUrl,
+          dauer_minuten: dauerMinuten ? Math.round(Number(dauerMinuten)) : null,
           modul_id: modulId || null,
           reihenfolge: sessions.length,
         }),
@@ -83,6 +86,7 @@ export default function AdminProgramDetailPage() {
       setBeschreibung('')
       setVideoUrl('')
       setBildUrl('')
+      setDauerMinuten('')
       setModulId('')
       await loadSessions()
     } catch (err) {
@@ -107,6 +111,9 @@ export default function AdminProgramDetailPage() {
     setEditBeschreibung(session.beschreibung ?? '')
     setEditVideoUrl(session.video_url ?? '')
     setEditBildUrl(session.bild_url ?? '')
+    setEditDauerMinuten(
+      session.dauer_minuten != null ? String(session.dauer_minuten) : '',
+    )
     setEditModulId(session.modul_id ?? '')
     setEditReihenfolge(session.reihenfolge)
   }
@@ -128,6 +135,9 @@ export default function AdminProgramDetailPage() {
           beschreibung: editBeschreibung,
           video_url: editVideoUrl,
           bild_url: editBildUrl,
+          dauer_minuten: editDauerMinuten
+            ? Math.round(Number(editDauerMinuten))
+            : null,
           modul_id: editModulId || null,
           reihenfolge: Number(editReihenfolge),
         }),
@@ -202,7 +212,7 @@ export default function AdminProgramDetailPage() {
         </div>
         <input
           type="url"
-          placeholder="Video-URL (YouTube)"
+          placeholder="Video-URL (YouTube oder Vimeo)"
           value={videoUrl}
           onChange={(e) => setVideoUrl(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
@@ -212,6 +222,14 @@ export default function AdminProgramDetailPage() {
           placeholder="Bild-URL"
           value={bildUrl}
           onChange={(e) => setBildUrl(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+        />
+        <input
+          type="number"
+          min="0"
+          placeholder="Dauer in Minuten (optional)"
+          value={dauerMinuten}
+          onChange={(e) => setDauerMinuten(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
         />
         <select
@@ -331,7 +349,7 @@ export default function AdminProgramDetailPage() {
                   </div>
                   <input
                     type="url"
-                    placeholder="Video-URL (YouTube)"
+                    placeholder="Video-URL (YouTube oder Vimeo)"
                     value={editVideoUrl}
                     onChange={(e) => setEditVideoUrl(e.target.value)}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
@@ -341,6 +359,14 @@ export default function AdminProgramDetailPage() {
                     placeholder="Bild-URL"
                     value={editBildUrl}
                     onChange={(e) => setEditBildUrl(e.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Dauer in Minuten (optional)"
+                    value={editDauerMinuten}
+                    onChange={(e) => setEditDauerMinuten(e.target.value)}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                   />
                   <select

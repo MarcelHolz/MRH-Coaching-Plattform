@@ -3,6 +3,9 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
+import { toVimeoEmbedUrl } from '../lib/vimeo'
+import CalendlyWidget from '../components/CalendlyWidget'
+import ZertifikatButton from '../components/ZertifikatButton'
 import { getSignedMaterialUrl } from '../lib/storage'
 import { renderMarkdown } from '../lib/markdown'
 
@@ -159,14 +162,24 @@ function Sternebewertung({ wert, onChange }) {
   )
 }
 
-function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle }) {
+function SessionRow({
+  session,
+  coachieId,
+  status,
+  onStatusChange,
+  open,
+  onToggle,
+  istLesezeichen,
+  onToggleLesezeichen,
+}) {
   const [auswahl, setAuswahl] = useState(status?.status ?? 'offen')
   const [notiz, setNotiz] = useState(status?.notiz ?? '')
   const [bewertung, setBewertung] = useState(status?.bewertung ?? null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const embedUrl = toYoutubeEmbedUrl(session.video_url)
+  const embedUrl =
+    toYoutubeEmbedUrl(session.video_url) || toVimeoEmbedUrl(session.video_url)
 
   async function handleSave() {
     setSaving(true)
@@ -200,24 +213,35 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
 
   return (
     <div className="rounded-xl bg-white shadow-sm">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-5 py-4 text-left"
-      >
-        <StatusIcon status={status?.status ?? 'offen'} />
-        <span className="flex-1 font-medium text-slate-800">{session.titel}</span>
-        <svg
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`h-4 w-4 shrink-0 text-mrh-grey transition-transform ${open ? 'rotate-180' : ''}`}
+      <div className="flex w-full items-center gap-3 px-5 py-4">
+        <button
+          onClick={() => onToggleLesezeichen(session.id)}
+          aria-label={
+            istLesezeichen ? 'Lesezeichen entfernen' : 'Lesezeichen setzen'
+          }
+          className="shrink-0 text-lg text-mrh-gold-dark"
         >
-          <path
-            fillRule="evenodd"
-            d="M5.2 7.2a1 1 0 0 1 1.4 0L10 10.6l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 8.6a1 1 0 0 1 0-1.4Z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
+          {istLesezeichen ? '★' : '☆'}
+        </button>
+        <button
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-3 text-left"
+        >
+          <StatusIcon status={status?.status ?? 'offen'} />
+          <span className="flex-1 font-medium text-slate-800">{session.titel}</span>
+          <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className={`h-4 w-4 shrink-0 text-mrh-grey transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.2 7.2a1 1 0 0 1 1.4 0L10 10.6l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L5.2 8.6a1 1 0 0 1 0-1.4Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
 
       {open && (
         <div className="border-t border-slate-100 px-5 pb-5 pt-4">
@@ -319,56 +343,6 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
   )
 }
 
-// Lädt das PDF-Zertifikat (api/certificate.js) authentifiziert per
-// Access-Token herunter -- der erste coachie-authentifizierte
-// Backend-Aufruf dieser App, alle anderen Coachie-Schreibzugriffe laufen
-// direkt über den Supabase-Client mit RLS.
-function ZertifikatButton({ programmId, programmTitel, accessToken }) {
-  const [laedt, setLaedt] = useState(false)
-  const [fehler, setFehler] = useState('')
-
-  async function handleDownload() {
-    setLaedt(true)
-    setFehler('')
-    try {
-      const response = await fetch(`/api/certificate?programm_id=${programmId}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-
-      if (!response.ok) {
-        throw new Error('Zertifikat konnte nicht erstellt werden.')
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `Zertifikat-${programmTitel}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
-    } catch {
-      setFehler('Zertifikat konnte nicht heruntergeladen werden.')
-    } finally {
-      setLaedt(false)
-    }
-  }
-
-  return (
-    <div>
-      <button
-        onClick={handleDownload}
-        disabled={laedt}
-        className="rounded-lg border border-mrh-gold px-4 py-2 text-sm font-medium text-mrh-gold-dark transition hover:bg-mrh-gold/10 disabled:opacity-50"
-      >
-        {laedt ? 'Erstellt Zertifikat…' : 'Zertifikat herunterladen'}
-      </button>
-      {fehler && <p className="mt-2 text-xs text-red-600">{fehler}</p>}
-    </div>
-  )
-}
-
 function ModulKarte({
   modul,
   sessions,
@@ -379,6 +353,8 @@ function ModulKarte({
   onToggle,
   openSessionId,
   onToggleSession,
+  lesezeichenSet,
+  onToggleLesezeichen,
 }) {
   const abgeschlossen = sessions.filter(
     (s) => statusMap[s.id]?.status === 'abgeschlossen',
@@ -386,6 +362,13 @@ function ModulKarte({
   const prozent =
     sessions.length > 0 ? Math.round((abgeschlossen / sessions.length) * 100) : 0
   const begonnen = sessions.some((s) => statusMap[s.id])
+
+  // Fehlende dauer_minuten (nullable, siehe session_dauer.sql) werden
+  // beim Summieren einfach übersprungen statt einen Fehler zu werfen.
+  const gesamtDauer = sessions.reduce(
+    (summe, s) => summe + (s.dauer_minuten || 0),
+    0,
+  )
 
   return (
     <div className="rounded-xl bg-white shadow-sm">
@@ -417,6 +400,10 @@ function ModulKarte({
                 : 'Noch nicht begonnen'}
           </span>
           <p className="font-semibold text-slate-800">{modul.titel}</p>
+          <p className="text-xs text-mrh-grey">
+            {sessions.length} Session{sessions.length === 1 ? '' : 's'}
+            {gesamtDauer > 0 ? ` · ${gesamtDauer} Min.` : ''}
+          </p>
           {modul.beschreibung && (
             <p
               className={`mt-1 text-sm text-mrh-grey ${open ? '' : 'line-clamp-2'}`}
@@ -458,6 +445,8 @@ function ModulKarte({
               onStatusChange={onStatusChange}
               open={openSessionId === session.id}
               onToggle={() => onToggleSession(session.id)}
+              istLesezeichen={lesezeichenSet.has(session.id)}
+              onToggleLesezeichen={onToggleLesezeichen}
             />
           ))}
           {sessions.length === 0 && (
@@ -490,6 +479,8 @@ export default function CoachieProgramPage() {
   const [zielEingabe, setZielEingabe] = useState('')
   const [zielSpeichert, setZielSpeichert] = useState(false)
   const [erfolgAnzeigen, setErfolgAnzeigen] = useState(false)
+  const [lesezeichenSet, setLesezeichenSet] = useState(new Set())
+  const [zeigeCalendly, setZeigeCalendly] = useState(false)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -548,6 +539,7 @@ export default function CoachieProgramPage() {
 
       const sessionIds = (sessionsData ?? []).map((s) => s.id)
       let statusListe = []
+      let lesezeichenListe = []
 
       if (sessionIds.length > 0) {
         const { data: statusData } = await supabase
@@ -557,6 +549,14 @@ export default function CoachieProgramPage() {
           .in('session_id', sessionIds)
 
         statusListe = statusData ?? []
+
+        const { data: lesezeichenData } = await supabase
+          .from('session_lesezeichen')
+          .select('session_id')
+          .eq('coachie_id', coachie.id)
+          .in('session_id', sessionIds)
+
+        lesezeichenListe = lesezeichenData ?? []
       }
 
       const { data: zuordnungData } = await supabase
@@ -586,6 +586,7 @@ export default function CoachieProgramPage() {
         )
         setZielText(zuordnungData?.ziel_text ?? null)
         setHatZuordnung(zuordnungData != null)
+        setLesezeichenSet(new Set(lesezeichenListe.map((l) => l.session_id)))
         setLoading(false)
       }
     }
@@ -612,6 +613,54 @@ export default function CoachieProgramPage() {
     if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
     setAutoStartErledigt(true)
   }, [autoStartErledigt, loading, sessions, module, statusMap, searchParams])
+
+  useEffect(() => {
+    // Deep-Link aus der Suche (SearchPage.jsx): ?session=<id> öffnet
+    // direkt die passende Session samt ihrem Modul, unabhängig vom
+    // ?start=1-Onboarding-Sprung oben.
+    if (loading) return
+    const zielId = searchParams.get('session')
+    if (!zielId) return
+
+    const ziel = sessions.find((s) => s.id === zielId)
+    if (!ziel) return
+
+    setOpenId(ziel.id)
+    if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
+  }, [loading, sessions, searchParams])
+
+  async function handleToggleLesezeichen(sessionId) {
+    const istGesetzt = lesezeichenSet.has(sessionId)
+
+    // Optimistisch umschalten, bei Fehler zurückrollen -- kein neuer
+    // API-Endpunkt nötig, direkter Supabase-Client-Zugriff mit RLS
+    // ("coachie verwaltet eigene Lesezeichen", session_lesezeichen.sql).
+    setLesezeichenSet((prev) => {
+      const next = new Set(prev)
+      if (istGesetzt) next.delete(sessionId)
+      else next.add(sessionId)
+      return next
+    })
+
+    const { error: lesezeichenError } = istGesetzt
+      ? await supabase
+          .from('session_lesezeichen')
+          .delete()
+          .eq('coachie_id', coachie.id)
+          .eq('session_id', sessionId)
+      : await supabase
+          .from('session_lesezeichen')
+          .insert({ coachie_id: coachie.id, session_id: sessionId })
+
+    if (lesezeichenError) {
+      setLesezeichenSet((prev) => {
+        const next = new Set(prev)
+        if (istGesetzt) next.add(sessionId)
+        else next.delete(sessionId)
+        return next
+      })
+    }
+  }
 
   function handleStatusChange(sessionId, newStatus) {
     setStatusMap((prev) => {
@@ -774,6 +823,22 @@ export default function CoachieProgramPage() {
         </div>
       )}
 
+      {programm.calendly_url && (
+        <div className="mt-6">
+          <button
+            onClick={() => setZeigeCalendly((v) => !v)}
+            className="rounded-lg border border-mrh-navy px-4 py-2 text-sm font-medium text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
+          >
+            {zeigeCalendly ? 'Terminbuchung schließen' : '1:1-Termin buchen'}
+          </button>
+          {zeigeCalendly && (
+            <div className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm">
+              <CalendlyWidget url={programm.calendly_url} />
+            </div>
+          )}
+        </div>
+      )}
+
       {zielPromptSichtbar && (
         <form
           onSubmit={handleZielSpeichern}
@@ -911,6 +976,8 @@ export default function CoachieProgramPage() {
                   onToggle={() =>
                     setOpenId(openId === session.id ? null : session.id)
                   }
+                  istLesezeichen={lesezeichenSet.has(session.id)}
+                  onToggleLesezeichen={handleToggleLesezeichen}
                 />
               ))}
               {moduleMitSessions.map((modul) => (
@@ -929,6 +996,8 @@ export default function CoachieProgramPage() {
                   onToggleSession={(id) =>
                     setOpenId(openId === id ? null : id)
                   }
+                  lesezeichenSet={lesezeichenSet}
+                  onToggleLesezeichen={handleToggleLesezeichen}
                 />
               ))}
             </div>

@@ -1,9 +1,21 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { initialen } from '../lib/initialen'
 
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
   { to: '/coachie/auswertungen', label: 'Meine Auswertungen' },
+  { to: '/coachie/suche', label: 'Suche' },
+  { to: '/coachie/zertifikate', label: 'Meine Abschlüsse' },
+  { to: '/coachie/einstellungen', label: 'Einstellungen' },
+]
+
+// Feste, im Code hinterlegte Links zu anderen MRH-Marken (Feature 4) --
+// ändert sich selten genug für einen festen Codeblock, kein CMS-Feld.
+const MARKEN_LINKS = [
+  { label: 'MRH Beratung & Coaching', href: 'https://mrh-beratung.de' },
+  { label: 'Cashmor', href: 'https://www.cashmor.de' },
+  { label: 'ExecutiveDeepDive', href: 'https://www.executivedeepdive.com' },
 ]
 
 export default function CoachieLayout() {
@@ -22,7 +34,20 @@ export default function CoachieLayout() {
           <Link to="/coachie" className="text-lg font-semibold">
             MRH Beratung &amp; Coaching
           </Link>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-3 text-sm">
+            {coachie?.avatar_url ? (
+              <img
+                src={coachie.avatar_url}
+                alt=""
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              coachie && (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-semibold">
+                  {initialen(coachie.name)}
+                </span>
+              )
+            )}
             {coachie?.name && <span className="text-slate-200">{coachie.name}</span>}
             <button
               onClick={handleLogout}
@@ -54,6 +79,26 @@ export default function CoachieLayout() {
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Outlet />
       </main>
+      <footer className="border-t border-slate-200 py-8">
+        <div className="mx-auto max-w-5xl px-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-mrh-grey">
+            Mehr von MRH
+          </p>
+          <div className="flex flex-wrap gap-4 text-sm">
+            {MARKEN_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-mrh-navy hover:underline"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

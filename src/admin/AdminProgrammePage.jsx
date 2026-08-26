@@ -96,6 +96,9 @@ export default function AdminProgrammePage() {
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editBildUrl, setEditBildUrl] = useState('')
   const [editTrailerVideoUrl, setEditTrailerVideoUrl] = useState('')
+  const [editCoachFotoUrl, setEditCoachFotoUrl] = useState('')
+  const [editBegruessungText, setEditBegruessungText] = useState('')
+  const [editCalendlyUrl, setEditCalendlyUrl] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
@@ -103,6 +106,9 @@ export default function AdminProgrammePage() {
     setEditBeschreibung(programm.beschreibung ?? '')
     setEditBildUrl(programm.bild_url ?? '')
     setEditTrailerVideoUrl(programm.trailer_video_url ?? '')
+    setEditCoachFotoUrl(programm.coach_foto_url ?? '')
+    setEditBegruessungText(programm.begruessung_text ?? '')
+    setEditCalendlyUrl(programm.calendly_url ?? '')
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -160,6 +166,9 @@ export default function AdminProgrammePage() {
           beschreibung: editBeschreibung,
           bild_url: editBildUrl || null,
           trailer_video_url: editTrailerVideoUrl.trim() || null,
+          coach_foto_url: editCoachFotoUrl || null,
+          begruessung_text: editBegruessungText.trim() || null,
+          calendly_url: editCalendlyUrl.trim() || null,
         }),
       })
       setEditingId(null)
@@ -336,6 +345,55 @@ export default function AdminProgrammePage() {
                       placeholder="https://www.youtube.com/watch?v=..."
                       value={editTrailerVideoUrl}
                       onChange={(e) => setEditTrailerVideoUrl(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Coach-Foto (für die persönliche Begrüßung im
+                      Coachie-Dashboard)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://... (oder Bild hochladen)"
+                        value={editCoachFotoUrl}
+                        onChange={(e) => setEditCoachFotoUrl(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                      />
+                      <BildUpload onUploaded={setEditCoachFotoUrl} />
+                    </div>
+                    {editCoachFotoUrl && (
+                      <img
+                        src={editCoachFotoUrl}
+                        alt=""
+                        className="mt-2 h-16 w-16 rounded-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Begrüßungstext (optional, erscheint zusammen mit dem
+                      Coach-Foto)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="z. B. Schön, dass du da bist! Ich freue mich auf die gemeinsame Zeit."
+                      value={editBegruessungText}
+                      onChange={(e) => setEditBegruessungText(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Calendly-Link (für &bdquo;1:1-Termin buchen&ldquo; im
+                      Coachie-Bereich)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://calendly.com/..."
+                      value={editCalendlyUrl}
+                      onChange={(e) => setEditCalendlyUrl(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
                   </div>

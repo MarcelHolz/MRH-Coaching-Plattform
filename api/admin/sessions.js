@@ -92,6 +92,7 @@ async function handleSessions(req, res, supabase) {
       bild_url,
       modul_id,
       reihenfolge,
+      dauer_minuten,
     } = req.body ?? {}
 
     if (!programm_id || !titel) {
@@ -109,6 +110,7 @@ async function handleSessions(req, res, supabase) {
         bild_url,
         modul_id: modul_id || null,
         reihenfolge: reihenfolge ?? 0,
+        dauer_minuten: dauer_minuten || null,
       })
       .select()
       .single()
