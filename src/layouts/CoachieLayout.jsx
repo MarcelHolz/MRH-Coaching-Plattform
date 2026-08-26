@@ -9,6 +9,14 @@ const NAV_ITEMS = [
   { to: '/coachie/einstellungen', label: 'Einstellungen' },
 ]
 
+// Feste, im Code hinterlegte Links zu anderen MRH-Marken (Feature 4) --
+// ändert sich selten genug für einen festen Codeblock, kein CMS-Feld.
+const MARKEN_LINKS = [
+  { label: 'MRH Beratung & Coaching', href: 'https://mrh-beratung.de' },
+  { label: 'Cashmor', href: 'https://www.cashmor.de' },
+  { label: 'ExecutiveDeepDive', href: 'https://www.executivedeepdive.com' },
+]
+
 export default function CoachieLayout() {
   const { coachie, logout } = useAuth()
   const navigate = useNavigate()
@@ -70,6 +78,26 @@ export default function CoachieLayout() {
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Outlet />
       </main>
+      <footer className="border-t border-slate-200 py-8">
+        <div className="mx-auto max-w-5xl px-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-mrh-grey">
+            Mehr von MRH
+          </p>
+          <div className="flex flex-wrap gap-4 text-sm">
+            {MARKEN_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-mrh-navy hover:underline"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
