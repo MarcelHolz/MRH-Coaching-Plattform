@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { to: '/admin/programme', label: 'Programme' },
   { to: '/admin/coachies', label: 'Coachies' },
   { to: '/admin/fortschritt', label: 'Fortschritt' },
+  { to: '/admin/testimonials', label: 'Testimonials' },
 ]
 
 export default function AdminLayout() {

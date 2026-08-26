@@ -9,6 +9,7 @@ import CoachieLayout from './layouts/CoachieLayout'
 import CoachieDashboardPage from './pages/CoachieDashboardPage'
 import CoachieProgramPage from './pages/CoachieProgramPage'
 import CoachieAuswertungenPage from './pages/CoachieAuswertungenPage'
+import TestimonialFormPage from './pages/TestimonialFormPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -18,6 +19,7 @@ import AdminProgrammePage from './admin/AdminProgrammePage'
 import AdminProgramDetailPage from './admin/AdminProgramDetailPage'
 import AdminCoachiesPage from './admin/AdminCoachiesPage'
 import AdminProgressPage from './admin/AdminProgressPage'
+import AdminTestimonialsPage from './admin/AdminTestimonialsPage'
 
 export default function App() {
   return (
@@ -49,6 +51,10 @@ export default function App() {
               <Route index element={<CoachieDashboardPage />} />
               <Route path="programme/:programId" element={<CoachieProgramPage />} />
               <Route path="auswertungen" element={<CoachieAuswertungenPage />} />
+              <Route
+                path="testimonial/:programmId"
+                element={<TestimonialFormPage />}
+              />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -69,6 +75,7 @@ export default function App() {
               />
               <Route path="coachies" element={<AdminCoachiesPage />} />
               <Route path="fortschritt" element={<AdminProgressPage />} />
+              <Route path="testimonials" element={<AdminTestimonialsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" replace />} />
