@@ -131,9 +131,38 @@ function MaterialZeile({ material }) {
   )
 }
 
+// Kleine, überspringbare Sternebewertung -- erscheint nur, wenn die
+// Session als abgeschlossen markiert wird (Kurzfeedback, kein Zwang:
+// wer keinen Stern anklickt, speichert einfach ohne Bewertung).
+function Sternebewertung({ wert, onChange }) {
+  return (
+    <div className="mb-3 flex items-center gap-1">
+      <span className="mr-1 text-xs text-mrh-grey">
+        Wie war diese Session? (optional)
+      </span>
+      {[1, 2, 3, 4, 5].map((stern) => (
+        <button
+          key={stern}
+          type="button"
+          onClick={() => onChange(wert === stern ? null : stern)}
+          aria-label={`${stern} Sterne`}
+          className={`text-lg leading-none transition ${
+            wert != null && stern <= wert
+              ? 'text-mrh-gold'
+              : 'text-slate-300 hover:text-mrh-gold-soft'
+          }`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle }) {
   const [auswahl, setAuswahl] = useState(status?.status ?? 'offen')
   const [notiz, setNotiz] = useState(status?.notiz ?? '')
+  const [bewertung, setBewertung] = useState(status?.bewertung ?? null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -152,6 +181,7 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
           session_id: session.id,
           status: auswahl,
           notiz,
+          bewertung: auswahl === 'abgeschlossen' ? bewertung : null,
           aktualisiert_am: new Date().toISOString(),
         },
         { onConflict: 'coachie_id,session_id' },
@@ -265,6 +295,9 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
                 </button>
               ))}
             </div>
+            {auswahl === 'abgeschlossen' && (
+              <Sternebewertung wert={bewertung} onChange={setBewertung} />
+            )}
             <textarea
               value={notiz}
               onChange={(e) => setNotiz(e.target.value)}
