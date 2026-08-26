@@ -98,6 +98,7 @@ export default function AdminProgrammePage() {
   const [editTrailerVideoUrl, setEditTrailerVideoUrl] = useState('')
   const [editCoachFotoUrl, setEditCoachFotoUrl] = useState('')
   const [editBegruessungText, setEditBegruessungText] = useState('')
+  const [editCalendlyUrl, setEditCalendlyUrl] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
@@ -107,6 +108,7 @@ export default function AdminProgrammePage() {
     setEditTrailerVideoUrl(programm.trailer_video_url ?? '')
     setEditCoachFotoUrl(programm.coach_foto_url ?? '')
     setEditBegruessungText(programm.begruessung_text ?? '')
+    setEditCalendlyUrl(programm.calendly_url ?? '')
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -166,6 +168,7 @@ export default function AdminProgrammePage() {
           trailer_video_url: editTrailerVideoUrl.trim() || null,
           coach_foto_url: editCoachFotoUrl || null,
           begruessung_text: editBegruessungText.trim() || null,
+          calendly_url: editCalendlyUrl.trim() || null,
         }),
       })
       setEditingId(null)
@@ -378,6 +381,19 @@ export default function AdminProgrammePage() {
                       placeholder="z. B. Schön, dass du da bist! Ich freue mich auf die gemeinsame Zeit."
                       value={editBegruessungText}
                       onChange={(e) => setEditBegruessungText(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Calendly-Link (für &bdquo;1:1-Termin buchen&ldquo; im
+                      Coachie-Bereich)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://calendly.com/..."
+                      value={editCalendlyUrl}
+                      onChange={(e) => setEditCalendlyUrl(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
                   </div>

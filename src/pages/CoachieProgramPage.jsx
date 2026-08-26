@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
 import { toVimeoEmbedUrl } from '../lib/vimeo'
+import CalendlyWidget from '../components/CalendlyWidget'
 import { getSignedMaterialUrl } from '../lib/storage'
 import { renderMarkdown } from '../lib/markdown'
 
@@ -528,6 +529,7 @@ export default function CoachieProgramPage() {
   const [zielSpeichert, setZielSpeichert] = useState(false)
   const [erfolgAnzeigen, setErfolgAnzeigen] = useState(false)
   const [lesezeichenSet, setLesezeichenSet] = useState(new Set())
+  const [zeigeCalendly, setZeigeCalendly] = useState(false)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -867,6 +869,22 @@ export default function CoachieProgramPage() {
         <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
           Du siehst hier die erste Session kostenlos als Vorschau. Für den
           vollständigen Zugriff auf alle Sessions melde dich bei Marcel.
+        </div>
+      )}
+
+      {programm.calendly_url && (
+        <div className="mt-6">
+          <button
+            onClick={() => setZeigeCalendly((v) => !v)}
+            className="rounded-lg border border-mrh-navy px-4 py-2 text-sm font-medium text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
+          >
+            {zeigeCalendly ? 'Terminbuchung schließen' : '1:1-Termin buchen'}
+          </button>
+          {zeigeCalendly && (
+            <div className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm">
+              <CalendlyWidget url={programm.calendly_url} />
+            </div>
+          )}
         </div>
       )}
 
