@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
   { to: '/coachie/auswertungen', label: 'Meine Auswertungen' },
   { to: '/coachie/suche', label: 'Suche' },
+  { to: '/coachie/zertifikate', label: 'Meine Abschlüsse' },
   { to: '/coachie/einstellungen', label: 'Einstellungen' },
 ]
 
