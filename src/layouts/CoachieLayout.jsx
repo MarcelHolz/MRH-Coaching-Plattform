@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
   { to: '/coachie/auswertungen', label: 'Meine Auswertungen' },
+  { to: '/coachie/suche', label: 'Suche' },
 ]
 
 export default function CoachieLayout() {

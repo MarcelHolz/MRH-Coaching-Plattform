@@ -626,6 +626,21 @@ export default function CoachieProgramPage() {
     setAutoStartErledigt(true)
   }, [autoStartErledigt, loading, sessions, module, statusMap, searchParams])
 
+  useEffect(() => {
+    // Deep-Link aus der Suche (SearchPage.jsx): ?session=<id> öffnet
+    // direkt die passende Session samt ihrem Modul, unabhängig vom
+    // ?start=1-Onboarding-Sprung oben.
+    if (loading) return
+    const zielId = searchParams.get('session')
+    if (!zielId) return
+
+    const ziel = sessions.find((s) => s.id === zielId)
+    if (!ziel) return
+
+    setOpenId(ziel.id)
+    if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
+  }, [loading, sessions, searchParams])
+
   function handleStatusChange(sessionId, newStatus) {
     setStatusMap((prev) => {
       const updated = { ...prev, [sessionId]: newStatus }

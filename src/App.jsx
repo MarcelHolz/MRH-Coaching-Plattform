@@ -10,6 +10,7 @@ import CoachieDashboardPage from './pages/CoachieDashboardPage'
 import CoachieProgramPage from './pages/CoachieProgramPage'
 import CoachieAuswertungenPage from './pages/CoachieAuswertungenPage'
 import TestimonialFormPage from './pages/TestimonialFormPage'
+import SearchPage from './pages/SearchPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -55,6 +56,7 @@ export default function App() {
                 path="testimonial/:programmId"
                 element={<TestimonialFormPage />}
               />
+              <Route path="suche" element={<SearchPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
