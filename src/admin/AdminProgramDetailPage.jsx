@@ -212,7 +212,7 @@ export default function AdminProgramDetailPage() {
         </div>
         <input
           type="url"
-          placeholder="Video-URL (YouTube)"
+          placeholder="Video-URL (YouTube oder Vimeo)"
           value={videoUrl}
           onChange={(e) => setVideoUrl(e.target.value)}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
@@ -349,7 +349,7 @@ export default function AdminProgramDetailPage() {
                   </div>
                   <input
                     type="url"
-                    placeholder="Video-URL (YouTube)"
+                    placeholder="Video-URL (YouTube oder Vimeo)"
                     value={editVideoUrl}
                     onChange={(e) => setEditVideoUrl(e.target.value)}
                     className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
+import { toVimeoEmbedUrl } from '../lib/vimeo'
 import { getSignedMaterialUrl } from '../lib/storage'
 import { renderMarkdown } from '../lib/markdown'
 
@@ -166,7 +167,8 @@ function SessionRow({ session, coachieId, status, onStatusChange, open, onToggle
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const embedUrl = toYoutubeEmbedUrl(session.video_url)
+  const embedUrl =
+    toYoutubeEmbedUrl(session.video_url) || toVimeoEmbedUrl(session.video_url)
 
   async function handleSave() {
     setSaving(true)
