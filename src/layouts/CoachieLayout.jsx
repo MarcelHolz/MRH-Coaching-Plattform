@@ -16,6 +16,7 @@ const MARKEN_LINKS = [
   { label: 'MRH Beratung & Coaching', href: 'https://mrh-beratung.de' },
   { label: 'Cashmor', href: 'https://www.cashmor.de' },
   { label: 'ExecutiveDeepDive', href: 'https://www.executivedeepdive.com' },
+  { label: 'THA One', href: 'https://tha-one.com' },
 ]
 
 export default function CoachieLayout() {
