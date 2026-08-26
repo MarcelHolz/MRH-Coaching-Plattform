@@ -56,6 +56,7 @@ export default function CoachieDashboardPage() {
   const { coachie, istErsterLogin, konsumiereErstenLogin } = useAuth()
   const [programme, setProgramme] = useState([])
   const [teaserProgramme, setTeaserProgramme] = useState([])
+  const [freemiumProgramme, setFreemiumProgramme] = useState([])
   const [abgelaufeneProgramme, setAbgelaufeneProgramme] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -119,6 +120,16 @@ export default function CoachieDashboardPage() {
         (t) => !zugeordneteIds.has(t.id),
       )
 
+      const { data: freemium } = await supabase
+        .from('programme')
+        .select('id, titel, beschreibung, bild_url')
+        .eq('freemium_aktiv', true)
+        .eq('aktiv', true)
+
+      const freemiumOhneEigene = (freemium ?? []).filter(
+        (p) => !zugeordneteIds.has(p.id),
+      )
+
       const programmeMitFortschritt = await Promise.all(
         aktiveProgramme.map(async (programm) => {
           const { data: sessions } = await supabase
@@ -162,6 +173,7 @@ export default function CoachieDashboardPage() {
       if (!cancelled) {
         setProgramme(programmeMitFortschritt)
         setTeaserProgramme(teaserOhneEigene)
+        setFreemiumProgramme(freemiumOhneEigene)
         setAbgelaufeneProgramme(abgelaufen)
 
         // Aktives Onboarding: nur beim allerersten Login auswerten, danach
@@ -406,6 +418,52 @@ export default function CoachieDashboardPage() {
                   )}
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {freemiumProgramme.length > 0 && (
+        <div
+          className={
+            programme.length === 0 && teaserProgramme.length === 0
+              ? 'mt-8'
+              : 'mt-10'
+          }
+        >
+          <h2 className="mb-4 text-lg font-semibold text-mrh-navy">
+            Kostenlos reinschnuppern
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {freemiumProgramme.map((programm) => (
+              <Link
+                key={programm.id}
+                to={`/coachie/programme/${programm.id}`}
+                className="rounded-xl bg-white p-5 shadow-sm transition hover:shadow-md"
+              >
+                <div className="mb-3 flex items-start gap-3">
+                  {programm.bild_url && (
+                    <img
+                      src={programm.bild_url}
+                      alt=""
+                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="mb-2 inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                      Kostenlose Vorschau
+                    </span>
+                    <h3 className="font-serif font-semibold text-slate-800">
+                      {programm.titel}
+                    </h3>
+                  </div>
+                </div>
+                {programm.beschreibung && (
+                  <p className="line-clamp-2 text-sm text-slate-500">
+                    {programm.beschreibung}
+                  </p>
+                )}
+              </Link>
             ))}
           </div>
         </div>

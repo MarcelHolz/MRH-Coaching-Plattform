@@ -402,6 +402,7 @@ export default function CoachieProgramPage() {
   const [offenesModulId, setOffenesModulId] = useState(null)
   const [autoStartErledigt, setAutoStartErledigt] = useState(false)
   const [zielText, setZielText] = useState(null)
+  const [hatZuordnung, setHatZuordnung] = useState(true)
   const [zielPromptAusgeblendet, setZielPromptAusgeblendet] = useState(false)
   const [zielEingabe, setZielEingabe] = useState('')
   const [zielSpeichert, setZielSpeichert] = useState(false)
@@ -501,6 +502,7 @@ export default function CoachieProgramPage() {
           Object.fromEntries(statusListe.map((s) => [s.session_id, s])),
         )
         setZielText(zuordnungData?.ziel_text ?? null)
+        setHatZuordnung(zuordnungData != null)
         setLoading(false)
       }
     }
@@ -669,6 +671,13 @@ export default function CoachieProgramPage() {
           />
         )}
       </div>
+
+      {!hatZuordnung && programm.freemium_aktiv && (
+        <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          Du siehst hier die erste Session kostenlos als Vorschau. Für den
+          vollständigen Zugriff auf alle Sessions melde dich bei Marcel.
+        </div>
+      )}
 
       {zielPromptSichtbar && (
         <form
