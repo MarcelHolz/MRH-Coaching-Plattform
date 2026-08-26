@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { requireAdmin } from '../_lib/adminAuth.js'
+import { requireCoachie } from '../_lib/coachieAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 const BILD_BUCKET = 'programm-bilder'
@@ -119,6 +120,20 @@ async function handleTestimonials(req, res, supabase) {
 }
 
 export default async function handler(req, res) {
+  // Coachie-Selbstbedienung für das eigene Profilbild (Feature 2,
+  // EinstellungenPage.jsx) -- bewusst vor dem requireAdmin-Gate, da
+  // hier kein Admin, sondern ein eingeloggter Coachie zugreift (per
+  // Supabase-Access-Token, siehe requireCoachie/api/certificate.js).
+  // Nutzt denselben öffentlichen Bucket "programm-bilder" wie die
+  // Admin-Bilder, kein neuer Bucket/keine neue Function nötig.
+  if (req.method === 'POST' && req.query.resource === 'avatar-upload') {
+    const supabase = getSupabaseAdmin()
+    const coachieId = await requireCoachie(req, res, supabase)
+    if (!coachieId) return
+    await handleBildUploadUrl(req, res, supabase)
+    return
+  }
+
   if (!requireAdmin(req, res)) return
 
   const supabase = getSupabaseAdmin()

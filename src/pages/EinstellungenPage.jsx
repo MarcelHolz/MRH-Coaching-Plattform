@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import AvatarUpload from '../components/AvatarUpload'
+import { initialen } from '../lib/initialen'
 
 // Passwort-Änderung direkt über den Supabase-Client (kein eigener
 // API-Endpunkt nötig, RLS/Auth regelt das schon). Das "aktuelle
@@ -10,7 +12,8 @@ import { useAuth } from '../context/AuthContext'
 // ohne diese Prüfung könnte jeder mit einer offenen Sitzung (z. B. an
 // einem fremden Rechner) das Passwort ändern, ohne es zu kennen.
 export default function EinstellungenPage() {
-  const { coachie } = useAuth()
+  const { coachie, session, refreshCoachie } = useAuth()
+  const [avatarFehler, setAvatarFehler] = useState('')
   const [aktuellesPasswort, setAktuellesPasswort] = useState('')
   const [neuesPasswort, setNeuesPasswort] = useState('')
   const [neuesPasswortWiederholung, setNeuesPasswortWiederholung] = useState('')
@@ -62,9 +65,46 @@ export default function EinstellungenPage() {
     }
   }
 
+  async function handleAvatarUploaded(url) {
+    setAvatarFehler('')
+    const { error } = await supabase
+      .from('coachies')
+      .update({ avatar_url: url })
+      .eq('id', coachie.id)
+
+    if (error) {
+      setAvatarFehler('Profilbild konnte nicht gespeichert werden.')
+      return
+    }
+
+    await refreshCoachie()
+  }
+
   return (
-    <div className="mx-auto max-w-lg">
-      <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">Einstellungen</h1>
+    <div className="mx-auto max-w-lg space-y-6">
+      <h1 className="text-2xl font-semibold text-mrh-navy">Einstellungen</h1>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="mb-4 font-semibold text-slate-800">Profilbild</h2>
+        <div className="flex items-center gap-4">
+          {coachie?.avatar_url ? (
+            <img
+              src={coachie.avatar_url}
+              alt=""
+              className="h-16 w-16 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-mrh-navy text-lg font-semibold text-white">
+              {initialen(coachie?.name)}
+            </span>
+          )}
+          <AvatarUpload
+            accessToken={session?.access_token}
+            onUploaded={handleAvatarUploaded}
+          />
+        </div>
+        {avatarFehler && <p className="mt-2 text-xs text-red-600">{avatarFehler}</p>}
+      </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-semibold text-slate-800">Passwort ändern</h2>

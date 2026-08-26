@@ -70,6 +70,19 @@ export function AuthProvider({ children }) {
     }
   }, [session])
 
+  // Lädt die coachies-Zeile neu, z. B. nachdem EinstellungenPage.jsx das
+  // Profilbild aktualisiert hat -- damit der Header (CoachieLayout.jsx)
+  // ohne Reload das neue Bild zeigt.
+  async function refreshCoachie() {
+    if (!session?.user) return
+    const { data } = await supabase
+      .from('coachies')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
+    setCoachie(data ?? null)
+  }
+
   async function login(email, password) {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -97,6 +110,7 @@ export function AuthProvider({ children }) {
     konsumiereErstenLogin,
     login,
     logout,
+    refreshCoachie,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

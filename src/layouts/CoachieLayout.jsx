@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { initialen } from '../lib/initialen'
 
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
@@ -24,7 +25,20 @@ export default function CoachieLayout() {
           <Link to="/coachie" className="text-lg font-semibold">
             MRH Beratung &amp; Coaching
           </Link>
-          <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-3 text-sm">
+            {coachie?.avatar_url ? (
+              <img
+                src={coachie.avatar_url}
+                alt=""
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              coachie && (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-xs font-semibold">
+                  {initialen(coachie.name)}
+                </span>
+              )
+            )}
             {coachie?.name && <span className="text-slate-200">{coachie.name}</span>}
             <button
               onClick={handleLogout}
