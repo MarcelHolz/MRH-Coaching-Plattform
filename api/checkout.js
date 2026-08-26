@@ -19,7 +19,7 @@ async function handleVorschau(req, res, supabase) {
   const { data, error } = await supabase
     .from('programme')
     .select(
-      'titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate',
+      'id, titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate, bild_url, trailer_video_url',
     )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
@@ -36,7 +36,30 @@ async function handleVorschau(req, res, supabase) {
     return
   }
 
-  res.status(200).json({ programm: data })
+  // Modulübersicht (Titel + Anzahl Sessions je Modul) für die
+  // großzügigere Verkaufsseite -- rein informativ, keine Inhalte.
+  const [module, sessions] = await Promise.all([
+    supabase
+      .from('module')
+      .select('id, titel')
+      .eq('programm_id', data.id)
+      .order('reihenfolge', { ascending: true }),
+    supabase.from('sessions').select('id, modul_id').eq('programm_id', data.id),
+  ])
+
+  const modulUebersicht = (module.data ?? []).map((modul) => ({
+    titel: modul.titel,
+    sessionAnzahl: (sessions.data ?? []).filter((s) => s.modul_id === modul.id)
+      .length,
+  }))
+
+  res.status(200).json({
+    programm: {
+      ...data,
+      modulUebersicht,
+      gesamtSessionAnzahl: (sessions.data ?? []).length,
+    },
+  })
 }
 
 async function handleCheckoutSession(req, res, supabase) {
