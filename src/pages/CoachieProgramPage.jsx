@@ -387,6 +387,13 @@ function ModulKarte({
     sessions.length > 0 ? Math.round((abgeschlossen / sessions.length) * 100) : 0
   const begonnen = sessions.some((s) => statusMap[s.id])
 
+  // Fehlende dauer_minuten (nullable, siehe session_dauer.sql) werden
+  // beim Summieren einfach übersprungen statt einen Fehler zu werfen.
+  const gesamtDauer = sessions.reduce(
+    (summe, s) => summe + (s.dauer_minuten || 0),
+    0,
+  )
+
   return (
     <div className="rounded-xl bg-white shadow-sm">
       <button
@@ -417,6 +424,10 @@ function ModulKarte({
                 : 'Noch nicht begonnen'}
           </span>
           <p className="font-semibold text-slate-800">{modul.titel}</p>
+          <p className="text-xs text-mrh-grey">
+            {sessions.length} Session{sessions.length === 1 ? '' : 's'}
+            {gesamtDauer > 0 ? ` · ${gesamtDauer} Min.` : ''}
+          </p>
           {modul.beschreibung && (
             <p
               className={`mt-1 text-sm text-mrh-grey ${open ? '' : 'line-clamp-2'}`}
