@@ -481,6 +481,7 @@ export default function CoachieProgramPage() {
   const [erfolgAnzeigen, setErfolgAnzeigen] = useState(false)
   const [lesezeichenSet, setLesezeichenSet] = useState(new Set())
   const [zeigeCalendly, setZeigeCalendly] = useState(false)
+  const [calendlyBuchungenAnzahl, setCalendlyBuchungenAnzahl] = useState(0)
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -572,6 +573,17 @@ export default function CoachieProgramPage() {
         .eq('programm_id', programId)
         .order('reihenfolge', { ascending: true })
 
+      let buchungenAnzahl = 0
+      if (programmData?.calendly_url) {
+        const { count } = await supabase
+          .from('programm_calendly_buchungen')
+          .select('id', { count: 'exact', head: true })
+          .eq('coachie_id', coachie.id)
+          .eq('programm_id', programId)
+
+        buchungenAnzahl = count ?? 0
+      }
+
       if (!cancelled) {
         setProgramm(programmData)
         setSessions(
@@ -587,6 +599,7 @@ export default function CoachieProgramPage() {
         setZielText(zuordnungData?.ziel_text ?? null)
         setHatZuordnung(zuordnungData != null)
         setLesezeichenSet(new Set(lesezeichenListe.map((l) => l.session_id)))
+        setCalendlyBuchungenAnzahl(buchungenAnzahl)
         setLoading(false)
       }
     }
@@ -823,21 +836,35 @@ export default function CoachieProgramPage() {
         </div>
       )}
 
-      {programm.calendly_url && (
-        <div className="mt-6">
-          <button
-            onClick={() => setZeigeCalendly((v) => !v)}
-            className="rounded-lg border border-mrh-navy px-4 py-2 text-sm font-medium text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
-          >
-            {zeigeCalendly ? 'Terminbuchung schließen' : '1:1-Termin buchen'}
-          </button>
-          {zeigeCalendly && (
-            <div className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm">
-              <CalendlyWidget url={programm.calendly_url} />
-            </div>
-          )}
-        </div>
-      )}
+      {programm.calendly_url &&
+        (programm.max_calendly_sitzungen != null &&
+        calendlyBuchungenAnzahl >= programm.max_calendly_sitzungen ? (
+          <div className="mt-6 rounded-xl border border-mrh-gold/30 bg-mrh-gold/10 p-4 text-sm text-mrh-navy">
+            Du hast alle {programm.max_calendly_sitzungen} Sitzungen genutzt.
+            Melde dich bei Marcel für eine Verlängerung.
+          </div>
+        ) : (
+          <div className="mt-6">
+            <button
+              onClick={() => setZeigeCalendly((v) => !v)}
+              className="rounded-lg border border-mrh-navy px-4 py-2 text-sm font-medium text-mrh-navy transition hover:bg-mrh-navy hover:text-white"
+            >
+              {zeigeCalendly ? 'Terminbuchung schließen' : '1:1-Termin buchen'}
+            </button>
+            {programm.max_calendly_sitzungen != null && (
+              <p className="mt-1 text-xs text-mrh-grey">
+                Noch{' '}
+                {programm.max_calendly_sitzungen - calendlyBuchungenAnzahl} von{' '}
+                {programm.max_calendly_sitzungen} Sitzungen verfügbar
+              </p>
+            )}
+            {zeigeCalendly && (
+              <div className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm">
+                <CalendlyWidget url={programm.calendly_url} />
+              </div>
+            )}
+          </div>
+        ))}
 
       {zielPromptSichtbar && (
         <form
