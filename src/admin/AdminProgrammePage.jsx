@@ -99,6 +99,7 @@ export default function AdminProgrammePage() {
   const [editCoachFotoUrl, setEditCoachFotoUrl] = useState('')
   const [editBegruessungText, setEditBegruessungText] = useState('')
   const [editCalendlyUrl, setEditCalendlyUrl] = useState('')
+  const [editMaxCalendlySitzungen, setEditMaxCalendlySitzungen] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   function startEdit(programm) {
@@ -109,6 +110,11 @@ export default function AdminProgrammePage() {
     setEditCoachFotoUrl(programm.coach_foto_url ?? '')
     setEditBegruessungText(programm.begruessung_text ?? '')
     setEditCalendlyUrl(programm.calendly_url ?? '')
+    setEditMaxCalendlySitzungen(
+      programm.max_calendly_sitzungen != null
+        ? String(programm.max_calendly_sitzungen)
+        : '',
+    )
     setEditPreis(
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
@@ -169,6 +175,9 @@ export default function AdminProgrammePage() {
           coach_foto_url: editCoachFotoUrl || null,
           begruessung_text: editBegruessungText.trim() || null,
           calendly_url: editCalendlyUrl.trim() || null,
+          max_calendly_sitzungen: editMaxCalendlySitzungen
+            ? Math.round(Number(editMaxCalendlySitzungen))
+            : null,
         }),
       })
       setEditingId(null)
@@ -394,6 +403,19 @@ export default function AdminProgrammePage() {
                       placeholder="https://calendly.com/..."
                       value={editCalendlyUrl}
                       onChange={(e) => setEditCalendlyUrl(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Inkludierte 1:1-Sitzungen (optional, sonst kein Limit)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="z. B. 4"
+                      value={editMaxCalendlySitzungen}
+                      onChange={(e) => setEditMaxCalendlySitzungen(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
                   </div>
