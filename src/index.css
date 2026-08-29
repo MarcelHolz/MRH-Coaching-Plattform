@@ -80,12 +80,10 @@ body {
 }
 
 /* Gold-Hervorhebung für einzelne Wörter/Sätze ("Gold-Hervorhebung"-Button
-   in MarkdownFeld.jsx, <span class="mrh-gold-text">...</span>) -- bewusst
-   nur dieser eine, fest hinterlegte Markenton statt freier Farbauswahl,
-   damit die Konsistenz über alle Kurse hinweg erhalten bleibt.
-   font-weight zusätzlich zur Farbe, da reiner Farbwechsel ohne Fettung
-   auf hellem Hintergrund zu wenig Kontrast/Lesbarkeit hätte. */
+   in MarkdownFeld.jsx, <strong class="mrh-gold-text">...</strong>) --
+   bewusst nur dieser eine, fest hinterlegte Markenton statt freier
+   Farbauswahl, damit die Konsistenz über alle Kurse hinweg erhalten
+   bleibt. Fettung übernimmt das <strong>-Tag selbst, hier nur die Farbe. */
 .mrh-gold-text {
   color: var(--color-mrh-gold);
-  font-weight: 600;
 }
