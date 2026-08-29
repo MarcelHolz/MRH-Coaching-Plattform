@@ -6,9 +6,14 @@ const MAX_BILD_BYTES = 5 * 1024 * 1024
 const ERLAUBTE_BILD_TYPEN = ['image/jpeg', 'image/png', 'image/webp']
 
 // Kleine Toolbar für einfache Markdown-Formatierung (fett, Überschrift,
-// Liste, Hervorheben, Bild einfügen) -- kein voller Rich-Text-Editor,
-// nur Syntax-Hilfe an der Cursorposition. Rendering im Coachie-Bereich
-// erfolgt separat über `marked` (siehe src/lib/markdown.js).
+// Liste, Hervorheben, Bild einfügen, Gold-Hervorhebung) -- kein voller
+// Rich-Text-Editor, nur Syntax-Hilfe an der Cursorposition. Rendering
+// im Coachie-Bereich erfolgt separat über `marked` (siehe
+// src/lib/markdown.js). Die Gold-Hervorhebung nutzt reines Inline-HTML
+// (<span class="mrh-gold-text">), kein Markdown-Syntax-Konstrukt --
+// marked gibt Inline-HTML unverändert durch, und der Inhalt kommt
+// ausschließlich aus dem admin-geschützten Formular, daher unkritisch
+// ohne Sanitizing (siehe Kommentar in src/lib/markdown.js).
 export default function MarkdownFeld({ value, onChange, placeholder, rows = 4 }) {
   const textareaRef = useRef(null)
   const bildInputRef = useRef(null)
@@ -153,6 +158,14 @@ export default function MarkdownFeld({ value, onChange, placeholder, rows = 4 })
           className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
         >
           &gt;
+        </button>
+        <button
+          type="button"
+          onClick={() => umschliessen('<span class="mrh-gold-text">', '</span>')}
+          title="Gold-Hervorhebung"
+          className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-mrh-gold-dark hover:bg-slate-50"
+        >
+          A
         </button>
         <input
           ref={bildInputRef}
