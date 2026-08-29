@@ -10,10 +10,12 @@ const ERLAUBTE_BILD_TYPEN = ['image/jpeg', 'image/png', 'image/webp']
 // Rich-Text-Editor, nur Syntax-Hilfe an der Cursorposition. Rendering
 // im Coachie-Bereich erfolgt separat über `marked` (siehe
 // src/lib/markdown.js). Die Gold-Hervorhebung nutzt reines Inline-HTML
-// (<span class="mrh-gold-text">), kein Markdown-Syntax-Konstrukt --
-// marked gibt Inline-HTML unverändert durch, und der Inhalt kommt
-// ausschließlich aus dem admin-geschützten Formular, daher unkritisch
-// ohne Sanitizing (siehe Kommentar in src/lib/markdown.js).
+// (<strong class="mrh-gold-text">, Fettung und Goldfarbe in einem Tag,
+// nicht als zwei separat kombinierbare Bausteine), kein
+// Markdown-Syntax-Konstrukt -- marked gibt Inline-HTML unverändert
+// durch, und der Inhalt kommt ausschließlich aus dem admin-geschützten
+// Formular, daher unkritisch ohne Sanitizing (siehe Kommentar in
+// src/lib/markdown.js).
 export default function MarkdownFeld({ value, onChange, placeholder, rows = 4 }) {
   const textareaRef = useRef(null)
   const bildInputRef = useRef(null)
@@ -116,7 +118,10 @@ export default function MarkdownFeld({ value, onChange, placeholder, rows = 4 })
         .from('programm-bilder')
         .getPublicUrl(pfad)
 
-      anCursorEinfuegen(`![Bildbeschreibung](${publicUrlData.publicUrl})`)
+      // Immer auf einer eigenen Zeile, unabhängig von der Cursorposition
+      // -- verhindert, dass das Bild versehentlich mitten in eine
+      // Überschriften- oder Fließtext-Zeile rutscht.
+      anCursorEinfuegen(`\n\n![Bildbeschreibung](${publicUrlData.publicUrl})\n\n`)
     } catch {
       setBildFehler('Bild konnte nicht hochgeladen werden.')
     } finally {
@@ -161,7 +166,7 @@ export default function MarkdownFeld({ value, onChange, placeholder, rows = 4 })
         </button>
         <button
           type="button"
-          onClick={() => umschliessen('<span class="mrh-gold-text">', '</span>')}
+          onClick={() => umschliessen('<strong class="mrh-gold-text">', '</strong>')}
           title="Gold-Hervorhebung"
           className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold text-mrh-gold-dark hover:bg-slate-50"
         >
