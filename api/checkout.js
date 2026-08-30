@@ -19,7 +19,7 @@ async function handleVorschau(req, res, supabase) {
   const { data, error } = await supabase
     .from('programme')
     .select(
-      'id, titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate, bild_url, trailer_video_url',
+      'id, titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate, bild_url, trailer_video_url, einfuehrungspreis_cent, einfuehrungspreis_gueltig_bis',
     )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
@@ -83,7 +83,9 @@ async function handleCheckoutSession(req, res, supabase) {
 
   const { data: programm, error } = await supabase
     .from('programme')
-    .select('id, stripe_price_id')
+    .select(
+      'id, stripe_price_id, stripe_price_id_einfuehrung, einfuehrungspreis_gueltig_bis',
+    )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
     .eq('aktiv', true)
@@ -94,7 +96,21 @@ async function handleCheckoutSession(req, res, supabase) {
     return
   }
 
-  if (!programm || !programm.stripe_price_id) {
+  // Serverseitig geprüft, niemals ein vom Client mitgeschicktes Datum
+  // vertrauen (siehe einfuehrungspreis.sql) -- Datumsvergleich als
+  // ISO-Datumsstring (YYYY-MM-DD), da einfuehrungspreis_gueltig_bis eine
+  // reine date-Spalte ohne Uhrzeit ist.
+  const heute = new Date().toISOString().slice(0, 10)
+  const einfuehrungAktiv =
+    programm?.stripe_price_id_einfuehrung &&
+    programm?.einfuehrungspreis_gueltig_bis &&
+    heute <= programm.einfuehrungspreis_gueltig_bis
+
+  const priceId = einfuehrungAktiv
+    ? programm.stripe_price_id_einfuehrung
+    : programm?.stripe_price_id
+
+  if (!programm || !priceId) {
     res.status(404).json({ error: 'Programm ist nicht käuflich.' })
     return
   }
@@ -107,7 +123,7 @@ async function handleCheckoutSession(req, res, supabase) {
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
-    line_items: [{ price: programm.stripe_price_id, quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/kaufen/${slug}?abgebrochen=1`,
     metadata: { programm_id: programm.id },

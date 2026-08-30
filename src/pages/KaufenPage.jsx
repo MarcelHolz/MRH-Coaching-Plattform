@@ -3,6 +3,15 @@ import { useParams } from 'react-router-dom'
 import { formatPreis } from '../lib/preis'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
 
+function formatDatum(isoDatum) {
+  if (!isoDatum) return ''
+  return new Date(`${isoDatum}T00:00:00`).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 // Struktur für Kundenstimmen steht bereit und wird von api/checkout.js
 // befüllt, sobald es freigegebene Testimonials gibt (siehe testimonials.sql
 // und die Admin-Freigabe in AdminTestimonialsPage.jsx) -- bis dahin liefert
@@ -142,6 +151,12 @@ export default function KaufenPage() {
 
   const trailerEmbedUrl = toYoutubeEmbedUrl(programm.trailer_video_url)
 
+  const heute = new Date().toISOString().slice(0, 10)
+  const einfuehrungspreisAktiv =
+    programm.einfuehrungspreis_cent != null &&
+    programm.einfuehrungspreis_gueltig_bis &&
+    heute <= programm.einfuehrungspreis_gueltig_bis
+
   return (
     <div className="min-h-screen bg-mrh-black text-white">
       <div className="mx-auto max-w-3xl px-4 py-16">
@@ -209,10 +224,27 @@ export default function KaufenPage() {
         <TestimonialsSection testimonials={programm.testimonials} />
 
         <div className="rounded-2xl bg-white/5 p-6">
-          {programm.preis_cent != null && (
-            <p className="mb-1 text-3xl font-semibold text-mrh-gold-soft">
-              {formatPreis(programm.preis_cent)}
-            </p>
+          {einfuehrungspreisAktiv ? (
+            <div className="mb-1">
+              {programm.preis_cent != null && (
+                <span className="mr-2 text-lg text-white/40 line-through">
+                  {formatPreis(programm.preis_cent)}
+                </span>
+              )}
+              <span className="text-3xl font-semibold text-mrh-gold-soft">
+                {formatPreis(programm.einfuehrungspreis_cent)}
+              </span>
+              <p className="mt-1 text-xs text-mrh-gold-soft">
+                Einführungspreis gültig bis{' '}
+                {formatDatum(programm.einfuehrungspreis_gueltig_bis)}
+              </p>
+            </div>
+          ) : (
+            programm.preis_cent != null && (
+              <p className="mb-1 text-3xl font-semibold text-mrh-gold-soft">
+                {formatPreis(programm.preis_cent)}
+              </p>
+            )
           )}
           {programm.standard_zugriffsmonate != null && (
             <p className="mb-6 text-xs text-white/60">

@@ -85,6 +85,11 @@ export default function AdminProgrammePage() {
   const [editingId, setEditingId] = useState(null)
   const [editPreis, setEditPreis] = useState('')
   const [editStripePriceId, setEditStripePriceId] = useState('')
+  const [editEinfuehrungspreis, setEditEinfuehrungspreis] = useState('')
+  const [editEinfuehrungspreisGueltigBis, setEditEinfuehrungspreisGueltigBis] =
+    useState('')
+  const [editStripePriceIdEinfuehrung, setEditStripePriceIdEinfuehrung] =
+    useState('')
   const [editSlug, setEditSlug] = useState('')
   const [editKaufbar, setEditKaufbar] = useState(false)
   const [editTeaser, setEditTeaser] = useState(false)
@@ -119,6 +124,15 @@ export default function AdminProgrammePage() {
       programm.preis_cent != null ? String(programm.preis_cent / 100) : '',
     )
     setEditStripePriceId(programm.stripe_price_id ?? '')
+    setEditEinfuehrungspreis(
+      programm.einfuehrungspreis_cent != null
+        ? String(programm.einfuehrungspreis_cent / 100)
+        : '',
+    )
+    setEditEinfuehrungspreisGueltigBis(
+      programm.einfuehrungspreis_gueltig_bis ?? '',
+    )
+    setEditStripePriceIdEinfuehrung(programm.stripe_price_id_einfuehrung ?? '')
     setEditSlug(programm.slug ?? '')
     setEditKaufbar(programm.oeffentlich_kaufbar ?? false)
     setEditTeaser(programm.teaser_aktiv ?? false)
@@ -159,6 +173,11 @@ export default function AdminProgrammePage() {
           id: editingId,
           preis_cent: editPreis ? Math.round(Number(editPreis) * 100) : null,
           stripe_price_id: editStripePriceId || null,
+          einfuehrungspreis_cent: editEinfuehrungspreis
+            ? Math.round(Number(editEinfuehrungspreis) * 100)
+            : null,
+          einfuehrungspreis_gueltig_bis: editEinfuehrungspreisGueltigBis || null,
+          stripe_price_id_einfuehrung: editStripePriceIdEinfuehrung || null,
           slug: editSlug || null,
           oeffentlich_kaufbar: editKaufbar,
           teaser_aktiv: editTeaser,
@@ -442,6 +461,47 @@ export default function AdminProgrammePage() {
                       placeholder="price_..."
                       value={editStripePriceId}
                       onChange={(e) => setEditStripePriceId(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Einführungspreis in Euro (optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="z. B. 149.00"
+                      value={editEinfuehrungspreis}
+                      onChange={(e) => setEditEinfuehrungspreis(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Einführungspreis gültig bis
+                    </label>
+                    <input
+                      type="date"
+                      value={editEinfuehrungspreisGueltigBis}
+                      onChange={(e) =>
+                        setEditEinfuehrungspreisGueltigBis(e.target.value)
+                      }
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Stripe Price ID für den Einführungspreis
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="price_..."
+                      value={editStripePriceIdEinfuehrung}
+                      onChange={(e) =>
+                        setEditStripePriceIdEinfuehrung(e.target.value)
+                      }
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
                   </div>
