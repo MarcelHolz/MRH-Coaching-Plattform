@@ -97,6 +97,10 @@ export default function AdminProgrammePage() {
   const [editPreisAnzeigen, setEditPreisAnzeigen] = useState(true)
   const [editZugriffsmonate, setEditZugriffsmonate] = useState('')
   const [editZielgruppeText, setEditZielgruppeText] = useState('')
+  const [editSubline, setEditSubline] = useState('')
+  const [editLeistungenText, setEditLeistungenText] = useState('')
+  const [editAbgrenzungText, setEditAbgrenzungText] = useState('')
+  const [editCtaText, setEditCtaText] = useState('')
   const [editAblaufSchritte, setEditAblaufSchritte] = useState(['', '', ''])
   const [editBeschreibung, setEditBeschreibung] = useState('')
   const [editBildUrl, setEditBildUrl] = useState('')
@@ -144,6 +148,10 @@ export default function AdminProgrammePage() {
         : '',
     )
     setEditZielgruppeText(programm.zielgruppe_text ?? '')
+    setEditSubline(programm.subline ?? '')
+    setEditLeistungenText(programm.leistungen_text ?? '')
+    setEditAbgrenzungText(programm.abgrenzung_text ?? '')
+    setEditCtaText(programm.cta_text ?? '')
     const schritte = Array.isArray(programm.ablauf_schritte)
       ? programm.ablauf_schritte
       : []
@@ -187,6 +195,10 @@ export default function AdminProgrammePage() {
             ? Math.round(Number(editZugriffsmonate))
             : null,
           zielgruppe_text: editZielgruppeText.trim() || null,
+          subline: editSubline.trim() || null,
+          leistungen_text: editLeistungenText.trim() || null,
+          abgrenzung_text: editAbgrenzungText.trim() || null,
+          cta_text: editCtaText.trim() || null,
           ablauf_schritte: ablaufSchritte.length > 0 ? ablaufSchritte : null,
           beschreibung: editBeschreibung,
           bild_url: editBildUrl || null,
@@ -544,6 +556,58 @@ export default function AdminProgrammePage() {
                       placeholder="z. B. Für Unternehmer, die klare Entscheidungen wollen"
                       value={editZielgruppeText}
                       onChange={(e) => setEditZielgruppeText(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Subline (kurzer Untertitel unter der Headline)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="z. B. Sichtbar werden, ohne dich zu verbiegen"
+                      value={editSubline}
+                      onChange={(e) => setEditSubline(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Was Du bekommst (eine Zeile = ein Punkt)
+                    </label>
+                    <textarea
+                      rows={4}
+                      placeholder={
+                        'z. B.\nEin klares Positionierungs-Framework\nWöchentliches 1:1-Feedback\nZugriff auf alle Materialien'
+                      }
+                      value={editLeistungenText}
+                      onChange={(e) => setEditLeistungenText(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Was das hier nicht ist (eine Zeile = ein Punkt)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder={
+                        'z. B.\nKein Selbstlernkurs ohne Begleitung\nKeine Standardlösung von der Stange'
+                      }
+                      value={editAbgrenzungText}
+                      onChange={(e) => setEditAbgrenzungText(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-slate-600">
+                      Button-Beschriftung (sonst &bdquo;Jetzt kaufen&ldquo;)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="z. B. Business & Sichtbarkeit starten"
+                      value={editCtaText}
+                      onChange={(e) => setEditCtaText(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
                     />
                   </div>

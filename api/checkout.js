@@ -19,7 +19,7 @@ async function handleVorschau(req, res, supabase) {
   const { data, error } = await supabase
     .from('programme')
     .select(
-      'id, titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate, bild_url, trailer_video_url, einfuehrungspreis_cent, einfuehrungspreis_gueltig_bis',
+      'id, titel, beschreibung, preis_cent, slug, zielgruppe_text, ablauf_schritte, standard_zugriffsmonate, bild_url, trailer_video_url, einfuehrungspreis_cent, einfuehrungspreis_gueltig_bis, subline, leistungen_text, abgrenzung_text, cta_text',
     )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
@@ -41,7 +41,7 @@ async function handleVorschau(req, res, supabase) {
   const [module, sessions, testimonials] = await Promise.all([
     supabase
       .from('module')
-      .select('id, titel')
+      .select('id, titel, beschreibung')
       .eq('programm_id', data.id)
       .order('reihenfolge', { ascending: true }),
     supabase.from('sessions').select('id, modul_id').eq('programm_id', data.id),
@@ -59,6 +59,7 @@ async function handleVorschau(req, res, supabase) {
 
   const modulUebersicht = (module.data ?? []).map((modul) => ({
     titel: modul.titel,
+    beschreibung: modul.beschreibung,
     sessionAnzahl: (sessions.data ?? []).filter((s) => s.modul_id === modul.id)
       .length,
   }))

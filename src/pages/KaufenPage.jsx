@@ -57,17 +57,83 @@ function ModulUebersicht({ module, gesamtSessionAnzahl }) {
         {module.map((modul, index) => (
           <li
             key={index}
-            className="flex items-center justify-between gap-3 rounded-xl bg-white/5 px-4 py-3"
+            className="flex items-start justify-between gap-3 rounded-xl bg-white/5 px-4 py-3"
           >
-            <span className="flex items-center gap-3 text-sm text-white/90">
+            <div className="flex items-start gap-3 text-sm text-white/90">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mrh-gold/20 text-xs font-semibold text-mrh-gold-soft">
                 {index + 1}
               </span>
-              {modul.titel}
-            </span>
+              <div>
+                <p>{modul.titel}</p>
+                {modul.beschreibung && (
+                  <p className="mt-1 text-xs text-white/60">
+                    {modul.beschreibung}
+                  </p>
+                )}
+              </div>
+            </div>
             <span className="shrink-0 text-xs text-white/50">
               {modul.sessionAnzahl} Session{modul.sessionAnzahl === 1 ? '' : 's'}
             </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// "Was Du bekommst" -- gleicher visueller Stil wie die ablauf_schritte-
+// Liste (nummerierte Gold-Kreise), da beides positive, werbende Listen
+// sind.
+function LeistungenSection({ leistungenText }) {
+  const punkte = (leistungenText ?? '')
+    .split('\n')
+    .map((zeile) => zeile.trim())
+    .filter(Boolean)
+
+  if (punkte.length === 0) return null
+
+  return (
+    <div className="mb-10">
+      <p className="mb-4 text-xs font-medium uppercase tracking-wide text-white/50">
+        Was Du bekommst
+      </p>
+      <ul className="space-y-3">
+        {punkte.map((punkt, index) => (
+          <li key={index} className="flex gap-3 text-white/80">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-mrh-gold/20 text-xs font-semibold text-mrh-gold-soft">
+              {index + 1}
+            </span>
+            {punkt}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// "Was das hier nicht ist" -- bewusst zurückhaltender als die positiven
+// Listen (Minus-Symbol statt Nummerierung, gedämpftere Farbe), um die
+// Abgrenzung optisch abzuheben statt sie wie ein weiteres Verkaufs-
+// argument aussehen zu lassen.
+function AbgrenzungSection({ abgrenzungText }) {
+  const punkte = (abgrenzungText ?? '')
+    .split('\n')
+    .map((zeile) => zeile.trim())
+    .filter(Boolean)
+
+  if (punkte.length === 0) return null
+
+  return (
+    <div className="mb-10">
+      <p className="mb-4 text-xs font-medium uppercase tracking-wide text-white/50">
+        Was das hier nicht ist
+      </p>
+      <ul className="space-y-2">
+        {punkte.map((punkt, index) => (
+          <li key={index} className="flex gap-3 text-sm text-white/50">
+            <span className="shrink-0">–</span>
+            {punkt}
           </li>
         ))}
       </ul>
@@ -165,9 +231,13 @@ export default function KaufenPage() {
             {programm.zielgruppe_text}
           </p>
         )}
-        <h1 className="mb-6 font-serif text-4xl font-semibold">
+        <h1 className="mb-2 font-serif text-4xl font-semibold">
           {programm.titel}
         </h1>
+
+        {programm.subline && (
+          <p className="mb-6 text-base text-white/50">{programm.subline}</p>
+        )}
 
         {trailerEmbedUrl ? (
           <div className="mb-8 aspect-video overflow-hidden rounded-2xl bg-black">
@@ -221,6 +291,19 @@ export default function KaufenPage() {
           gesamtSessionAnzahl={programm.gesamtSessionAnzahl}
         />
 
+        <LeistungenSection leistungenText={programm.leistungen_text} />
+
+        <AbgrenzungSection abgrenzungText={programm.abgrenzung_text} />
+
+        {programm.zielgruppe_text && (
+          <div className="mb-10">
+            <p className="mb-4 text-xs font-medium uppercase tracking-wide text-white/50">
+              Für wen
+            </p>
+            <p className="text-white/80">{programm.zielgruppe_text}</p>
+          </div>
+        )}
+
         <TestimonialsSection testimonials={programm.testimonials} />
 
         <div className="rounded-2xl bg-white/5 p-6">
@@ -260,7 +343,7 @@ export default function KaufenPage() {
             disabled={kaufLaeuft}
             className="w-full rounded-full bg-gradient-to-br from-mrh-gold to-mrh-gold-dark py-3 text-sm font-semibold text-white shadow-lg shadow-mrh-gold-dark/40 transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {kaufLaeuft ? 'Weiterleitung…' : 'Jetzt kaufen'}
+            {kaufLaeuft ? 'Weiterleitung…' : programm.cta_text || 'Jetzt kaufen'}
           </button>
           <p className="mt-4 text-xs text-white/60">
             Weiterleitung zur sicheren Bezahlung über Stripe. Nach erfolgreicher
