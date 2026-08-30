@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { formatPreis } from '../lib/preis'
+import { stripMarkdown } from '../lib/markdown'
 
 function ProgressRing({ prozent }) {
   const size = 88
@@ -361,7 +362,7 @@ export default function CoachieDashboardPage() {
                     </div>
                   </div>
                   <p className="mb-4 line-clamp-2 text-sm text-mrh-grey">
-                    {programm.beschreibung}
+                    {stripMarkdown(programm.beschreibung)}
                   </p>
                   <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                     <div
@@ -418,7 +419,7 @@ export default function CoachieDashboardPage() {
                   </div>
                 </div>
                 <p className="mb-4 line-clamp-2 text-sm text-white/70">
-                  {programm.beschreibung}
+                  {stripMarkdown(programm.beschreibung)}
                 </p>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-mrh-gold-soft">
@@ -478,7 +479,7 @@ export default function CoachieDashboardPage() {
                 </div>
                 {programm.beschreibung && (
                   <p className="line-clamp-2 text-sm text-slate-500">
-                    {programm.beschreibung}
+                    {stripMarkdown(programm.beschreibung)}
                   </p>
                 )}
               </Link>
