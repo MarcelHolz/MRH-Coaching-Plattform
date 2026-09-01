@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react'
 import { adminFetch } from '../lib/adminFetch'
 import { TEST_TYP_LABEL } from '../lib/testergebnisse'
+import TestergebnisChart from '../components/TestergebnisChart'
+
+// Gleiche Punkte-Extraktion wie in CoachieAuswertungenPage.jsx -- die
+// Werte stecken in ergebnis_daten (JSON aus dem Profil-Quiz), nicht in
+// einem eigenen Punkte-Feld auf der Zeile selbst.
+function ergebnisPunkte(ergebnis) {
+  const daten = ergebnis.ergebnis_daten ?? {}
+  const punkte = {
+    dominant: daten.punkte_dominant,
+    kreativ: daten.punkte_kreativ,
+    sachlich: daten.punkte_sachlich,
+    harmonisch: daten.punkte_harmonisch,
+  }
+  return Object.values(punkte).some((v) => v != null) ? punkte : null
+}
 
 function formatDatum(iso) {
   if (!iso) return null
@@ -45,6 +60,7 @@ export default function TestergebnisseManager({ coachieId, coachieEmail }) {
   const [sucheErgebnisse, setSucheErgebnisse] = useState(null)
 
   const [verknuepfendId, setVerknuepfendId] = useState(null)
+  const [aufgeklapptId, setAufgeklapptId] = useState(null)
 
   async function laden() {
     setLoading(true)
@@ -130,12 +146,41 @@ export default function TestergebnisseManager({ coachieId, coachieEmail }) {
         <>
           {verknuepft.length > 0 && (
             <ul className="mb-3 space-y-1">
-              {verknuepft.map((v) => (
-                <li key={v.id} className="text-sm text-slate-700">
-                  ✓ {TEST_TYP_LABEL[v.test_typ] ?? v.test_typ} —{' '}
-                  {formatDatum(v.verknuepft_am)}
-                </li>
-              ))}
+              {verknuepft.map((v) => {
+                const punkte = ergebnisPunkte(v)
+                const offen = aufgeklapptId === v.id
+
+                return (
+                  <li key={v.id} className="text-sm text-slate-700">
+                    <div
+                      role={punkte ? 'button' : undefined}
+                      tabIndex={punkte ? 0 : undefined}
+                      onClick={() =>
+                        punkte && setAufgeklapptId(offen ? null : v.id)
+                      }
+                      className={`flex items-center justify-between gap-2 ${
+                        punkte ? 'cursor-pointer select-none' : ''
+                      }`}
+                    >
+                      <span>
+                        ✓ {TEST_TYP_LABEL[v.test_typ] ?? v.test_typ} —{' '}
+                        {formatDatum(v.verknuepft_am)}
+                      </span>
+                      {punkte && (
+                        <span className="shrink-0 text-xs text-slate-400">
+                          {offen ? '▾' : '▸'}
+                        </span>
+                      )}
+                    </div>
+
+                    {offen && punkte && (
+                      <div className="mt-2 rounded-lg bg-white p-3">
+                        <TestergebnisChart punkte={punkte} />
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
 

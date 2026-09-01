@@ -30,6 +30,16 @@ export default function AdminProgressPage() {
   const [error, setError] = useState('')
   const [filterCoachie, setFilterCoachie] = useState('')
   const [ansicht, setAnsicht] = useState('coachies')
+  const [offeneModule, setOffeneModule] = useState(new Set())
+
+  function toggleModul(key) {
+    setOffeneModule((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   useEffect(() => {
     adminFetch('/api/admin/progress')
@@ -44,6 +54,7 @@ export default function AdminProgressPage() {
   const sessions = data?.sessions ?? []
   const status = data?.status ?? []
   const sessionStats = data?.sessionStats ?? []
+  const module = data?.module ?? []
 
   const sichtbareCoachies = filterCoachie
     ? coachies.filter((c) => c.id === filterCoachie)
@@ -185,28 +196,95 @@ export default function AdminProgressPage() {
                     .filter((s) => s.programm_id === programm.id)
                     .sort((a, b) => a.reihenfolge - b.reihenfolge)
 
+                  const programmModule = module
+                    .filter((m) => m.programm_id === programm.id)
+                    .sort((a, b) => a.reihenfolge - b.reihenfolge)
+
+                  const sessionsOhneModul = programmSessions.filter(
+                    (s) => !s.modul_id,
+                  )
+
+                  const gruppen = [
+                    ...programmModule.map((modul) => ({
+                      key: modul.id,
+                      titel: modul.titel,
+                      sessions: programmSessions.filter(
+                        (s) => s.modul_id === modul.id,
+                      ),
+                    })),
+                    ...(sessionsOhneModul.length > 0
+                      ? [
+                          {
+                            key: 'ohne-modul',
+                            titel: 'Ohne Modul',
+                            sessions: sessionsOhneModul,
+                          },
+                        ]
+                      : []),
+                  ].filter((gruppe) => gruppe.sessions.length > 0)
+
                   return (
                     <div key={programm.id}>
                       <p className="mb-1 text-sm font-medium text-slate-700">
                         {programm.titel}
                       </p>
-                      <div className="flex flex-wrap gap-2">
-                        {programmSessions.map((session) => {
-                          const sessionStatus = status.find(
-                            (s) =>
-                              s.coachie_id === coachie.id &&
-                              s.session_id === session.id,
-                          )
-                          const statusWert = sessionStatus?.status ?? 'offen'
+                      <div className="space-y-2">
+                        {gruppen.map((gruppe) => {
+                          const gruppenKey = `${coachie.id}:${programm.id}:${gruppe.key}`
+                          const offen = offeneModule.has(gruppenKey)
+                          const abgeschlossenAnzahl = gruppe.sessions.filter(
+                            (session) => {
+                              const sessionStatus = status.find(
+                                (s) =>
+                                  s.coachie_id === coachie.id &&
+                                  s.session_id === session.id,
+                              )
+                              return sessionStatus?.status === 'abgeschlossen'
+                            },
+                          ).length
 
                           return (
-                            <span
-                              key={session.id}
-                              title={session.titel}
-                              className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_FARBE[statusWert]}`}
-                            >
-                              {session.titel}: {STATUS_LABEL[statusWert]}
-                            </span>
+                            <div key={gruppe.key}>
+                              <button
+                                onClick={() => toggleModul(gruppenKey)}
+                                className="flex w-full items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-left text-sm text-slate-700 transition hover:bg-slate-100"
+                              >
+                                <span className="text-slate-400">
+                                  {offen ? '▾' : '▸'}
+                                </span>
+                                <span className="font-medium">
+                                  {gruppe.titel}
+                                </span>
+                                <span className="text-slate-400">
+                                  ({abgeschlossenAnzahl}/{gruppe.sessions.length}{' '}
+                                  abgeschlossen)
+                                </span>
+                              </button>
+
+                              {offen && (
+                                <div className="mt-2 flex flex-wrap gap-2 pl-5">
+                                  {gruppe.sessions.map((session) => {
+                                    const sessionStatus = status.find(
+                                      (s) =>
+                                        s.coachie_id === coachie.id &&
+                                        s.session_id === session.id,
+                                    )
+                                    const statusWert =
+                                      sessionStatus?.status ?? 'offen'
+
+                                    return (
+                                      <span
+                                        key={session.id}
+                                        title={session.titel}
+                                        className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_FARBE[statusWert]}`}
+                                      >
+                                        {session.titel}: {STATUS_LABEL[statusWert]}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           )
                         })}
                       </div>

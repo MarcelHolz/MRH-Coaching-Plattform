@@ -11,18 +11,24 @@ export default async function handler(req, res) {
 
   const supabase = getSupabaseAdmin()
 
-  const [coachies, programme, assignments, sessions, status] =
+  const [coachies, programme, assignments, sessions, status, module] =
     await Promise.all([
       supabase.from('coachies').select('*').order('name', { ascending: true }),
       supabase.from('programme').select('*'),
       supabase.from('coachie_programme').select('*'),
       supabase.from('sessions').select('*'),
       supabase.from('coachie_status').select('*'),
+      supabase.from('module').select('*'),
     ])
 
-  const firstError = [coachies, programme, assignments, sessions, status].find(
-    (result) => result.error,
-  )
+  const firstError = [
+    coachies,
+    programme,
+    assignments,
+    sessions,
+    status,
+    module,
+  ].find((result) => result.error)
 
   if (firstError) {
     res.status(500).json({ error: firstError.error.message })
@@ -79,6 +85,7 @@ export default async function handler(req, res) {
     assignments: assignments.data,
     sessions: sessions.data,
     status: status.data,
+    module: module.data,
     sessionStats,
   })
 }
