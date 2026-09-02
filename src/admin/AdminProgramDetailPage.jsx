@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
-import MaterialManager from './MaterialManager'
+import MaterialManager, { TYP_OPTIONEN } from './MaterialManager'
+import MaterialUpload from './MaterialUpload'
 import MarkdownFeld from './MarkdownFeld'
 import ModuleManager from './ModuleManager'
 
@@ -19,6 +20,11 @@ export default function AdminProgramDetailPage() {
   const [modulId, setModulId] = useState('')
   const [expandedId, setExpandedId] = useState(null)
   const [expandedGruppen, setExpandedGruppen] = useState(new Set())
+
+  const [materialAufklappen, setMaterialAufklappen] = useState(false)
+  const [materialTitel, setMaterialTitel] = useState('')
+  const [materialDateiUrl, setMaterialDateiUrl] = useState('')
+  const [materialTyp, setMaterialTyp] = useState('')
 
   const [editingId, setEditingId] = useState(null)
   const [editTitel, setEditTitel] = useState('')
@@ -79,7 +85,7 @@ export default function AdminProgramDetailPage() {
     event.preventDefault()
     setError('')
     try {
-      await adminFetch('/api/admin/sessions', {
+      const data = await adminFetch('/api/admin/sessions', {
         method: 'POST',
         body: JSON.stringify({
           programm_id: programId,
@@ -90,14 +96,29 @@ export default function AdminProgramDetailPage() {
           dauer_minuten: dauerMinuten ? Math.round(Number(dauerMinuten)) : null,
           modul_id: modulId || null,
           reihenfolge: sessions.length,
+          material:
+            materialTitel && materialDateiUrl
+              ? {
+                  titel: materialTitel,
+                  datei_url: materialDateiUrl,
+                  typ: materialTyp || null,
+                }
+              : undefined,
         }),
       })
+      if (data.materialFehler) {
+        setError(data.materialFehler)
+      }
       setTitel('')
       setBeschreibung('')
       setVideoUrl('')
       setBildUrl('')
       setDauerMinuten('')
       setModulId('')
+      setMaterialAufklappen(false)
+      setMaterialTitel('')
+      setMaterialDateiUrl('')
+      setMaterialTyp('')
       await loadSessions()
     } catch (err) {
       setError(err.message)
@@ -267,6 +288,60 @@ export default function AdminProgramDetailPage() {
             </option>
           ))}
         </select>
+
+        <div className="sm:col-span-2">
+          <button
+            type="button"
+            onClick={() => setMaterialAufklappen((prev) => !prev)}
+            className="text-sm text-mrh-navy hover:underline"
+          >
+            {materialAufklappen ? '− ' : '+ '}
+            Material hinzufügen (optional)
+          </button>
+
+          {materialAufklappen && (
+            <div className="mt-2 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-4">
+              <input
+                type="text"
+                placeholder="Titel"
+                value={materialTitel}
+                onChange={(e) => setMaterialTitel(e.target.value)}
+                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+              />
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <input
+                  type="text"
+                  placeholder="Storage-Pfad (z. B. <programm-id>/materialien/Workbook.pdf)"
+                  value={materialDateiUrl}
+                  onChange={(e) => setMaterialDateiUrl(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                />
+                <MaterialUpload
+                  programmId={programId}
+                  onUploaded={setMaterialDateiUrl}
+                />
+              </div>
+              <select
+                value={materialTyp}
+                onChange={(e) => setMaterialTyp(e.target.value)}
+                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+              >
+                {TYP_OPTIONEN.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 sm:col-span-4">
+                Titel und Storage-Pfad müssen beide gesetzt sein, damit das
+                Material mit angelegt wird -- sonst entsteht nur die Session.
+                Für weitere Materialien bleibt der Bereich „Materialien“ nach
+                dem Anlegen wie gewohnt verfügbar.
+              </p>
+            </div>
+          )}
+        </div>
+
         <button
           type="submit"
           className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark sm:col-span-2"
