@@ -18,6 +18,7 @@ export default function AdminProgramDetailPage() {
   const [dauerMinuten, setDauerMinuten] = useState('')
   const [modulId, setModulId] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [expandedGruppen, setExpandedGruppen] = useState(new Set())
 
   const [editingId, setEditingId] = useState(null)
   const [editTitel, setEditTitel] = useState('')
@@ -64,6 +65,15 @@ export default function AdminProgramDetailPage() {
     loadModule()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programId])
+
+  function toggleGruppe(key) {
+    setExpandedGruppen((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   async function handleCreate(event) {
     event.preventDefault()
@@ -176,6 +186,19 @@ export default function AdminProgramDetailPage() {
     }
   }
 
+  const gruppen = [
+    ...module.map((modul) => ({
+      key: modul.id,
+      titel: modul.titel,
+      sessions: sessions.filter((s) => s.modul_id === modul.id),
+    })),
+    {
+      key: 'kein-modul',
+      titel: 'Kein Modul',
+      sessions: sessions.filter((s) => !s.modul_id),
+    },
+  ].filter((gruppe) => gruppe.sessions.length > 0)
+
   return (
     <div>
       <Link
@@ -257,145 +280,192 @@ export default function AdminProgramDetailPage() {
       {loading ? (
         <p className="text-slate-500">Lädt…</p>
       ) : (
-        <div className="space-y-3">
-          {sessions.map((session, index) => (
-            <div key={session.id} className="rounded-xl bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-slate-800">
-                    {session.titel}
-                  </h2>
-                  {session.modul_id && (
-                    <p className="text-xs text-mrh-gold-dark">
-                      Modul:{' '}
-                      {module.find((m) => m.id === session.modul_id)?.titel ??
-                        '–'}
-                    </p>
-                  )}
-                  {session.beschreibung && (
-                    <p className="text-sm text-slate-500">
-                      {session.beschreibung}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleMove(index, -1)}
-                    disabled={index === 0}
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => handleMove(index, 1)}
-                    disabled={index === sessions.length - 1}
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    onClick={() =>
-                      editingId === session.id ? cancelEdit() : startEdit(session)
-                    }
-                    className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
-                  >
-                    {editingId === session.id ? 'Abbrechen' : 'Bearbeiten'}
-                  </button>
-                  <button
-                    onClick={() =>
-                      setExpandedId(expandedId === session.id ? null : session.id)
-                    }
-                    className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
-                  >
-                    {expandedId === session.id ? 'Schließen' : 'Materialien'}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(session.id)}
-                    className="text-sm text-red-600 hover:underline"
-                  >
-                    Löschen
-                  </button>
-                </div>
-              </div>
-
-              {editingId === session.id && (
-                <form
-                  onSubmit={handleUpdate}
-                  className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"
+        <div className="space-y-4">
+          {gruppen.map((gruppe) => {
+            const offen = expandedGruppen.has(gruppe.key)
+            return (
+              <div key={gruppe.key}>
+                <button
+                  onClick={() => toggleGruppe(gruppe.key)}
+                  className="flex w-full items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-200"
                 >
-                  <input
-                    type="text"
-                    placeholder="Titel"
-                    required
-                    value={editTitel}
-                    onChange={(e) => setEditTitel(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Reihenfolge"
-                    required
-                    value={editReihenfolge}
-                    onChange={(e) => setEditReihenfolge(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <div className="sm:col-span-2">
-                    <MarkdownFeld
-                      value={editBeschreibung}
-                      onChange={setEditBeschreibung}
-                      placeholder="Beschreibung (optional, mit **fett**, # Überschrift, - Liste)"
-                      rows={3}
-                    />
-                  </div>
-                  <input
-                    type="url"
-                    placeholder="Video-URL (YouTube oder Vimeo)"
-                    value={editVideoUrl}
-                    onChange={(e) => setEditVideoUrl(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Bild-URL"
-                    value={editBildUrl}
-                    onChange={(e) => setEditBildUrl(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Dauer in Minuten (optional)"
-                    value={editDauerMinuten}
-                    onChange={(e) => setEditDauerMinuten(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <select
-                    value={editModulId}
-                    onChange={(e) => setEditModulId(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
-                  >
-                    <option value="">Kein Modul (direkt unter dem Programm)</option>
-                    {module.map((modul) => (
-                      <option key={modul.id} value={modul.id}>
-                        {modul.titel}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="submit"
-                    disabled={editSubmitting}
-                    className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50 sm:col-span-2"
-                  >
-                    {editSubmitting ? 'Speichert…' : 'Änderungen speichern'}
-                  </button>
-                </form>
-              )}
+                  <span className="text-slate-400">{offen ? '▾' : '▸'}</span>
+                  {gruppe.titel}
+                  <span className="text-xs font-normal text-slate-400">
+                    ({gruppe.sessions.length})
+                  </span>
+                </button>
 
-              {expandedId === session.id && (
-                <MaterialManager sessionId={session.id} programmId={programId} />
-              )}
-            </div>
-          ))}
+                {offen && (
+                  <div className="mt-3 space-y-3">
+                    {gruppe.sessions.map((session) => {
+                      const index = sessions.indexOf(session)
+                      return (
+                        <div
+                          key={session.id}
+                          className="rounded-xl bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h2 className="font-semibold text-slate-800">
+                                {session.titel}
+                              </h2>
+                              {session.modul_id && (
+                                <p className="text-xs text-mrh-gold-dark">
+                                  Modul:{' '}
+                                  {module.find((m) => m.id === session.modul_id)
+                                    ?.titel ?? '–'}
+                                </p>
+                              )}
+                              {session.beschreibung && (
+                                <p className="text-sm text-slate-500">
+                                  {session.beschreibung}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleMove(index, -1)}
+                                disabled={index === 0}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => handleMove(index, 1)}
+                                disabled={index === sessions.length - 1}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                onClick={() =>
+                                  editingId === session.id
+                                    ? cancelEdit()
+                                    : startEdit(session)
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
+                              >
+                                {editingId === session.id
+                                  ? 'Abbrechen'
+                                  : 'Bearbeiten'}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setExpandedId(
+                                    expandedId === session.id ? null : session.id,
+                                  )
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
+                              >
+                                {expandedId === session.id
+                                  ? 'Schließen'
+                                  : 'Materialien'}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(session.id)}
+                                className="text-sm text-red-600 hover:underline"
+                              >
+                                Löschen
+                              </button>
+                            </div>
+                          </div>
+
+                          {editingId === session.id && (
+                            <form
+                              onSubmit={handleUpdate}
+                              className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"
+                            >
+                              <input
+                                type="text"
+                                placeholder="Titel"
+                                required
+                                value={editTitel}
+                                onChange={(e) => setEditTitel(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <input
+                                type="number"
+                                placeholder="Reihenfolge"
+                                required
+                                value={editReihenfolge}
+                                onChange={(e) =>
+                                  setEditReihenfolge(e.target.value)
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <div className="sm:col-span-2">
+                                <MarkdownFeld
+                                  value={editBeschreibung}
+                                  onChange={setEditBeschreibung}
+                                  placeholder="Beschreibung (optional, mit **fett**, # Überschrift, - Liste)"
+                                  rows={3}
+                                />
+                              </div>
+                              <input
+                                type="url"
+                                placeholder="Video-URL (YouTube oder Vimeo)"
+                                value={editVideoUrl}
+                                onChange={(e) => setEditVideoUrl(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <input
+                                type="url"
+                                placeholder="Bild-URL"
+                                value={editBildUrl}
+                                onChange={(e) => setEditBildUrl(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Dauer in Minuten (optional)"
+                                value={editDauerMinuten}
+                                onChange={(e) =>
+                                  setEditDauerMinuten(e.target.value)
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <select
+                                value={editModulId}
+                                onChange={(e) => setEditModulId(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
+                              >
+                                <option value="">
+                                  Kein Modul (direkt unter dem Programm)
+                                </option>
+                                {module.map((modul) => (
+                                  <option key={modul.id} value={modul.id}>
+                                    {modul.titel}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="submit"
+                                disabled={editSubmitting}
+                                className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50 sm:col-span-2"
+                              >
+                                {editSubmitting
+                                  ? 'Speichert…'
+                                  : 'Änderungen speichern'}
+                              </button>
+                            </form>
+                          )}
+
+                          {expandedId === session.id && (
+                            <MaterialManager
+                              sessionId={session.id}
+                              programmId={programId}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           {sessions.length === 0 && (
             <p className="text-slate-500">Noch keine Sessions angelegt.</p>
           )}
