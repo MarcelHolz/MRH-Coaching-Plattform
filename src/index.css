@@ -87,3 +87,13 @@ body {
 .mrh-gold-text {
   color: var(--color-mrh-gold);
 }
+
+/* Session-Liste in CoachieProgramPage.jsx: deaktiviert das automatische
+   Scroll-Anchoring des Browsers für diesen Bereich. Ohne das wählt der
+   Browser beim Aufklappen einer Session (Höhenänderung durch Video/Bild,
+   das oft erst asynchron nachlädt) eigenmächtig einen Ankerpunkt und
+   scrollt an eine zufällige Position -- unser eigenes scrollIntoView()
+   beim Öffnen soll die einzige Quelle für die Scrollposition sein. */
+.session-liste {
+  overflow-anchor: none;
+}

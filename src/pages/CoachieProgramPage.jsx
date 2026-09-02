@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -171,6 +171,7 @@ function SessionRow({
   onToggle,
   istLesezeichen,
   onToggleLesezeichen,
+  registerRef,
 }) {
   const [auswahl, setAuswahl] = useState(status?.status ?? 'offen')
   const [notiz, setNotiz] = useState(status?.notiz ?? '')
@@ -212,7 +213,7 @@ function SessionRow({
   }
 
   return (
-    <div className="rounded-xl bg-white shadow-sm">
+    <div ref={registerRef} className="rounded-xl bg-white shadow-sm">
       <div className="flex w-full items-center gap-3 px-5 py-4">
         <button
           onClick={() => onToggleLesezeichen(session.id)}
@@ -355,6 +356,7 @@ function ModulKarte({
   onToggleSession,
   lesezeichenSet,
   onToggleLesezeichen,
+  registerSessionRef,
 }) {
   const abgeschlossen = sessions.filter(
     (s) => statusMap[s.id]?.status === 'abgeschlossen',
@@ -447,6 +449,7 @@ function ModulKarte({
               onToggle={() => onToggleSession(session.id)}
               istLesezeichen={lesezeichenSet.has(session.id)}
               onToggleLesezeichen={onToggleLesezeichen}
+              registerRef={(el) => registerSessionRef(session.id, el)}
             />
           ))}
           {sessions.length === 0 && (
@@ -482,6 +485,44 @@ export default function CoachieProgramPage() {
   const [lesezeichenSet, setLesezeichenSet] = useState(new Set())
   const [zeigeCalendly, setZeigeCalendly] = useState(false)
   const [calendlyBuchungenAnzahl, setCalendlyBuchungenAnzahl] = useState(0)
+
+  const sessionRefs = useRef(new Map())
+
+  function registerSessionRef(id, el) {
+    if (el) sessionRefs.current.set(id, el)
+    else sessionRefs.current.delete(id)
+  }
+
+  // Scrollt zum Anfang der Session-Karte statt der bisherigen zufälligen
+  // Position -- per requestAnimationFrame verzögert, damit die Karte
+  // bereits aufgeklappt (und, falls nötig, ihr Modul bereits mitgerendert)
+  // ist, wenn scrollIntoView berechnet wird. Ergänzend dazu deaktiviert
+  // .session-liste (siehe index.css) das Scroll-Anchoring des Browsers,
+  // damit später nachladende Bilder/Videos die Position nicht wieder
+  // verschieben.
+  function scrollZuSession(id) {
+    requestAnimationFrame(() => {
+      sessionRefs.current.get(id)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  // Öffnet eine Session gezielt (Fortsetzen-Button, Onboarding-Sprung,
+  // Such-Deep-Link) -- im Unterschied zu handleToggleSession kein Toggle,
+  // da diese Aufrufer immer eine bestimmte Session sichtbar machen wollen.
+  function openSession(id, modulId) {
+    setOpenId(id)
+    if (modulId) setOffenesModulId(modulId)
+    scrollZuSession(id)
+  }
+
+  function handleToggleSession(id) {
+    const wirdGeoeffnet = openId !== id
+    setOpenId(wirdGeoeffnet ? id : null)
+    if (wirdGeoeffnet) scrollZuSession(id)
+  }
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -622,9 +663,9 @@ export default function CoachieProgramPage() {
     const ziel =
       geordnet.find((s) => statusMap[s.id]?.status !== 'abgeschlossen') ??
       geordnet[0]
-    setOpenId(ziel.id)
-    if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
+    openSession(ziel.id, ziel.modul_id)
     setAutoStartErledigt(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStartErledigt, loading, sessions, module, statusMap, searchParams])
 
   useEffect(() => {
@@ -638,8 +679,8 @@ export default function CoachieProgramPage() {
     const ziel = sessions.find((s) => s.id === zielId)
     if (!ziel) return
 
-    setOpenId(ziel.id)
-    if (ziel.modul_id) setOffenesModulId(ziel.modul_id)
+    openSession(ziel.id, ziel.modul_id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, sessions, searchParams])
 
   async function handleToggleLesezeichen(sessionId) {
@@ -971,12 +1012,9 @@ export default function CoachieProgramPage() {
                 </span>
                 {naechsteSession && (
                   <button
-                    onClick={() => {
-                      setOpenId(naechsteSession.id)
-                      if (naechsteSession.modul_id) {
-                        setOffenesModulId(naechsteSession.modul_id)
-                      }
-                    }}
+                    onClick={() =>
+                      openSession(naechsteSession.id, naechsteSession.modul_id)
+                    }
                     className="block w-full rounded-lg bg-mrh-navy py-2 text-center text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
                   >
                     Fortsetzen
@@ -991,7 +1029,7 @@ export default function CoachieProgramPage() {
           </div>
 
           <div className="order-3 lg:col-span-2">
-            <div className="space-y-3">
+            <div className="session-liste space-y-3">
               {modulLoseSessions.map((session) => (
                 <SessionRow
                   key={session.id}
@@ -1000,11 +1038,10 @@ export default function CoachieProgramPage() {
                   status={statusMap[session.id]}
                   onStatusChange={handleStatusChange}
                   open={openId === session.id}
-                  onToggle={() =>
-                    setOpenId(openId === session.id ? null : session.id)
-                  }
+                  onToggle={() => handleToggleSession(session.id)}
                   istLesezeichen={lesezeichenSet.has(session.id)}
                   onToggleLesezeichen={handleToggleLesezeichen}
+                  registerRef={(el) => registerSessionRef(session.id, el)}
                 />
               ))}
               {moduleMitSessions.map((modul) => (
@@ -1020,11 +1057,10 @@ export default function CoachieProgramPage() {
                     setOffenesModulId(offenesModulId === modul.id ? null : modul.id)
                   }
                   openSessionId={openId}
-                  onToggleSession={(id) =>
-                    setOpenId(openId === id ? null : id)
-                  }
+                  onToggleSession={handleToggleSession}
                   lesezeichenSet={lesezeichenSet}
                   onToggleLesezeichen={handleToggleLesezeichen}
+                  registerSessionRef={registerSessionRef}
                 />
               ))}
             </div>
