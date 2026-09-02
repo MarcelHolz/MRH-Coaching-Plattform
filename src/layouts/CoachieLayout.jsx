@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { initialen } from '../lib/initialen'
@@ -22,6 +23,7 @@ const MARKEN_LINKS = [
 export default function CoachieLayout() {
   const { coachie, logout } = useAuth()
   const navigate = useNavigate()
+  const [menuOffen, setMenuOffen] = useState(false)
 
   async function handleLogout() {
     await logout()
@@ -31,7 +33,7 @@ export default function CoachieLayout() {
   return (
     <div className="min-h-screen bg-mrh-cream">
       <header className="border-b border-slate-200 bg-mrh-navy text-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <Link to="/coachie" className="text-lg font-semibold">
             MRH Beratung &amp; Coaching
           </Link>
@@ -49,16 +51,41 @@ export default function CoachieLayout() {
                 </span>
               )
             )}
-            {coachie?.name && <span className="text-slate-200">{coachie.name}</span>}
+            {coachie?.name && (
+              <span className="hidden text-slate-200 sm:inline">
+                {coachie.name}
+              </span>
+            )}
             <button
               onClick={handleLogout}
               className="rounded-lg border border-white/30 px-3 py-1.5 transition hover:bg-white/10"
             >
               Abmelden
             </button>
+            <button
+              onClick={() => setMenuOffen((prev) => !prev)}
+              aria-label={menuOffen ? 'Navigation schließen' : 'Navigation öffnen'}
+              aria-expanded={menuOffen}
+              className="rounded-lg border border-white/30 p-1.5 transition hover:bg-white/10 md:hidden"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-5xl gap-1 px-4">
+        <nav className="mx-auto hidden max-w-5xl gap-1 px-4 md:flex">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -76,6 +103,27 @@ export default function CoachieLayout() {
             </NavLink>
           ))}
         </nav>
+        {menuOffen && (
+          <nav className="mx-auto flex max-w-5xl flex-col gap-1 px-4 pb-4 md:hidden">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={() => setMenuOffen(false)}
+                className={({ isActive }) =>
+                  `rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-mrh-cream text-mrh-navy'
+                      : 'text-slate-200 hover:bg-white/10'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Outlet />
