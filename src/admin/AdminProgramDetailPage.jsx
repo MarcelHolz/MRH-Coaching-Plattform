@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { adminFetch } from '../lib/adminFetch'
-import MaterialManager from './MaterialManager'
+import MaterialManager, { TYP_OPTIONEN } from './MaterialManager'
+import MaterialUpload from './MaterialUpload'
 import MarkdownFeld from './MarkdownFeld'
 import ModuleManager from './ModuleManager'
 
@@ -18,6 +19,12 @@ export default function AdminProgramDetailPage() {
   const [dauerMinuten, setDauerMinuten] = useState('')
   const [modulId, setModulId] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [expandedGruppen, setExpandedGruppen] = useState(new Set())
+
+  const [materialAufklappen, setMaterialAufklappen] = useState(false)
+  const [materialTitel, setMaterialTitel] = useState('')
+  const [materialDateiUrl, setMaterialDateiUrl] = useState('')
+  const [materialTyp, setMaterialTyp] = useState('')
 
   const [editingId, setEditingId] = useState(null)
   const [editTitel, setEditTitel] = useState('')
@@ -65,11 +72,20 @@ export default function AdminProgramDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [programId])
 
+  function toggleGruppe(key) {
+    setExpandedGruppen((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   async function handleCreate(event) {
     event.preventDefault()
     setError('')
     try {
-      await adminFetch('/api/admin/sessions', {
+      const data = await adminFetch('/api/admin/sessions', {
         method: 'POST',
         body: JSON.stringify({
           programm_id: programId,
@@ -80,14 +96,29 @@ export default function AdminProgramDetailPage() {
           dauer_minuten: dauerMinuten ? Math.round(Number(dauerMinuten)) : null,
           modul_id: modulId || null,
           reihenfolge: sessions.length,
+          material:
+            materialTitel && materialDateiUrl
+              ? {
+                  titel: materialTitel,
+                  datei_url: materialDateiUrl,
+                  typ: materialTyp || null,
+                }
+              : undefined,
         }),
       })
+      if (data.materialFehler) {
+        setError(data.materialFehler)
+      }
       setTitel('')
       setBeschreibung('')
       setVideoUrl('')
       setBildUrl('')
       setDauerMinuten('')
       setModulId('')
+      setMaterialAufklappen(false)
+      setMaterialTitel('')
+      setMaterialDateiUrl('')
+      setMaterialTyp('')
       await loadSessions()
     } catch (err) {
       setError(err.message)
@@ -176,6 +207,19 @@ export default function AdminProgramDetailPage() {
     }
   }
 
+  const gruppen = [
+    ...module.map((modul) => ({
+      key: modul.id,
+      titel: modul.titel,
+      sessions: sessions.filter((s) => s.modul_id === modul.id),
+    })),
+    {
+      key: 'kein-modul',
+      titel: 'Kein Modul',
+      sessions: sessions.filter((s) => !s.modul_id),
+    },
+  ].filter((gruppe) => gruppe.sessions.length > 0)
+
   return (
     <div>
       <Link
@@ -244,6 +288,60 @@ export default function AdminProgramDetailPage() {
             </option>
           ))}
         </select>
+
+        <div className="sm:col-span-2">
+          <button
+            type="button"
+            onClick={() => setMaterialAufklappen((prev) => !prev)}
+            className="text-sm text-mrh-navy hover:underline"
+          >
+            {materialAufklappen ? '− ' : '+ '}
+            Material hinzufügen (optional)
+          </button>
+
+          {materialAufklappen && (
+            <div className="mt-2 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-4">
+              <input
+                type="text"
+                placeholder="Titel"
+                value={materialTitel}
+                onChange={(e) => setMaterialTitel(e.target.value)}
+                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+              />
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <input
+                  type="text"
+                  placeholder="Storage-Pfad (z. B. <programm-id>/materialien/Workbook.pdf)"
+                  value={materialDateiUrl}
+                  onChange={(e) => setMaterialDateiUrl(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                />
+                <MaterialUpload
+                  programmId={programId}
+                  onUploaded={setMaterialDateiUrl}
+                />
+              </div>
+              <select
+                value={materialTyp}
+                onChange={(e) => setMaterialTyp(e.target.value)}
+                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+              >
+                {TYP_OPTIONEN.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-400 sm:col-span-4">
+                Titel und Storage-Pfad müssen beide gesetzt sein, damit das
+                Material mit angelegt wird -- sonst entsteht nur die Session.
+                Für weitere Materialien bleibt der Bereich „Materialien“ nach
+                dem Anlegen wie gewohnt verfügbar.
+              </p>
+            </div>
+          )}
+        </div>
+
         <button
           type="submit"
           className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark sm:col-span-2"
@@ -257,145 +355,192 @@ export default function AdminProgramDetailPage() {
       {loading ? (
         <p className="text-slate-500">Lädt…</p>
       ) : (
-        <div className="space-y-3">
-          {sessions.map((session, index) => (
-            <div key={session.id} className="rounded-xl bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-slate-800">
-                    {session.titel}
-                  </h2>
-                  {session.modul_id && (
-                    <p className="text-xs text-mrh-gold-dark">
-                      Modul:{' '}
-                      {module.find((m) => m.id === session.modul_id)?.titel ??
-                        '–'}
-                    </p>
-                  )}
-                  {session.beschreibung && (
-                    <p className="text-sm text-slate-500">
-                      {session.beschreibung}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleMove(index, -1)}
-                    disabled={index === 0}
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => handleMove(index, 1)}
-                    disabled={index === sessions.length - 1}
-                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    onClick={() =>
-                      editingId === session.id ? cancelEdit() : startEdit(session)
-                    }
-                    className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
-                  >
-                    {editingId === session.id ? 'Abbrechen' : 'Bearbeiten'}
-                  </button>
-                  <button
-                    onClick={() =>
-                      setExpandedId(expandedId === session.id ? null : session.id)
-                    }
-                    className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
-                  >
-                    {expandedId === session.id ? 'Schließen' : 'Materialien'}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(session.id)}
-                    className="text-sm text-red-600 hover:underline"
-                  >
-                    Löschen
-                  </button>
-                </div>
-              </div>
-
-              {editingId === session.id && (
-                <form
-                  onSubmit={handleUpdate}
-                  className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"
+        <div className="space-y-4">
+          {gruppen.map((gruppe) => {
+            const offen = expandedGruppen.has(gruppe.key)
+            return (
+              <div key={gruppe.key}>
+                <button
+                  onClick={() => toggleGruppe(gruppe.key)}
+                  className="flex w-full items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-200"
                 >
-                  <input
-                    type="text"
-                    placeholder="Titel"
-                    required
-                    value={editTitel}
-                    onChange={(e) => setEditTitel(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Reihenfolge"
-                    required
-                    value={editReihenfolge}
-                    onChange={(e) => setEditReihenfolge(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <div className="sm:col-span-2">
-                    <MarkdownFeld
-                      value={editBeschreibung}
-                      onChange={setEditBeschreibung}
-                      placeholder="Beschreibung (optional, mit **fett**, # Überschrift, - Liste)"
-                      rows={3}
-                    />
-                  </div>
-                  <input
-                    type="url"
-                    placeholder="Video-URL (YouTube oder Vimeo)"
-                    value={editVideoUrl}
-                    onChange={(e) => setEditVideoUrl(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Bild-URL"
-                    value={editBildUrl}
-                    onChange={(e) => setEditBildUrl(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Dauer in Minuten (optional)"
-                    value={editDauerMinuten}
-                    onChange={(e) => setEditDauerMinuten(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
-                  />
-                  <select
-                    value={editModulId}
-                    onChange={(e) => setEditModulId(e.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
-                  >
-                    <option value="">Kein Modul (direkt unter dem Programm)</option>
-                    {module.map((modul) => (
-                      <option key={modul.id} value={modul.id}>
-                        {modul.titel}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="submit"
-                    disabled={editSubmitting}
-                    className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50 sm:col-span-2"
-                  >
-                    {editSubmitting ? 'Speichert…' : 'Änderungen speichern'}
-                  </button>
-                </form>
-              )}
+                  <span className="text-slate-400">{offen ? '▾' : '▸'}</span>
+                  {gruppe.titel}
+                  <span className="text-xs font-normal text-slate-400">
+                    ({gruppe.sessions.length})
+                  </span>
+                </button>
 
-              {expandedId === session.id && (
-                <MaterialManager sessionId={session.id} programmId={programId} />
-              )}
-            </div>
-          ))}
+                {offen && (
+                  <div className="mt-3 space-y-3">
+                    {gruppe.sessions.map((session) => {
+                      const index = sessions.indexOf(session)
+                      return (
+                        <div
+                          key={session.id}
+                          className="rounded-xl bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h2 className="font-semibold text-slate-800">
+                                {session.titel}
+                              </h2>
+                              {session.modul_id && (
+                                <p className="text-xs text-mrh-gold-dark">
+                                  Modul:{' '}
+                                  {module.find((m) => m.id === session.modul_id)
+                                    ?.titel ?? '–'}
+                                </p>
+                              )}
+                              {session.beschreibung && (
+                                <p className="text-sm text-slate-500">
+                                  {session.beschreibung}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleMove(index, -1)}
+                                disabled={index === 0}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                onClick={() => handleMove(index, 1)}
+                                disabled={index === sessions.length - 1}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-sm transition hover:bg-slate-50 disabled:opacity-30"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                onClick={() =>
+                                  editingId === session.id
+                                    ? cancelEdit()
+                                    : startEdit(session)
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
+                              >
+                                {editingId === session.id
+                                  ? 'Abbrechen'
+                                  : 'Bearbeiten'}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setExpandedId(
+                                    expandedId === session.id ? null : session.id,
+                                  )
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-1 text-sm transition hover:bg-slate-50"
+                              >
+                                {expandedId === session.id
+                                  ? 'Schließen'
+                                  : 'Materialien'}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(session.id)}
+                                className="text-sm text-red-600 hover:underline"
+                              >
+                                Löschen
+                              </button>
+                            </div>
+                          </div>
+
+                          {editingId === session.id && (
+                            <form
+                              onSubmit={handleUpdate}
+                              className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-2"
+                            >
+                              <input
+                                type="text"
+                                placeholder="Titel"
+                                required
+                                value={editTitel}
+                                onChange={(e) => setEditTitel(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <input
+                                type="number"
+                                placeholder="Reihenfolge"
+                                required
+                                value={editReihenfolge}
+                                onChange={(e) =>
+                                  setEditReihenfolge(e.target.value)
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <div className="sm:col-span-2">
+                                <MarkdownFeld
+                                  value={editBeschreibung}
+                                  onChange={setEditBeschreibung}
+                                  placeholder="Beschreibung (optional, mit **fett**, # Überschrift, - Liste)"
+                                  rows={3}
+                                />
+                              </div>
+                              <input
+                                type="url"
+                                placeholder="Video-URL (YouTube oder Vimeo)"
+                                value={editVideoUrl}
+                                onChange={(e) => setEditVideoUrl(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <input
+                                type="url"
+                                placeholder="Bild-URL"
+                                value={editBildUrl}
+                                onChange={(e) => setEditBildUrl(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Dauer in Minuten (optional)"
+                                value={editDauerMinuten}
+                                onChange={(e) =>
+                                  setEditDauerMinuten(e.target.value)
+                                }
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+                              />
+                              <select
+                                value={editModulId}
+                                onChange={(e) => setEditModulId(e.target.value)}
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy sm:col-span-2"
+                              >
+                                <option value="">
+                                  Kein Modul (direkt unter dem Programm)
+                                </option>
+                                {module.map((modul) => (
+                                  <option key={modul.id} value={modul.id}>
+                                    {modul.titel}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="submit"
+                                disabled={editSubmitting}
+                                className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50 sm:col-span-2"
+                              >
+                                {editSubmitting
+                                  ? 'Speichert…'
+                                  : 'Änderungen speichern'}
+                              </button>
+                            </form>
+                          )}
+
+                          {expandedId === session.id && (
+                            <MaterialManager
+                              sessionId={session.id}
+                              programmId={programId}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           {sessions.length === 0 && (
             <p className="text-slate-500">Noch keine Sessions angelegt.</p>
           )}

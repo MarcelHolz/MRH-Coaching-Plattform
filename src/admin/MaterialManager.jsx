@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { adminFetch } from '../lib/adminFetch'
 import MaterialUpload from './MaterialUpload'
 
-const TYP_OPTIONEN = [
+export const TYP_OPTIONEN = [
   { value: '', label: 'Typ wählen' },
   { value: 'pdf', label: 'PDF' },
   { value: 'bild', label: 'Bild (PNG/JPEG)' },

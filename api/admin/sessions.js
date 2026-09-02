@@ -93,6 +93,7 @@ async function handleSessions(req, res, supabase) {
       modul_id,
       reihenfolge,
       dauer_minuten,
+      material,
     } = req.body ?? {}
 
     if (!programm_id || !titel) {
@@ -100,7 +101,7 @@ async function handleSessions(req, res, supabase) {
       return
     }
 
-    const { data, error } = await supabase
+    const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
         programm_id,
@@ -115,12 +116,41 @@ async function handleSessions(req, res, supabase) {
       .select()
       .single()
 
-    if (error) {
-      res.status(500).json({ error: error.message })
+    if (sessionError) {
+      res.status(500).json({ error: sessionError.message })
       return
     }
 
-    res.status(201).json({ session: data })
+    // Optionales Material direkt bei der Anlage -- eigener Insert nach der
+    // Session, kein Rollback bei Fehlschlag: die Session bleibt bestehen,
+    // die Antwort benennt aber klar, welcher Teil fehlgeschlagen ist, damit
+    // das Material im bestehenden Materialien-Bereich nachgetragen wird.
+    if (material?.titel && material?.datei_url) {
+      const { data: materialData, error: materialError } = await supabase
+        .from('session_material')
+        .insert({
+          session_id: session.id,
+          titel: material.titel,
+          datei_url: material.datei_url,
+          typ: material.typ || null,
+          reihenfolge: 0,
+        })
+        .select()
+        .single()
+
+      if (materialError) {
+        res.status(201).json({
+          session,
+          materialFehler: `Session wurde angelegt, Material konnte aber nicht gespeichert werden: ${materialError.message}`,
+        })
+        return
+      }
+
+      res.status(201).json({ session, material: materialData })
+      return
+    }
+
+    res.status(201).json({ session })
     return
   }
 
