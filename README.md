@@ -501,7 +501,14 @@ Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
   landen in einer synthetischen Gruppe `{ id: null, titel: 'Kein
   Modul', ... }`. `copy_paste_master_url` je Session ist aktuell immer
   `null` (kein entsprechendes DB-Feld, als Platzhalter für die von der
-  Antwortstruktur vorgegebene Form erhalten).
+  Antwortstruktur vorgegebene Form erhalten). **Nur bei dieser einen
+  Resource** wird das Secret zusätzlich als Query-Parameter akzeptiert
+  (`?resource=lesen&secret=<Secret>`), für Tools wie Copilot Studio, die
+  keinen Custom-Header setzen können — der Header bleibt der primäre,
+  empfohlene Weg. Bewusst nicht für die schreibenden Ressourcen
+  verfügbar: ein Secret in der URL landet in Server-/Proxy-Logs und im
+  Browser-Verlauf, für Lesezugriff vertretbar, für Schreibzugriff ein
+  unnötiges Risiko.
 
 Beispiel — neues Entwurfsprogramm anlegen:
 
