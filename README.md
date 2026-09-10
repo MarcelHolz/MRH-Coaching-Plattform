@@ -494,15 +494,25 @@ Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
   `beschreibung`, `video_url`, `bild_url`, `reihenfolge`).
 - `GET /api/agent/inhalte?resource=lesen` — kompletter Ist-Stand der
   Plattform in einem Call, verschachtelt `programme[].module[].sessions[]`
-  statt drei flacher Listen. Enthält auch Entwürfe (`aktiv = false`).
-  Leere Felder werden explizit als `null` zurückgegeben, nicht
-  weggelassen. Rein lesend — `POST`/`PATCH`/`DELETE` auf diesen Pfad
-  antworten mit `405`, unabhängig vom Body. Sessions ohne `modul_id`
-  landen in einer synthetischen Gruppe `{ id: null, titel: 'Kein
-  Modul', ... }`. `copy_paste_master_url` je Session ist aktuell immer
-  `null` (kein entsprechendes DB-Feld, als Platzhalter für die von der
-  Antwortstruktur vorgegebene Form erhalten). **Nur bei dieser einen
-  Resource** wird das Secret zusätzlich als Query-Parameter akzeptiert
+  statt drei flacher Listen. Programme/Module/Sessions liefern jeweils
+  auch `beschreibung` (bei Sessions der vollständige Session-Inhalt,
+  nicht nur eine Kurzbeschreibung — es gibt kein separates
+  Sessiontext-Feld). Enthält auch Entwürfe (`aktiv = false`). Leere
+  Felder werden explizit als `null` zurückgegeben, nicht weggelassen.
+  Rein lesend — `POST`/`PATCH`/`DELETE` auf diesen Pfad antworten mit
+  `405`, unabhängig vom Body. Sessions ohne `modul_id` landen in einer
+  synthetischen Gruppe `{ id: null, titel: 'Kein Modul', ... }`. Jede
+  Session liefert zusätzlich `material: [{ typ, dateiname, url }]` aus
+  `session_material` — `url` ist eine signierte URL (1 Stunde gültig,
+  der private Bucket "Programme" hat keine öffentlichen Links).
+  "Impulskarten" haben kein eigenes Feld/keinen eigenen Materialtyp,
+  sondern sind normale `session_material`-Einträge mit `typ = "bild"`
+  und einer Titel-Konvention wie `P1_Impulskarte_01` — über `material`
+  bereits mit erfasst. Optionaler Filter `?programm_id=<uuid>` reduziert
+  die Antwort auf ein einzelnes Programm, falls die volle Antwort (voller
+  Sessiontext + Materialien für alle Programme, aktuell ca. 400 KB) zu
+  groß wird. **Nur bei dieser einen Resource** wird das Secret
+  zusätzlich als Query-Parameter akzeptiert
   (`?resource=lesen&secret=<Secret>`), für Tools wie Copilot Studio, die
   keinen Custom-Header setzen können — der Header bleibt der primäre,
   empfohlene Weg. Bewusst nicht für die schreibenden Ressourcen

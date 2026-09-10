@@ -417,6 +417,38 @@ async function handleSessions(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+const MATERIAL_BUCKET = 'Programme'
+
+// Länger als die 60 Sekunden des Klick-Downloads in src/lib/storage.js
+// (getSignedMaterialUrl) -- dieser Endpoint liefert die URLs in einer
+// JSON-Antwort, die ein Agent typischerweise über eine ganze
+// Review-Sitzung hinweg abruft, nicht für einen einzelnen sofortigen
+// Klick.
+const MATERIAL_URL_ABLAUF_SEKUNDEN = 3600
+
+// Erzeugt für alle übergebenen Storage-Pfade in einem einzigen Aufruf
+// signierte URLs (statt einem Call pro Material -- bei ~230 Materialien
+// sonst 230 sequenzielle Storage-Requests). Liefert eine Pfad->URL-Map;
+// fehlgeschlagene einzelne Pfade (z. B. Datei zwischenzeitlich
+// gelöscht) werden übersprungen, nicht der ganze Request abgebrochen.
+async function signierteMaterialUrls(supabase, pfade) {
+  if (pfade.length === 0) return new Map()
+
+  const { data, error } = await supabase.storage
+    .from(MATERIAL_BUCKET)
+    .createSignedUrls(pfade, MATERIAL_URL_ABLAUF_SEKUNDEN)
+
+  if (error || !data) return new Map()
+
+  const zuordnung = new Map()
+  data.forEach((eintrag) => {
+    if (eintrag.signedUrl && eintrag.path) {
+      zuordnung.set(eintrag.path, eintrag.signedUrl)
+    }
+  })
+  return zuordnung
+}
+
 // Lese-Pendant zu handleProgramme/handleModule/handleSessions: liefert
 // die komplette Plattform in einem Call, verschachtelt statt als drei
 // flache Listen, für einen externen Agenten, der den Gesamtzustand
@@ -425,29 +457,46 @@ async function handleSessions(req, res, supabase) {
 // diesen Pfad unter keinen Umständen geschrieben werden kann, auch
 // wenn handleProgramme/-Modul/-Sessions weiterhin Schreibzugriff für
 // den Entwurfs-Workflow bieten.
+//
+// Optionaler Filter ?programm_id=<uuid>: reduziert Response-Größe und
+// die Anzahl signierter Material-URLs, wenn die volle Antwort (voller
+// Sessiontext + Materialien für alle Programme) zu groß wird oder nur
+// ein Programm inhaltlich geprüft werden soll.
 async function handleLesen(req, res, supabase) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
     return
   }
 
-  const [programmeResult, modulResult, sessionsResult] = await Promise.all([
+  const { programm_id: programmIdFilter } = req.query
+
+  let programmeQuery = supabase
+    .from('programme')
     // aktiv bewusst nicht gefiltert -- Entwürfe (aktiv=false) sollen
     // laut Auftrag mit sichtbar sein, aktiv selbst dient als Flag dafür.
-    supabase
-      .from('programme')
-      .select(
-        'id, titel, aktiv, teaser_aktiv, preis_anzeigen, preis_cent, standard_zugriffsmonate, bild_url',
-      )
-      .order('erstellt_am', { ascending: false }),
-    supabase
-      .from('module')
-      .select('id, titel, bild_url, programm_id')
-      .order('reihenfolge', { ascending: true }),
-    supabase
-      .from('sessions')
-      .select('id, titel, video_url, workbook_url, programm_id, modul_id')
-      .order('reihenfolge', { ascending: true }),
+    .select(
+      'id, titel, beschreibung, aktiv, teaser_aktiv, preis_anzeigen, preis_cent, standard_zugriffsmonate, bild_url',
+    )
+    .order('erstellt_am', { ascending: false })
+  let modulQuery = supabase
+    .from('module')
+    .select('id, titel, beschreibung, bild_url, programm_id')
+    .order('reihenfolge', { ascending: true })
+  let sessionsQuery = supabase
+    .from('sessions')
+    .select('id, titel, beschreibung, video_url, workbook_url, programm_id, modul_id')
+    .order('reihenfolge', { ascending: true })
+
+  if (programmIdFilter) {
+    programmeQuery = programmeQuery.eq('id', programmIdFilter)
+    modulQuery = modulQuery.eq('programm_id', programmIdFilter)
+    sessionsQuery = sessionsQuery.eq('programm_id', programmIdFilter)
+  }
+
+  const [programmeResult, modulResult, sessionsResult] = await Promise.all([
+    programmeQuery,
+    modulQuery,
+    sessionsQuery,
   ])
 
   const fehler = [programmeResult, modulResult, sessionsResult].find(
@@ -461,18 +510,59 @@ async function handleLesen(req, res, supabase) {
   const alleModule = modulResult.data ?? []
   const alleSessions = sessionsResult.data ?? []
 
+  // Materialien (Workbooks, Impulskarten als Bild-Typ, ...) hängen an
+  // sessions.id, nicht an programm_id -- daher separat über die IDs der
+  // (ggf. bereits per programm_id gefilterten) Sessions geladen.
+  const sessionIds = alleSessions.map((session) => session.id)
+  const materialResult =
+    sessionIds.length > 0
+      ? await supabase
+          .from('session_material')
+          .select('id, session_id, titel, datei_url, typ')
+          .in('session_id', sessionIds)
+          .order('reihenfolge', { ascending: true })
+      : { data: [], error: null }
+
+  if (materialResult.error) {
+    res.status(500).json({ error: materialResult.error.message })
+    return
+  }
+
+  const alleMaterialien = materialResult.data ?? []
+  const materialUrls = await signierteMaterialUrls(
+    supabase,
+    alleMaterialien.map((material) => material.datei_url),
+  )
+
   function sessionZuObjekt(session) {
     return {
       id: session.id,
       titel: session.titel,
+      beschreibung: session.beschreibung,
       video_url: session.video_url,
       workbook_url: session.workbook_url,
-      // Existiert in keiner Tabelle des aktuellen Schemas (per
-      // Supabase-Abfrage geprüft) -- bleibt als expliziter null-
-      // Platzhalter erhalten, damit die vorgegebene Response-Struktur
-      // eingehalten wird, ohne Daten zu erfinden oder workbook_url
-      // unter zwei Namen zu duplizieren.
-      copy_paste_master_url: null,
+      // Echte Materialanhänge aus session_material (Workbooks,
+      // Impulskarten als typ "bild", ...) -- ersetzt das frühere
+      // immer-null-Platzhalterfeld copy_paste_master_url, das in
+      // keiner Tabelle existierte. "Impulskarten" haben laut
+      // Datenbestand kein eigenes Feld/keinen eigenen Materialtyp,
+      // sondern sind normale session_material-Einträge mit typ="bild"
+      // und einer Titel-Konvention wie "P1_Impulskarte_01" -- damit
+      // hier automatisch mit erfasst, kein Extra-Feld nötig.
+      material: alleMaterialien
+        .filter((material) => material.session_id === session.id)
+        .map((material) => ({
+          typ: material.typ,
+          // "dateiname" wie angefragt, in der DB aber der frei
+          // vergebene Anzeigetitel (session_material.titel), keine
+          // erzwungene Dateisystem-Endung.
+          dateiname: material.titel,
+          // Signierte URL (siehe MATERIAL_URL_ABLAUF_SEKUNDEN) --
+          // datei_url in der DB ist nur ein Pfad im privaten Bucket,
+          // keine direkt aufrufbare URL. null, falls das Signieren für
+          // dieses eine Material fehlschlug (z. B. Datei gelöscht).
+          url: materialUrls.get(material.datei_url) ?? null,
+        })),
     }
   }
 
@@ -482,6 +572,7 @@ async function handleLesen(req, res, supabase) {
       .map((modul) => ({
         id: modul.id,
         titel: modul.titel,
+        beschreibung: modul.beschreibung,
         bild_url: modul.bild_url,
         sessions: alleSessions
           .filter((session) => session.modul_id === modul.id)
@@ -502,6 +593,7 @@ async function handleLesen(req, res, supabase) {
     return {
       id: programm.id,
       titel: programm.titel,
+      beschreibung: programm.beschreibung,
       aktiv: programm.aktiv,
       teaser_aktiv: programm.teaser_aktiv,
       preis_anzeigen: programm.preis_anzeigen,
@@ -517,6 +609,7 @@ async function handleLesen(req, res, supabase) {
               {
                 id: null,
                 titel: 'Kein Modul',
+                beschreibung: null,
                 bild_url: null,
                 sessions: moduleloseSessions,
               },
