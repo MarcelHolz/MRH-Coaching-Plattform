@@ -16,8 +16,10 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 // README-Abschnitt "Produktagent" zur Begründung.
 //
 // ?resource=module bzw. ?resource=sessions dispatchen auf die anderen
-// beiden Tabellen, sonst (default) Programme -- Vercel Hobby: max. 12
-// Serverless Functions, ein Dispatch-File statt drei.
+// beiden Tabellen, ?resource=lesen liefert den kompletten Ist-Stand
+// der Plattform verschachtelt (Programm -> Modul -> Session) in einem
+// Call, sonst (default) Programme -- Vercel Hobby: max. 12 Serverless
+// Functions, ein Dispatch-File statt vier.
 
 async function ladeProgramm(supabase, programmId) {
   const { data } = await supabase
@@ -415,6 +417,118 @@ async function handleSessions(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Lese-Pendant zu handleProgramme/handleModule/handleSessions: liefert
+// die komplette Plattform in einem Call, verschachtelt statt als drei
+// flache Listen, für einen externen Agenten, der den Gesamtzustand
+// analysieren soll (nicht nur eigene Entwürfe verwalten). Bewusst nur
+// GET -- diese Resource kennt kein POST/PATCH/DELETE, damit über
+// diesen Pfad unter keinen Umständen geschrieben werden kann, auch
+// wenn handleProgramme/-Modul/-Sessions weiterhin Schreibzugriff für
+// den Entwurfs-Workflow bieten.
+async function handleLesen(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const [programmeResult, modulResult, sessionsResult] = await Promise.all([
+    // aktiv bewusst nicht gefiltert -- Entwürfe (aktiv=false) sollen
+    // laut Auftrag mit sichtbar sein, aktiv selbst dient als Flag dafür.
+    supabase
+      .from('programme')
+      .select(
+        'id, titel, aktiv, teaser_aktiv, preis_anzeigen, preis_cent, standard_zugriffsmonate, bild_url',
+      )
+      .order('erstellt_am', { ascending: false }),
+    supabase
+      .from('module')
+      .select('id, titel, bild_url, programm_id')
+      .order('reihenfolge', { ascending: true }),
+    supabase
+      .from('sessions')
+      .select('id, titel, video_url, workbook_url, programm_id, modul_id')
+      .order('reihenfolge', { ascending: true }),
+  ])
+
+  const fehler = [programmeResult, modulResult, sessionsResult].find(
+    (result) => result.error,
+  )
+  if (fehler) {
+    res.status(500).json({ error: fehler.error.message })
+    return
+  }
+
+  const alleModule = modulResult.data ?? []
+  const alleSessions = sessionsResult.data ?? []
+
+  function sessionZuObjekt(session) {
+    return {
+      id: session.id,
+      titel: session.titel,
+      video_url: session.video_url,
+      workbook_url: session.workbook_url,
+      // Existiert in keiner Tabelle des aktuellen Schemas (per
+      // Supabase-Abfrage geprüft) -- bleibt als expliziter null-
+      // Platzhalter erhalten, damit die vorgegebene Response-Struktur
+      // eingehalten wird, ohne Daten zu erfinden oder workbook_url
+      // unter zwei Namen zu duplizieren.
+      copy_paste_master_url: null,
+    }
+  }
+
+  const programme = (programmeResult.data ?? []).map((programm) => {
+    const programmModule = alleModule
+      .filter((modul) => modul.programm_id === programm.id)
+      .map((modul) => ({
+        id: modul.id,
+        titel: modul.titel,
+        bild_url: modul.bild_url,
+        sessions: alleSessions
+          .filter((session) => session.modul_id === modul.id)
+          .map(sessionZuObjekt),
+      }))
+
+    // Sessions ohne modul_id (direkt unter dem Programm) landen -- wie
+    // im Coachie- und Admin-Bereich bereits üblich (z. B.
+    // AdminProgramDetailPage.jsx) -- in einer synthetischen "Kein
+    // Modul"-Gruppe, damit die vorgegebene strikte Programm->Modul->
+    // Session-Verschachtelung keine Sessions verschluckt.
+    const moduleloseSessions = alleSessions
+      .filter(
+        (session) => session.programm_id === programm.id && !session.modul_id,
+      )
+      .map(sessionZuObjekt)
+
+    return {
+      id: programm.id,
+      titel: programm.titel,
+      aktiv: programm.aktiv,
+      teaser_aktiv: programm.teaser_aktiv,
+      preis_anzeigen: programm.preis_anzeigen,
+      // In Cent, wie programme.preis_cent in der DB -- bewusst keine
+      // Euro-Umrechnung, um Rundungsfehler zu vermeiden.
+      preis: programm.preis_cent,
+      standard_zugriffsmonate: programm.standard_zugriffsmonate,
+      bild_url: programm.bild_url,
+      module: [
+        ...programmModule,
+        ...(moduleloseSessions.length > 0
+          ? [
+              {
+                id: null,
+                titel: 'Kein Modul',
+                bild_url: null,
+                sessions: moduleloseSessions,
+              },
+            ]
+          : []),
+      ],
+    }
+  })
+
+  res.status(200).json({ programme })
+}
+
 export default async function handler(req, res) {
   if (!requireAgent(req, res)) return
 
@@ -428,6 +542,11 @@ export default async function handler(req, res) {
 
   if (resource === 'sessions') {
     await handleSessions(req, res, supabase)
+    return
+  }
+
+  if (resource === 'lesen') {
+    await handleLesen(req, res, supabase)
     return
   }
 

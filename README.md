@@ -492,6 +492,16 @@ Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
 - `GET/POST/PATCH/DELETE /api/agent/inhalte?resource=sessions` —
   Sessions (Felder: `programm_id`, `modul_id` optional, `titel`,
   `beschreibung`, `video_url`, `bild_url`, `reihenfolge`).
+- `GET /api/agent/inhalte?resource=lesen` — kompletter Ist-Stand der
+  Plattform in einem Call, verschachtelt `programme[].module[].sessions[]`
+  statt drei flacher Listen. Enthält auch Entwürfe (`aktiv = false`).
+  Leere Felder werden explizit als `null` zurückgegeben, nicht
+  weggelassen. Rein lesend — `POST`/`PATCH`/`DELETE` auf diesen Pfad
+  antworten mit `405`, unabhängig vom Body. Sessions ohne `modul_id`
+  landen in einer synthetischen Gruppe `{ id: null, titel: 'Kein
+  Modul', ... }`. `copy_paste_master_url` je Session ist aktuell immer
+  `null` (kein entsprechendes DB-Feld, als Platzhalter für die von der
+  Antwortstruktur vorgegebene Form erhalten).
 
 Beispiel — neues Entwurfsprogramm anlegen:
 
@@ -527,7 +537,7 @@ api/
                  Testergebnisse (+Suche via ?resource=suche), Fortschritt,
                  Login
   agent/         Secret-geschützte Route für den Produktagenten
-                 (inhalte.js, Programme + ?resource=module/sessions),
+                 (inhalte.js, Programme + ?resource=module/sessions/lesen),
                  siehe README-Abschnitt "Produktagent"
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
@@ -561,7 +571,8 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 - `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
   `?resource=suche` (Profil-Quiz-Suche).
 - `api/agent/inhalte.js` — Standard (Programme), `?resource=module`,
-  `?resource=sessions` (Produktagent, siehe README-Abschnitt
+  `?resource=sessions`, `?resource=lesen` (rein lesend, verschachtelter
+  Gesamtstand) (Produktagent, siehe README-Abschnitt
   "Produktagent").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
