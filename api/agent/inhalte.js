@@ -622,6 +622,59 @@ async function handleLesen(req, res, supabase) {
   res.status(200).json({ programme })
 }
 
+// Rohe session_material-Liste, ungefiltert und ohne Verschachtelung --
+// für Werkzeuge, die selbst gruppieren wollen (z. B. das lokale
+// Export-Skript export-nach-sharepoint.js, das Programme/Module/
+// Sessions/Materialien getrennt abruft statt der zusammengesetzten
+// ?resource=lesen-Antwort). Analog zum GET-Zweig von handleModule/
+// handleSessions, aber bewusst nur GET -- diese Resource kennt kein
+// POST/PATCH/DELETE, Schreibzugriff auf Materialien bleibt
+// api/admin/sessions.js (?resource=materials) vorbehalten.
+async function handleMaterials(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const { data, error } = await supabase.from('session_material').select('*')
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ materialien: data })
+}
+
+// Signierte URL für einen einzelnen Storage-Pfad im privaten Bucket
+// "Programme" -- fürs lokale Export-Skript, das jede Datei einzeln
+// herunterlädt (anders als ?resource=lesen, das für ~230 Materialien
+// bereits im selben Call batch-signiert). Bewusst nur GET.
+async function handleMaterialSignedUrl(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const { pfad } = req.query
+
+  if (!pfad || typeof pfad !== 'string') {
+    res.status(400).json({ error: 'pfad ist erforderlich.' })
+    return
+  }
+
+  const { data, error } = await supabase.storage
+    .from(MATERIAL_BUCKET)
+    .createSignedUrl(pfad, MATERIAL_URL_ABLAUF_SEKUNDEN)
+
+  if (error || !data?.signedUrl) {
+    res.status(404).json({ error: 'Datei konnte nicht signiert werden.' })
+    return
+  }
+
+  res.status(200).json({ url: data.signedUrl })
+}
+
 export default async function handler(req, res) {
   const { resource } = req.query
 
@@ -646,6 +699,16 @@ export default async function handler(req, res) {
 
   if (resource === 'lesen') {
     await handleLesen(req, res, supabase)
+    return
+  }
+
+  if (resource === 'materials') {
+    await handleMaterials(req, res, supabase)
+    return
+  }
+
+  if (resource === 'material-signed-url') {
+    await handleMaterialSignedUrl(req, res, supabase)
     return
   }
 

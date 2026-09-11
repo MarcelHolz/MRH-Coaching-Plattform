@@ -519,6 +519,43 @@ Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
   verfügbar: ein Secret in der URL landet in Server-/Proxy-Logs und im
   Browser-Verlauf, für Lesezugriff vertretbar, für Schreibzugriff ein
   unnötiges Risiko.
+- `GET /api/agent/inhalte?resource=materials` — rohe, ungefilterte
+  `session_material`-Liste (`select('*')`), analog zum GET-Zweig von
+  `?resource=module`/`?resource=sessions`, aber bewusst nur `GET` (auch
+  hier `405` auf jede andere Methode). Für Werkzeuge, die selbst
+  gruppieren wollen, statt der zusammengesetzten `?resource=lesen`-
+  Antwort — siehe `export-nach-sharepoint.js`.
+- `GET /api/agent/inhalte?resource=material-signed-url&pfad=<Storage-Pfad>`
+  — signierte URL (1 Stunde gültig) für eine einzelne Datei im privaten
+  Bucket "Programme". Für Werkzeuge, die Materialien einzeln
+  herunterladen, statt der Batch-Signierung in `?resource=lesen`.
+
+### Lokaler Komplett-Export (`export-nach-sharepoint.js`)
+
+Einmaliges lokales Skript (kein npm-Paket nötig, Node 18+), das die
+komplette Plattform (Texte, Programm-/Modulbilder, Session-Materialien)
+in eine lokale Ordnerstruktur exportiert — z. B. zum Hochladen in
+SharePoint. Nicht Teil der deployten App, keine Migration, kein Einfluss
+auf das Vercel-Function-Limit.
+
+```bash
+# Windows (CMD)
+set AGENT_CONTENT_SECRET=... && node export-nach-sharepoint.js
+
+# Windows (PowerShell)
+$env:AGENT_CONTENT_SECRET="..."; node export-nach-sharepoint.js
+
+# macOS/Linux
+AGENT_CONTENT_SECRET=... node export-nach-sharepoint.js
+```
+
+Legt `export/<Programm-Titel>/<Modul-Titel oder "Ohne Modul">/<Session-
+Nummer>_<Session-Titel>/` an, mit `inhalt.md` (voller Session-Text,
+Video-URL, Dauer) und den zugehörigen Materialien unter ihrem
+ursprünglichen Dateinamen. Datei-/Ordnernamen werden von
+Windows-inkompatiblen Zeichen bereinigt. Einzelne fehlgeschlagene
+Downloads brechen den Export nicht ab, sondern erscheinen am Ende in der
+Zusammenfassung.
 
 Beispiel — neues Entwurfsprogramm anlegen:
 
@@ -554,8 +591,9 @@ api/
                  Testergebnisse (+Suche via ?resource=suche), Fortschritt,
                  Login
   agent/         Secret-geschützte Route für den Produktagenten
-                 (inhalte.js, Programme + ?resource=module/sessions/lesen),
-                 siehe README-Abschnitt "Produktagent"
+                 (inhalte.js, Programme + ?resource=module/sessions/lesen/
+                 materials/material-signed-url), siehe README-Abschnitt
+                 "Produktagent"
   checkout.js    Öffentliche Kaufseite: GET Programm-Vorschau, POST Stripe
                  Checkout Session
   cron/          Tägliche Erinnerungsautomation bei Inaktivität
@@ -589,7 +627,9 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   `?resource=suche` (Profil-Quiz-Suche).
 - `api/agent/inhalte.js` — Standard (Programme), `?resource=module`,
   `?resource=sessions`, `?resource=lesen` (rein lesend, verschachtelter
-  Gesamtstand) (Produktagent, siehe README-Abschnitt
+  Gesamtstand), `?resource=materials` (rein lesend, rohe Liste),
+  `?resource=material-signed-url` (rein lesend, einzelne signierte URL)
+  (Produktagent, siehe README-Abschnitt
   "Produktagent").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
