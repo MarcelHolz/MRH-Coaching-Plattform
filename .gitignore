@@ -7,6 +7,10 @@ dist
 .DS_Store
 *.log
 
+# Ausgabeordner von export-nach-sharepoint.js (lokaler Export, nicht
+# fürs Repo bestimmt)
+/export
+
 # Marcels persönliche Fotos — manuell ablegen, siehe public/brand/README.md
 public/brand/*
 !public/brand/README.md

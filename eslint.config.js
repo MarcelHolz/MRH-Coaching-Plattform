@@ -47,4 +47,17 @@ export default [
       ...js.configs.recommended.rules,
     },
   },
+  {
+    // Lokales Export-Skript (nicht Teil der deployten App), läuft mit
+    // Node statt im Browser -- gleiche Node-Globals wie api/**/*.js.
+    files: ['export-nach-sharepoint.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      globals: globals.node,
+      sourceType: 'module',
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+    },
+  },
 ]
