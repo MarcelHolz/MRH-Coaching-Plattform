@@ -21,6 +21,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/coachies', label: 'Coachies' },
       { to: '/admin/fortschritt', label: 'Fortschritt' },
+      { to: '/admin/empfehlungen', label: 'Empfehlungen' },
     ],
   },
   {

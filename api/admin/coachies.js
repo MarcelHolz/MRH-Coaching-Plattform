@@ -173,6 +173,31 @@ async function handlePasswortReset(req, res, supabase) {
   res.status(200).json({ ok: true })
 }
 
+// Admin-Übersicht erfolgreicher Empfehlungen (Feature Empfehlungsprogramm)
+// -- rein lesend, die Zuordnung/das Tracking passiert in checkout.js
+// bzw. webhooks/stripe.js. Belohnungslogik ist bewusst nicht Teil
+// dieser Übersicht, siehe README.
+async function handleEmpfehlungen(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('empfehlungen')
+    .select(
+      '*, werber:coachies!werber_coachie_id(name, email), geworbener:coachies!geworbener_coachie_id(name, email), programme(titel)',
+    )
+    .order('erstellt_am', { ascending: false })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ empfehlungen: data })
+}
+
 async function handleAssignments(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('coachie_programme').select('*')
@@ -290,6 +315,11 @@ export default async function handler(req, res) {
 
   if (resource === 'assignments') {
     await handleAssignments(req, res, supabase)
+    return
+  }
+
+  if (resource === 'empfehlungen') {
+    await handleEmpfehlungen(req, res, supabase)
     return
   }
 

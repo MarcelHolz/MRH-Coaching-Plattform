@@ -75,11 +75,25 @@ async function handleVorschau(req, res, supabase) {
 }
 
 async function handleCheckoutSession(req, res, supabase) {
-  const { slug } = req.body ?? {}
+  const { slug, ref } = req.body ?? {}
 
   if (!slug) {
     res.status(400).json({ error: 'slug ist erforderlich.' })
     return
+  }
+
+  // Empfehlungsprogramm: ref ist der persönliche Empfehlungscode eines
+  // werbenden Coachies (siehe api/certificate.js?resource=empfehlung).
+  // Ein unbekannter/ungültiger Code blockiert den Kauf nicht -- er wird
+  // einfach nicht zugeordnet, siehe webhooks/stripe.js.
+  let werberCoachieId = null
+  if (ref) {
+    const { data: werber } = await supabase
+      .from('coachies')
+      .select('id')
+      .eq('empfehlungscode', ref)
+      .maybeSingle()
+    werberCoachieId = werber?.id ?? null
   }
 
   const { data: programm, error } = await supabase
@@ -127,7 +141,10 @@ async function handleCheckoutSession(req, res, supabase) {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/kaufen/${slug}?abgebrochen=1`,
-    metadata: { programm_id: programm.id },
+    metadata: {
+      programm_id: programm.id,
+      ...(werberCoachieId ? { werber_coachie_id: werberCoachieId } : {}),
+    },
   })
 
   res.status(200).json({ url: session.url })
