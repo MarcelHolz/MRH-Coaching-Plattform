@@ -23,6 +23,7 @@ import AdminProgramDetailPage from './admin/AdminProgramDetailPage'
 import AdminCoachiesPage from './admin/AdminCoachiesPage'
 import AdminProgressPage from './admin/AdminProgressPage'
 import AdminTestimonialsPage from './admin/AdminTestimonialsPage'
+import AdminFaqPage from './admin/AdminFaqPage'
 
 export default function App() {
   return (
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="coachies" element={<AdminCoachiesPage />} />
               <Route path="fortschritt" element={<AdminProgressPage />} />
               <Route path="testimonials" element={<AdminTestimonialsPage />} />
+              <Route path="faq" element={<AdminFaqPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" replace />} />
