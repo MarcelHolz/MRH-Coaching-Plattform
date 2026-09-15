@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/admin/coachies', label: 'Coachies' },
   { to: '/admin/fortschritt', label: 'Fortschritt' },
   { to: '/admin/testimonials', label: 'Testimonials' },
+  { to: '/admin/entwuerfe', label: 'Agent-Entwürfe' },
 ]
 
 export default function AdminLayout() {

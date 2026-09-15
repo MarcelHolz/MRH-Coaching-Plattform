@@ -41,6 +41,22 @@ async function ladeProgrammIdVon(supabase, tabelle, id) {
   return data?.programm_id ?? null
 }
 
+// Protokolliert eine PATCH-Änderung an einem Entwurf für die Vorher/
+// Nachher-Diff-Ansicht im Review-Interface (AdminEntwuerfePage.jsx,
+// siehe entwurf_historie.sql). Best-effort: ein Fehler beim Schreiben
+// des Protokolls darf die eigentliche, bereits erfolgreich
+// durchgeführte Änderung nicht rückgängig machen oder dem Agenten als
+// Fehler gemeldet werden -- daher nur geloggt, nicht geworfen.
+async function protokolliereAenderung(supabase, tabelle, datensatzId, vorher, nachher) {
+  const { error } = await supabase
+    .from('entwurf_historie')
+    .insert({ tabelle, datensatz_id: datensatzId, vorher, nachher })
+
+  if (error) {
+    console.error('entwurf_historie konnte nicht geschrieben werden:', error.message)
+  }
+}
+
 async function handleProgramme(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
@@ -91,6 +107,12 @@ async function handleProgramme(req, res, supabase) {
       return
     }
 
+    const { data: vorher } = await supabase
+      .from('programme')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+
     const { data, error } = await supabase
       .from('programme')
       .update(updates)
@@ -111,6 +133,8 @@ async function handleProgramme(req, res, supabase) {
       })
       return
     }
+
+    await protokolliereAenderung(supabase, 'programme', id, vorher, data)
 
     res.status(200).json({ programm: data })
     return
@@ -231,6 +255,12 @@ async function handleModule(req, res, supabase) {
       return
     }
 
+    const { data: vorher } = await supabase
+      .from('module')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+
     const { data, error } = await supabase
       .from('module')
       .update(updates)
@@ -242,6 +272,8 @@ async function handleModule(req, res, supabase) {
       res.status(500).json({ error: error.message })
       return
     }
+
+    await protokolliereAenderung(supabase, 'module', id, vorher, data)
 
     res.status(200).json({ modul: data })
     return
@@ -368,6 +400,12 @@ async function handleSessions(req, res, supabase) {
       return
     }
 
+    const { data: vorher } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+
     const { data, error } = await supabase
       .from('sessions')
       .update(updates)
@@ -379,6 +417,8 @@ async function handleSessions(req, res, supabase) {
       res.status(500).json({ error: error.message })
       return
     }
+
+    await protokolliereAenderung(supabase, 'sessions', id, vorher, data)
 
     res.status(200).json({ session: data })
     return

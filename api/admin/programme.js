@@ -119,6 +119,88 @@ async function handleTestimonials(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Reine, isoliert testbare Zusammenstellungsfunktion für das Review-
+// Interface (Feature 2): verschachtelt Programm-Entwürfe mit ihren
+// Modulen/Sessions und hängt an jeden Datensatz seine Änderungshistorie
+// (entwurf_historie.sql) für die Vorher/Nachher-Diff-Ansicht. Erwartet
+// programme bereits auf aktiv=false gefiltert (macht die DB-Query).
+export function baueEntwurfsUebersicht({ programme, module, sessions, historie }) {
+  const programmIds = new Set(programme.map((p) => p.id))
+  const alleModule = module.filter((m) => programmIds.has(m.programm_id))
+  const alleSessions = sessions.filter((s) => programmIds.has(s.programm_id))
+
+  function historieFuer(tabelle, id) {
+    return historie.filter((h) => h.tabelle === tabelle && h.datensatz_id === id)
+  }
+
+  function sessionZuObjekt(session) {
+    return { ...session, historie: historieFuer('sessions', session.id) }
+  }
+
+  return programme.map((programm) => ({
+    ...programm,
+    historie: historieFuer('programme', programm.id),
+    module: alleModule
+      .filter((m) => m.programm_id === programm.id)
+      .map((modul) => ({
+        ...modul,
+        historie: historieFuer('module', modul.id),
+        sessions: alleSessions
+          .filter((s) => s.modul_id === modul.id)
+          .map(sessionZuObjekt),
+      })),
+    sessions_ohne_modul: alleSessions
+      .filter((s) => s.programm_id === programm.id && !s.modul_id)
+      .map(sessionZuObjekt),
+  }))
+}
+
+// Review-Interface für Agent-Entwürfe (Feature 2): liefert alle noch
+// nicht freigegebenen Programm-Entwürfe (aktiv=false) verschachtelt mit
+// ihren Modulen/Sessions, plus je Datensatz die Änderungshistorie
+// für die Vorher/Nachher-Diff-Ansicht. Bewusst nur GET -- Freigabe
+// läuft über den bestehenden PATCH-Zweig unten ({id, aktiv: true}),
+// Ablehnen über den bestehenden DELETE-Zweig (der für Entwürfe
+// kaskadierend löscht, siehe dort).
+async function handleEntwuerfe(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const [programmeResult, modulResult, sessionsResult, historieResult] = await Promise.all([
+    supabase
+      .from('programme')
+      .select('*')
+      .eq('aktiv', false)
+      .order('erstellt_am', { ascending: false }),
+    supabase.from('module').select('*').order('reihenfolge', { ascending: true }),
+    supabase.from('sessions').select('*').order('reihenfolge', { ascending: true }),
+    supabase
+      .from('entwurf_historie')
+      .select('*')
+      .order('geaendert_am', { ascending: false })
+      .limit(500),
+  ])
+
+  const fehler = [programmeResult, modulResult, sessionsResult, historieResult].find(
+    (result) => result.error,
+  )
+  if (fehler) {
+    res.status(500).json({ error: fehler.error.message })
+    return
+  }
+
+  const programme = baueEntwurfsUebersicht({
+    programme: programmeResult.data ?? [],
+    module: modulResult.data ?? [],
+    sessions: sessionsResult.data ?? [],
+    historie: historieResult.data ?? [],
+  })
+
+  res.status(200).json({ programme })
+}
+
 export default async function handler(req, res) {
   // Coachie-Selbstbedienung für das eigene Profilbild (Feature 2,
   // EinstellungenPage.jsx) -- bewusst vor dem requireAdmin-Gate, da
@@ -145,6 +227,11 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'testimonials') {
     await handleTestimonials(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'entwuerfe') {
+    await handleEntwuerfe(req, res, supabase)
     return
   }
 
@@ -215,6 +302,47 @@ export default async function handler(req, res) {
 
     if (!id) {
       res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data: programm } = await supabase
+      .from('programme')
+      .select('aktiv')
+      .eq('id', id)
+      .maybeSingle()
+
+    // Ablehnen eines Agent-Entwurfs (Feature "Review-Interface für
+    // Agent-Entwürfe"): ein noch nie veröffentlichtes Programm
+    // (aktiv=false) darf inklusive seiner Module/Sessions komplett
+    // verworfen werden, ohne den sonst üblichen Abhängigkeits-Schutz
+    // unten -- der existiert, um ein LIVE-Programm vor versehentlichem
+    // Löschen zu schützen, nicht um das gezielte Verwerfen eines
+    // kompletten Entwurfs zu erschweren. module.programm_id hat keine
+    // Kaskade (siehe FK), daher hier explizit zuerst gelöscht; sessions
+    // (inkl. session_material) und eine eventuelle coachie_programme-
+    // Zeile kaskadieren bereits über die DB beim Löschen des Programms.
+    if (programm && programm.aktiv === false) {
+      const { error: modulError } = await supabase
+        .from('module')
+        .delete()
+        .eq('programm_id', id)
+
+      if (modulError) {
+        res.status(500).json({ error: modulError.message })
+        return
+      }
+
+      const { error: programmError } = await supabase
+        .from('programme')
+        .delete()
+        .eq('id', id)
+
+      if (programmError) {
+        res.status(500).json({ error: programmError.message })
+        return
+      }
+
+      res.status(204).end()
       return
     }
 
