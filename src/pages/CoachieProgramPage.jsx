@@ -9,6 +9,15 @@ import ZertifikatButton from '../components/ZertifikatButton'
 import { getSignedMaterialUrl } from '../lib/storage'
 import { renderMarkdown } from '../lib/markdown'
 
+// Geschäftsmodell-Entscheidung: 1:1-Sitzungen werden nicht mehr in
+// Kurspakete gebündelt (FernUSG) -- die Buchungs-/Zählfunktion ist
+// deshalb plattformweit ausgeblendet. Zugrundeliegende Daten
+// (programme.calendly_url/max_calendly_sitzungen,
+// programm_calendly_buchungen, der Calendly-Webhook) bleiben bewusst
+// unangetastet, falls 1:1-Pakete künftig separat verkauft werden.
+// Zum Reaktivieren: einfach auf true setzen.
+const CALENDLY_BUCHUNG_AKTIV = false
+
 const STATUS_OPTIONEN = [
   { value: 'offen', label: 'Offen' },
   { value: 'in_bearbeitung', label: 'In Bearbeitung' },
@@ -877,7 +886,8 @@ export default function CoachieProgramPage() {
         </div>
       )}
 
-      {programm.calendly_url &&
+      {CALENDLY_BUCHUNG_AKTIV &&
+        programm.calendly_url &&
         (programm.max_calendly_sitzungen != null &&
         calendlyBuchungenAnzahl >= programm.max_calendly_sitzungen ? (
           <div className="mt-6 rounded-xl border border-mrh-gold/30 bg-mrh-gold/10 p-4 text-sm text-mrh-navy">
