@@ -25,7 +25,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Qualität',
-    items: [{ to: '/admin/testimonials', label: 'Testimonials' }],
+    items: [
+      { to: '/admin/testimonials', label: 'Testimonials' },
+      { to: '/admin/vollstaendigkeit', label: 'Vollständigkeit' },
+    ],
   },
 ]
 

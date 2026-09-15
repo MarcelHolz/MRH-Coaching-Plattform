@@ -695,6 +695,64 @@ Development) zu setzen, siehe `.env.example`:
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` --
   All-Inkl-Postfachzugang für `info@mrh-beratung.de`.
 
+## Mobile-Optimierung / PWA
+
+### Installierbare PWA
+
+- `public/manifest.webmanifest` -- Name, Theme-/Hintergrundfarbe (Corporate
+  Design), `display: standalone`, Icons in `public/icons/` (192/512px
+  normal + maskable-Variante für Android-Adaptive-Icons, 180px für
+  `apple-touch-icon`). Im Corporate Design generiert (Navy-Hintergrund,
+  goldenes "M").
+- `public/sw.js` -- Service Worker, in `src/main.jsx` nur in Produktion
+  registriert (`import.meta.env.PROD`), damit `npm run dev`/HMR nicht
+  durch gecachte Antworten gestört wird. Bewusst **kein** Precache-
+  Manifest (Vite-Bundle-Dateinamen sind pro Build gehasht) -- stattdessen
+  Laufzeit-Caching: Navigationen network-first mit Cache-Fallback,
+  statische Assets stale-while-revalidate. `/api/*` wird nie
+  abgefangen/gecacht -- die Antworten sind dynamisch und teils
+  personenbezogen, Caching wäre auf einem geteilten Gerät ein
+  Datenleck-Risiko.
+- `index.html` verlinkt Manifest, `theme-color` und `apple-touch-icon`.
+
+Installierbar über den Browser (Chrome/Edge: Adressleisten-Icon oder
+Menü "App installieren", iOS Safari: "Zum Home-Bildschirm").
+
+### Responsive Pass
+
+Der Coachie-Bereich hatte bereits eine mobile Navigation
+(`CoachieLayout.jsx`, Hamburger-Menü). Für diesen Durchgang identifiziert
+und behoben: mehrere dichte Aktions-Zeilen im **Admin**-Bereich, die auf
+schmalen Bildschirmen (< 640px) über den Viewport hinaus liefen, weil
+mehrere Buttons/Links in einer nicht umbrechenden `flex`-Zeile
+nebeneinanderstanden:
+
+- `AdminProgrammePage.jsx` (Programm-Kartenkopf: "Sessions verwalten" /
+  "Verkauf einrichten" / "Aktivieren" / "Löschen")
+- `AdminCoachiesPage.jsx` (Coachie-Kartenkopf: "Testergebnisse
+  verknüpfen" / "Einladung erneut senden" / "Passwort-Reset senden" /
+  "Löschen")
+- `AdminProgramDetailPage.jsx` (Session-Kartenkopf: ↑/↓/"Bearbeiten"/
+  "Materialien"/"Löschen")
+- `MaterialManager.jsx` (Material-Zeile, zusätzlich `break-words` für
+  lange Material-Titel)
+- `AdminProgressPage.jsx` ("Abschlussquote pro Session": Titel + Balken +
+  zwei Kennzahlen liefen mit festen Pixelbreiten unweigerlich über)
+
+Durchgängiges Muster: `flex-col` (gestapelt) auf Mobile, `sm:flex-row`
+(nebeneinander) ab 640px -- identisch zum bereits etablierten
+Tailwind-Breakpoint-Ansatz im Rest der App, keine neue Konvention. Bei
+900px Fensterbreite können die Aktions-Zeilen noch umbrechen (zwei
+Zeilen statt einer) -- immer noch besser als der vorherige harte
+Überlauf, und beim eigentlichen Ziel-Breakpoint dieser App
+(`max-w-6xl`/1152px Content-Breite) passt wieder alles in eine Zeile.
+
+Verifiziert per Playwright-Screenshot eines statischen Mockups mit den
+identischen Tailwind-Klassen bei 375px (kein horizontaler Overflow) und
+1200px (identisch zur vorherigen einzeiligen Darstellung) -- ein
+Live-Login war in der Sandbox mangels Supabase-Zugangsdaten nicht
+möglich, siehe Hinweis im zugehörigen PR.
+
 ## Automatisierte Rechnungsstellung über Lexware Office (Konzept, noch nicht umgesetzt)
 
 **Blocker:** Die Lexware Office Public API steht erst ab **Tarif XL**

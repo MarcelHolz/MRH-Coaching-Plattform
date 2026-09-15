@@ -25,6 +25,7 @@ import AdminCoachiesPage from './admin/AdminCoachiesPage'
 import AdminProgressPage from './admin/AdminProgressPage'
 import AdminTestimonialsPage from './admin/AdminTestimonialsPage'
 import AdminEntwuerfePage from './admin/AdminEntwuerfePage'
+import AdminVollstaendigkeitPage from './admin/AdminVollstaendigkeitPage'
 
 export default function App() {
   return (
@@ -85,6 +86,10 @@ export default function App() {
               <Route path="fortschritt" element={<AdminProgressPage />} />
               <Route path="testimonials" element={<AdminTestimonialsPage />} />
               <Route path="entwuerfe" element={<AdminEntwuerfePage />} />
+              <Route
+                path="vollstaendigkeit"
+                element={<AdminVollstaendigkeitPage />}
+              />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" replace />} />
