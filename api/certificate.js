@@ -1,3 +1,4 @@
+import Anthropic from '@anthropic-ai/sdk'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { requireCoachie } from './_lib/coachieAuth.js'
@@ -15,13 +16,119 @@ function dateiname(titel) {
   return `Zertifikat-${sicher || 'Programm'}.pdf`
 }
 
-export default async function handler(req, res) {
+// FAQ-Chat im Coachie-Bereich (Feature "KI-Chat für FAQs"): rein auf
+// api/certificate.js untergebracht statt einer eigenen Function-Datei,
+// da hier bereits der einzige coachie-token-authentifizierte Endpunkt
+// existiert (requireCoachie) und Vercel Hobby aktuell 12 von 12
+// Functions belegt.
+//
+// FernUSG-Abgrenzung (siehe Aufgabenstellung): der Chat darf sich NICHT
+// auf individuelle Eingaben/Abgaben eines Coachies zu dessen
+// persönlichem Lernfortschritt beziehen und keine personalisierte
+// Rückmeldung dazu geben. Deshalb bekommt der System-Prompt
+// ausschließlich die feste FAQ-Wissensbasis (faq_eintraege, aktiv=true)
+// als Kontext -- niemals coachie_status, Testergebnisse oder andere
+// individuellen Fortschrittsdaten -- und wird explizit angewiesen,
+// Fragen zum persönlichen Fortschritt abzulehnen statt zu beantworten.
+const FAQ_CHAT_MAX_FRAGE_LAENGE = 2000
+
+function baueFaqSystemPrompt(faqEintraege) {
+  const wissensbasis = faqEintraege
+    .map((eintrag) => `F: ${eintrag.frage}\nA: ${eintrag.antwort}`)
+    .join('\n\n')
+
+  return `Du bist der FAQ-Assistent von MRH Beratung & Coaching im Coachie-Bereich der Plattform.
+
+Deine Wissensbasis besteht ausschließlich aus den folgenden freigegebenen FAQ-Einträgen:
+
+${wissensbasis || '(aktuell keine FAQ-Einträge vorhanden)'}
+
+Regeln, die du unter keinen Umständen brichst:
+- Beantworte Fragen ausschließlich auf Basis der obigen Wissensbasis (allgemeine Plattform- und Kursinhalte). Wenn die Antwort dort nicht enthalten ist, sag das ehrlich und verweise auf den Support, statt zu spekulieren.
+- Du hast keinen Zugriff auf individuelle Fortschritts-, Bearbeitungs- oder Abgabedaten einzelner Coachies und darfst dazu auch keine Vermutungen äußern. Fragen nach dem persönlichen Lernfortschritt, einzelnen Bearbeitungen oder einer individuellen Rückmeldung zu Kursinhalten lehnst du höflich ab und verweist an den zuständigen Coach.
+- Gib keine personalisierte inhaltliche Bewertung von Kursaufgaben oder -abgaben ab.
+- Antworte auf Deutsch, freundlich und knapp.`
+}
+
+async function handleFaqChat(req, res, supabase) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
+  const coachieId = await requireCoachie(req, res, supabase)
+  if (!coachieId) return
+
+  const { frage } = req.body ?? {}
+
+  if (!frage || typeof frage !== 'string' || !frage.trim()) {
+    res.status(400).json({ error: 'frage ist erforderlich.' })
+    return
+  }
+
+  if (frage.length > FAQ_CHAT_MAX_FRAGE_LAENGE) {
+    res.status(400).json({ error: 'frage ist zu lang.' })
+    return
+  }
+
+  const { data: faqEintraege, error: faqError } = await supabase
+    .from('faq_eintraege')
+    .select('frage, antwort')
+    .eq('aktiv', true)
+    .order('reihenfolge', { ascending: true })
+
+  if (faqError) {
+    res.status(500).json({ error: faqError.message })
+    return
+  }
+
+  try {
+    const client = new Anthropic()
+    const response = await client.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 1024,
+      output_config: { effort: 'low' },
+      system: baueFaqSystemPrompt(faqEintraege ?? []),
+      messages: [{ role: 'user', content: frage }],
+    })
+
+    const antwortText = response.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n')
+      .trim()
+
+    if (!antwortText) {
+      res.status(502).json({ error: 'Der Chat konnte keine Antwort erzeugen.' })
+      return
+    }
+
+    res.status(200).json({ antwort: antwortText })
+  } catch (error) {
+    if (error instanceof Anthropic.AuthenticationError) {
+      res.status(500).json({ error: 'Chat ist aktuell nicht konfiguriert.' })
+      return
+    }
+    if (error instanceof Anthropic.RateLimitError) {
+      res
+        .status(429)
+        .json({ error: 'Der Chat ist gerade stark ausgelastet. Bitte kurz erneut versuchen.' })
+      return
+    }
+    if (error instanceof Anthropic.APIError) {
+      res.status(502).json({ error: 'Der Chat ist aktuell nicht erreichbar.' })
+      return
+    }
+    throw error
+  }
+}
+
+async function handleZertifikat(req, res, supabase) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Methode nicht erlaubt.' })
     return
   }
 
-  const supabase = getSupabaseAdmin()
   const coachieId = await requireCoachie(req, res, supabase)
   if (!coachieId) return
 
@@ -171,4 +278,15 @@ export default async function handler(req, res) {
     `attachment; filename="${dateiname(programm.titel)}"`,
   )
   res.status(200).end(Buffer.from(pdfBytes))
+}
+
+export default async function handler(req, res) {
+  const supabase = getSupabaseAdmin()
+
+  if (req.query.resource === 'faq-chat') {
+    await handleFaqChat(req, res, supabase)
+    return
+  }
+
+  await handleZertifikat(req, res, supabase)
 }

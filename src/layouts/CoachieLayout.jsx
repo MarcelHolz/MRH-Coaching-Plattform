@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { initialen } from '../lib/initialen'
+import FaqChatWidget from '../components/FaqChatWidget'
 
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
@@ -21,7 +22,7 @@ const MARKEN_LINKS = [
 ]
 
 export default function CoachieLayout() {
-  const { coachie, logout } = useAuth()
+  const { coachie, session, logout } = useAuth()
   const navigate = useNavigate()
   const [menuOffen, setMenuOffen] = useState(false)
 
@@ -148,6 +149,7 @@ export default function CoachieLayout() {
           </div>
         </div>
       </footer>
+      {session?.access_token && <FaqChatWidget accessToken={session.access_token} />}
     </div>
   )
 }

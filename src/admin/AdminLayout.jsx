@@ -24,6 +24,10 @@ const NAV_GROUPS = [
       { to: '/admin/vollstaendigkeit', label: 'Vollständigkeit' },
     ],
   },
+  {
+    label: 'Wissen',
+    items: [{ to: '/admin/faq', label: 'FAQ-Chat' }],
+  },
 ]
 
 function NavLinks({ onNavigate }) {
