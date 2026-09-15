@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { formatPreis } from '../lib/preis'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
+
+// Empfehlungsprogramm: ?ref=<Code> wird in sessionStorage gemerkt, damit
+// der Code auch dann noch beim Checkout mitgeschickt wird, wenn der
+// Besuch die Seite zwischenzeitlich neu lädt (z. B. nach einem
+// abgebrochenen Kaufversuch, cancel_url landet wieder auf /kaufen/:slug
+// ohne den Query-Parameter erneut mitzuschicken).
+const EMPFEHLUNGSCODE_STORAGE_KEY = 'mrh_empfehlungscode'
 
 function formatDatum(isoDatum) {
   if (!isoDatum) return ''
@@ -143,10 +150,23 @@ function AbgrenzungSection({ abgrenzungText }) {
 
 export default function KaufenPage() {
   const { slug } = useParams()
+  const [searchParams] = useSearchParams()
   const [programm, setProgramm] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [kaufLaeuft, setKaufLaeuft] = useState(false)
+
+  useEffect(() => {
+    const refAusUrl = searchParams.get('ref')
+    if (refAusUrl) {
+      try {
+        sessionStorage.setItem(EMPFEHLUNGSCODE_STORAGE_KEY, refAusUrl)
+      } catch {
+        // sessionStorage nicht verfügbar -- der Kauf funktioniert auch
+        // ohne Empfehlungscode, kein Blocker.
+      }
+    }
+  }, [searchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -181,10 +201,18 @@ export default function KaufenPage() {
     setError('')
     setKaufLaeuft(true)
     try {
+      let ref = null
+      try {
+        ref = sessionStorage.getItem(EMPFEHLUNGSCODE_STORAGE_KEY)
+      } catch {
+        // sessionStorage nicht verfügbar -- Kauf läuft dann ohne
+        // Empfehlungszuordnung weiter.
+      }
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, ...(ref ? { ref } : {}) }),
       })
       const data = await response.json().catch(() => null)
 

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { requireCoachie } from './_lib/coachieAuth.js'
@@ -15,13 +16,83 @@ function dateiname(titel) {
   return `Zertifikat-${sicher || 'Programm'}.pdf`
 }
 
-export default async function handler(req, res) {
+// Vergibt einen neuen, eindeutigen Empfehlungscode für einen Coachie
+// (Feature Empfehlungsprogramm) -- lazy statt beim Anlegen des
+// Coachies, damit auch bereits bestehende Coachies ohne Backfill-
+// Migration einen Code bekommen, sobald sie ihn zum ersten Mal
+// abrufen. Retry bei einer (extrem unwahrscheinlichen) Kollision mit
+// dem unique-Constraint auf coachies.empfehlungscode.
+async function vergebeEmpfehlungscode(supabase, coachieId, versuch = 0) {
+  if (versuch >= 5) return null
+
+  const code = crypto.randomBytes(5).toString('hex').toUpperCase()
+
+  const { data, error } = await supabase
+    .from('coachies')
+    .update({ empfehlungscode: code })
+    .eq('id', coachieId)
+    .select('empfehlungscode')
+    .maybeSingle()
+
+  if (error) {
+    if (error.code === '23505') {
+      return vergebeEmpfehlungscode(supabase, coachieId, versuch + 1)
+    }
+    return null
+  }
+
+  return data?.empfehlungscode ?? null
+}
+
+async function handleEmpfehlung(req, res, supabase) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Methode nicht erlaubt.' })
     return
   }
 
-  const supabase = getSupabaseAdmin()
+  const coachieId = await requireCoachie(req, res, supabase)
+  if (!coachieId) return
+
+  const { data: coachie, error: coachieError } = await supabase
+    .from('coachies')
+    .select('empfehlungscode')
+    .eq('id', coachieId)
+    .maybeSingle()
+
+  if (coachieError) {
+    res.status(500).json({ error: coachieError.message })
+    return
+  }
+
+  const code = coachie?.empfehlungscode || (await vergebeEmpfehlungscode(supabase, coachieId))
+
+  if (!code) {
+    res.status(500).json({ error: 'Empfehlungscode konnte nicht erzeugt werden.' })
+    return
+  }
+
+  // Ein Beispielprogramm für einen fertigen Beispiellink -- der Code
+  // selbst ist universell (funktioniert an jedem /kaufen/:slug), dieses
+  // Beispiel macht den Link im UI direkt kopierbar, statt den Coachie
+  // eine Slug selbst einsetzen zu lassen.
+  const { data: beispielProgramm } = await supabase
+    .from('programme')
+    .select('slug, titel')
+    .eq('oeffentlich_kaufbar', true)
+    .eq('aktiv', true)
+    .order('erstellt_am', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  res.status(200).json({ code, beispielProgramm: beispielProgramm ?? null })
+}
+
+async function handleZertifikat(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
   const coachieId = await requireCoachie(req, res, supabase)
   if (!coachieId) return
 
@@ -171,4 +242,15 @@ export default async function handler(req, res) {
     `attachment; filename="${dateiname(programm.titel)}"`,
   )
   res.status(200).end(Buffer.from(pdfBytes))
+}
+
+export default async function handler(req, res) {
+  const supabase = getSupabaseAdmin()
+
+  if (req.query.resource === 'empfehlung') {
+    await handleEmpfehlung(req, res, supabase)
+    return
+  }
+
+  await handleZertifikat(req, res, supabase)
 }

@@ -1,8 +1,111 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import AvatarUpload from '../components/AvatarUpload'
 import { initialen } from '../lib/initialen'
+
+// Empfehlungsprogramm: zeigt den persönlichen, lazy vergebenen
+// Empfehlungscode (api/certificate.js?resource=empfehlung) plus einen
+// fertigen Beispiellink zum Kopieren. Belohnungslogik (Rabatt,
+// Guthaben, o.ä.) ist bewusst noch nicht abgebildet -- das entscheidet
+// Marcel später, siehe README-Abschnitt "Empfehlungsprogramm".
+function EmpfehlungsprogrammSection({ accessToken }) {
+  const [daten, setDaten] = useState(null)
+  const [fehler, setFehler] = useState('')
+  const [kopiert, setKopiert] = useState(false)
+
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+
+    async function laden() {
+      try {
+        const response = await fetch('/api/certificate?resource=empfehlung', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        const data = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Empfehlungscode konnte nicht geladen werden.')
+        }
+
+        if (!cancelled) setDaten(data)
+      } catch (err) {
+        if (!cancelled) setFehler(err.message)
+      }
+    }
+
+    laden()
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken])
+
+  if (fehler) return null
+  if (!daten) return null
+
+  const link = daten.beispielProgramm
+    ? `${window.location.origin}/kaufen/${daten.beispielProgramm.slug}?ref=${daten.code}`
+    : null
+
+  async function kopieren(text) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setKopiert(true)
+      setTimeout(() => setKopiert(false), 2000)
+    } catch {
+      // Zwischenablage nicht verfügbar (z. B. fehlende Berechtigung) --
+      // der Code/Link steht trotzdem sichtbar da, kein Blocker.
+    }
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h2 className="mb-1 font-semibold text-slate-800">Empfehlungsprogramm</h2>
+      <p className="mb-4 text-sm text-mrh-grey">
+        Empfiehl MRH weiter -- mit deinem persönlichen Code oder Link.
+      </p>
+
+      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+        Dein Code
+      </label>
+      <div className="mb-4 flex gap-2">
+        <input
+          readOnly
+          value={daten.code}
+          className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
+        />
+        <button
+          onClick={() => kopieren(daten.code)}
+          className="shrink-0 rounded-lg border border-mrh-gold px-3 py-2 text-sm font-medium text-mrh-gold-dark transition hover:bg-mrh-gold/10"
+        >
+          {kopiert ? 'Kopiert!' : 'Kopieren'}
+        </button>
+      </div>
+
+      {link && (
+        <>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            Beispiellink ({daten.beispielProgramm.titel})
+          </label>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={link}
+              className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
+            />
+            <button
+              onClick={() => kopieren(link)}
+              className="shrink-0 rounded-lg border border-mrh-gold px-3 py-2 text-sm font-medium text-mrh-gold-dark transition hover:bg-mrh-gold/10"
+            >
+              {kopiert ? 'Kopiert!' : 'Kopieren'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // Passwort-Änderung direkt über den Supabase-Client (kein eigener
 // API-Endpunkt nötig, RLS/Auth regelt das schon). Das "aktuelle
@@ -105,6 +208,8 @@ export default function EinstellungenPage() {
         </div>
         {avatarFehler && <p className="mt-2 text-xs text-red-600">{avatarFehler}</p>}
       </div>
+
+      <EmpfehlungsprogrammSection accessToken={session?.access_token} />
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-semibold text-slate-800">Passwort ändern</h2>

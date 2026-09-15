@@ -620,7 +620,8 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 
 - `api/admin/coachies.js` — Standard (Coachies), `?resource=resend`
   (Einladung erneut senden), `?resource=assignments`
-  (Programm-Zuordnungen).
+  (Programm-Zuordnungen), `?resource=empfehlungen` (rein lesend,
+  Empfehlungsprogramm-Übersicht).
 - `api/admin/sessions.js` — Standard (Sessions), `?resource=materials`
   (Session-Materialien), `?resource=module` (Modul-Ebene).
 - `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
@@ -632,7 +633,10 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   (Produktagent, siehe README-Abschnitt
   "Produktagent").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
-  `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
+  `api/public/programme.js`), POST (Stripe Checkout Session, jetzt mit
+  optionalem `ref`-Empfehlungscode).
+- `api/certificate.js` — Standard/GET (PDF-Zertifikat), `?resource=empfehlung`
+  (GET, persönlicher Empfehlungscode für den eingeloggten Coachie).
 
 Ergebnis: 10 Functions (`admin/coachies.js`, `admin/login.js`,
 `admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
@@ -665,3 +669,48 @@ Development) zu setzen, siehe `.env.example`:
   `Authorization: Bearer $CRON_SECRET` bei jedem Cron-Aufruf.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` --
   All-Inkl-Postfachzugang für `info@mrh-beratung.de`.
+
+## Empfehlungsprogramm (technische Grundstruktur)
+
+Jeder Coachie bekommt einen persönlichen Empfehlungscode; erfolgreiche
+(abgeschlossene) Käufe über diesen Code erscheinen im Admin-Bereich unter
+**Empfehlungen**. **Belohnungslogik (Rabatt, Guthaben o. Ä.) ist bewusst
+nicht Teil dieser Umsetzung** -- das ist laut Aufgabenstellung eine
+eigenständige, spätere Entscheidung. Ein Vorschlag dazu:
+
+> **Vorschlag zur Belohnungslogik** (zur Entscheidung, nicht umgesetzt):
+> ein Startguthaben-Modell -- z. B. 20 € Gutschrift für den Werber nach
+> jeder erfolgreichen Empfehlung, einlösbar beim nächsten Kauf über einen
+> Stripe-Gutschein-Code (`stripe.coupons`). Vorteil gegenüber einem festen
+> Rabatt für den Geworbenen: verschiebt keinen bereits kalkulierten
+> Verkaufspreis, sondern ist ein separat buchbarer Bonus, und lässt sich
+> ohne Schema-Änderung nachrüsten (`empfehlungen` hat bereits alle nötigen
+> Zeilen, nur ein `eingeloest`/`gutschrift_cent`-Feld müsste ergänzt
+> werden). Alternativen wären ein Rabatt für beide Seiten (Werber + neuer
+> Coachie) oder ein Freischalt-Bonus (z. B. ein zusätzliches 1:1-Kontingent).
+
+### Funktionsweise
+
+- **Code:** `coachies.empfehlungscode`, lazy vergeben beim ersten Aufruf
+  von `api/certificate.js?resource=empfehlung` (nicht beim Anlegen des
+  Coachies) -- deckt so auch bereits bestehende Coachies ab, ohne
+  Backfill-Migration. Sichtbar unter **Einstellungen** im Coachie-Bereich,
+  zusammen mit einem fertigen Beispiellink (`/kaufen/<slug>?ref=<Code>`)
+  zum Kopieren.
+- **Zuordnung:** `KaufenPage.jsx` merkt `?ref=` in `sessionStorage` und
+  schickt es beim Checkout mit. `api/checkout.js` löst den Code zu einer
+  `werber_coachie_id` auf und legt sie in die Stripe-Session-Metadaten --
+  ein unbekannter/ungültiger Code blockiert den Kauf nicht, er wird
+  einfach nicht zugeordnet.
+- **Tracking:** `api/webhooks/stripe.js` trägt bei `checkout.session.completed`
+  eine Zeile in `empfehlungen` ein, sofern eine `werber_coachie_id` in den
+  Metadaten steckt und sie nicht mit dem kaufenden Coachie identisch ist
+  (kein Selbst-Verweis). `unique(geworbener_coachie_id, programm_id)` macht
+  das idempotent gegen Stripe-Retry-Zustellungen.
+- **Admin-Übersicht:** `api/admin/coachies.js?resource=empfehlungen` +
+  `src/admin/AdminEmpfehlungenPage.jsx` -- Liste aller erfolgreichen
+  Empfehlungen mit Rangliste je Werber.
+
+`supabase_migrations/empfehlungsprogramm.sql` (**manuell im Supabase SQL
+Editor ausführen**) legt `coachies.empfehlungscode` sowie die Tabelle
+`empfehlungen` an, rein additiv.

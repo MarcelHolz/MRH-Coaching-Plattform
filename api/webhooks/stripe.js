@@ -160,5 +160,24 @@ export default async function handler(req, res) {
     return
   }
 
+  // Empfehlungsprogramm: nur protokollieren, nicht den Webhook
+  // scheitern lassen -- der Kauf selbst ist bereits abgeschlossen.
+  // unique(geworbener_coachie_id, programm_id) in empfehlungen.sql
+  // macht das idempotent gegen Stripe-Retry-Zustellungen des gleichen
+  // Events; ein Selbst-Verweis (Coachie kauft mit eigenem Code) wird
+  // ignoriert.
+  const werberCoachieId = session.metadata?.werber_coachie_id
+  if (werberCoachieId && werberCoachieId !== coachieId) {
+    const { error: empfehlungError } = await supabase.from('empfehlungen').insert({
+      werber_coachie_id: werberCoachieId,
+      geworbener_coachie_id: coachieId,
+      programm_id: programmId,
+    })
+
+    if (empfehlungError && empfehlungError.code !== '23505') {
+      console.error('Empfehlung konnte nicht protokolliert werden:', empfehlungError.message)
+    }
+  }
+
   res.status(200).json({ received: true })
 }
