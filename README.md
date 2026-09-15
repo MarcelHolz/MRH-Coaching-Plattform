@@ -594,6 +594,47 @@ ihren Modulen/Sessions auflistet:
   LIVE-Programm vor versehentlichem Löschen schützen, nicht das gezielte
   Verwerfen eines Entwurfs erschweren.
 
+Zusätzlich verwaltet dieselbe Route eine FAQ-Wissensbasis für den unten
+beschriebenen FAQ-Chat: `GET/POST/PATCH/DELETE
+/api/agent/inhalte?resource=faq` (Felder: `frage`, `antwort`,
+`reihenfolge`), gleiches Entwurfs-Muster wie Programme — neue Einträge
+landen immer mit `aktiv = false`, `PATCH`/`DELETE` auf bereits
+freigegebene Einträge antworten mit `409`.
+
+## FAQ-Chat für Coachies
+
+Chat-Widget im Coachie-Bereich (`src/components/FaqChatWidget.jsx`,
+eingebunden in `CoachieLayout`), das Fragen ausschließlich auf Basis
+einer festen, admin- bzw. agent-gepflegten FAQ-Wissensbasis beantwortet
+(`faq_eintraege`, siehe `supabase_migrations/faq.sql`). Serverseitig
+untergebracht in `api/certificate.js?resource=faq-chat` (POST,
+coachie-authentifiziert über denselben `requireCoachie`-Mechanismus wie
+der Zertifikat-Download) statt einer eigenen Function-Datei — Vercel
+Hobby war zum Zeitpunkt der Umsetzung bei 12 von 12 Functions.
+
+**FernUSG-Abgrenzung:** Der Chat darf sich laut Aufgabenstellung nicht
+auf individuelle Eingaben/Abgaben eines Coachies zu dessen persönlichem
+Lernfortschritt beziehen und keine personalisierte Rückmeldung dazu
+geben. Deshalb bekommt der System-Prompt ausschließlich die aktiven
+FAQ-Einträge als Kontext — niemals `coachie_status`, Testergebnisse oder
+sonstige individuelle Fortschrittsdaten — und wird explizit angewiesen,
+Fragen zum persönlichen Fortschritt höflich abzulehnen statt zu
+beantworten.
+
+**Admin-Pflege:** `src/admin/AdminFaqPage.jsx` (**FAQ-Chat** im
+Admin-Menü) — Anlegen/Bearbeiten/Löschen sowie Freigabe von
+Agent-Entwürfen (`aktiv = false → true`), analog zu Testimonials.
+
+**Modell:** `claude-opus-5` über das offizielle `@anthropic-ai/sdk`
+(nicht ein günstigeres Modell) — Standardvorgabe für neue
+Claude-API-Integrationen in diesem Projekt.
+
+**Einrichtung:** `ANTHROPIC_API_KEY` (Server-only) in Vercel eintragen.
+Kann derselbe Key sein, der bereits in einem anderen Projekt für die
+Anthropic-API hinterlegt ist — dieses Projekt liest ihn nur aus seiner
+eigenen Umgebungsvariable, es besteht keine Abhängigkeit zwischen den
+Projekten.
+
 ## Projektstruktur
 
 ```
@@ -653,13 +694,17 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 - `api/agent/inhalte.js` — Standard (Programme), `?resource=module`,
   `?resource=sessions`, `?resource=lesen` (rein lesend, verschachtelter
   Gesamtstand), `?resource=materials` (rein lesend, rohe Liste),
-  `?resource=material-signed-url` (rein lesend, einzelne signierte URL)
+  `?resource=material-signed-url` (rein lesend, einzelne signierte URL),
+  `?resource=faq` (FAQ-Entwürfe für den Coachie-Chat)
   (Produktagent, siehe README-Abschnitt
   "Produktagent").
 - `api/admin/programme.js` — Standard (Programme), `?resource=testimonials`,
   `?resource=entwuerfe` (rein lesend, Review-Interface für
   Agent-Entwürfe, siehe README-Abschnitt "Review-Interface für
-  Agent-Entwürfe").
+  Agent-Entwürfe"), `?resource=faq` (FAQ-Pflege für den Coachie-Chat).
+- `api/certificate.js` — Standard/GET (PDF-Zertifikat), `?resource=faq-chat`
+  (POST, FAQ-Chat für Coachies, siehe README-Abschnitt "FAQ-Chat für
+  Coachies").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, wie bisher).
 

@@ -201,6 +201,96 @@ async function handleEntwuerfe(req, res, supabase) {
   res.status(200).json({ programme })
 }
 
+// Admin-CRUD der FAQ-Wissensbasis für den Coachie-Chat (Feature "KI-Chat
+// für FAQs", faq.sql). Über die Agent-API (?resource=faq in
+// api/agent/inhalte.js) angelegte Einträge landen mit aktiv=false als
+// Entwurf, bis sie hier freigegeben werden -- gleiches Muster wie
+// programme.aktiv.
+async function handleFaq(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .select('*')
+      .order('reihenfolge', { ascending: true })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ faq_eintraege: data })
+    return
+  }
+
+  if (req.method === 'POST') {
+    const { frage, antwort, reihenfolge } = req.body ?? {}
+
+    if (!frage || !antwort) {
+      res.status(400).json({ error: 'frage und antwort sind erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .insert({ frage, antwort, reihenfolge: reihenfolge ?? 0, aktiv: true })
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ faq_eintrag: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, ...updates } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ faq_eintrag: data })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { error } = await supabase.from('faq_eintraege').delete().eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
   // Coachie-Selbstbedienung für das eigene Profilbild (Feature 2,
   // EinstellungenPage.jsx) -- bewusst vor dem requireAdmin-Gate, da
@@ -232,6 +322,11 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'entwuerfe') {
     await handleEntwuerfe(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'faq') {
+    await handleFaq(req, res, supabase)
     return
   }
 

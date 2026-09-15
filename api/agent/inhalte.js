@@ -715,6 +715,122 @@ async function handleMaterialSignedUrl(req, res, supabase) {
   res.status(200).json({ url: data.signedUrl })
 }
 
+// Agent-Pendant zu handleFaq (api/admin/programme.js?resource=faq):
+// erlaubt dem Produktagenten, neue FAQ-Einträge für den Coachie-Chat
+// vorzuschlagen -- landet zwingend mit aktiv=false als Entwurf, bis ein
+// Admin sie freigibt (siehe faq.sql). PATCH/DELETE nur auf noch nicht
+// freigegebene Entwürfe, analog zum 409-Muster von handleProgramme.
+async function handleFaqEntwuerfe(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .select('*')
+      .order('reihenfolge', { ascending: true })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ faq_eintraege: data })
+    return
+  }
+
+  if (req.method === 'POST') {
+    const { frage, antwort, reihenfolge } = req.body ?? {}
+
+    if (!frage || !antwort) {
+      res.status(400).json({ error: 'frage und antwort sind erforderlich.' })
+      return
+    }
+
+    // aktiv bewusst nicht aus dem Body übernommen -- landet immer als
+    // Entwurf, unabhängig davon, was der Agent schickt.
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .insert({ frage, antwort, reihenfolge: reihenfolge ?? 0, aktiv: false })
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ faq_eintrag: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, ...updates } = req.body ?? {}
+    delete updates.aktiv // Freigabe bleibt exklusiv dem Admin-Bereich vorbehalten
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .update(updates)
+      .eq('id', id)
+      .eq('aktiv', false)
+      .select()
+      .maybeSingle()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    if (!data) {
+      res.status(409).json({
+        error:
+          'FAQ-Eintrag nicht gefunden oder bereits veröffentlicht -- der Agent darf veröffentlichte Einträge nicht mehr bearbeiten.',
+      })
+      return
+    }
+
+    res.status(200).json({ faq_eintrag: data })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('faq_eintraege')
+      .delete()
+      .eq('id', id)
+      .eq('aktiv', false)
+      .select()
+      .maybeSingle()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    if (!data) {
+      res.status(409).json({
+        error:
+          'FAQ-Eintrag nicht gefunden oder bereits veröffentlicht -- der Agent darf veröffentlichte Einträge nicht löschen.',
+      })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
   const { resource } = req.query
 
@@ -749,6 +865,11 @@ export default async function handler(req, res) {
 
   if (resource === 'material-signed-url') {
     await handleMaterialSignedUrl(req, res, supabase)
+    return
+  }
+
+  if (resource === 'faq') {
+    await handleFaqEntwuerfe(req, res, supabase)
     return
   }
 
