@@ -114,30 +114,35 @@ export default function AdminProgressPage() {
                     const quote = stats?.quote ?? 0
 
                     return (
-                      <div key={session.id} className="flex items-center gap-3">
-                        <span className="w-48 shrink-0 truncate text-sm text-slate-700">
+                      <div
+                        key={session.id}
+                        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3"
+                      >
+                        <span className="truncate text-sm text-slate-700 sm:w-48 sm:shrink-0">
                           {session.titel}
                         </span>
-                        <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={`h-full rounded-full transition-all ${quoteFarbe(quote)}`}
-                            style={{ width: `${quote}%` }}
-                          />
+                        <div className="flex items-center gap-3">
+                          <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className={`h-full rounded-full transition-all ${quoteFarbe(quote)}`}
+                              style={{ width: `${quote}%` }}
+                            />
+                          </div>
+                          <span className="w-28 shrink-0 text-right text-xs text-slate-500">
+                            {quote}%
+                            {stats && (
+                              <>
+                                {' '}
+                                ({stats.abgeschlossen}/{stats.gestartet})
+                              </>
+                            )}
+                          </span>
+                          <span className="w-20 shrink-0 text-right text-xs text-mrh-gold-dark">
+                            {stats?.durchschnittBewertung != null
+                              ? `★ ${stats.durchschnittBewertung} (${stats.anzahlBewertungen})`
+                              : '–'}
+                          </span>
                         </div>
-                        <span className="w-28 shrink-0 text-right text-xs text-slate-500">
-                          {quote}%
-                          {stats && (
-                            <>
-                              {' '}
-                              ({stats.abgeschlossen}/{stats.gestartet})
-                            </>
-                          )}
-                        </span>
-                        <span className="w-20 shrink-0 text-right text-xs text-mrh-gold-dark">
-                          {stats?.durchschnittBewertung != null
-                            ? `★ ${stats.durchschnittBewertung} (${stats.anzahlBewertungen})`
-                            : '–'}
-                        </span>
                       </div>
                     )
                   })}
