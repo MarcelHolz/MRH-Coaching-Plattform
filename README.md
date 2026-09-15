@@ -665,3 +665,83 @@ Development) zu setzen, siehe `.env.example`:
   `Authorization: Bearer $CRON_SECRET` bei jedem Cron-Aufruf.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` --
   All-Inkl-Postfachzugang für `info@mrh-beratung.de`.
+
+## Automatisierte Rechnungsstellung über Lexware Office (Konzept, noch nicht umgesetzt)
+
+**Blocker:** Die Lexware Office Public API steht erst ab **Tarif XL**
+zur Verfügung -- der ist aktuell nicht gebucht. Dieser Abschnitt ist
+daher bewusst reine Vorbereitung (Doku-Sichtung + Integrationskonzept),
+**kein Code wurde geschrieben**. Sobald der Tarif gebucht und ein
+`LEXWARE_API_KEY` vorhanden ist, kann die Integration umgesetzt werden --
+bis dahin bitte nicht ohne Rückfrage anfassen.
+
+### API-Eckdaten (Stand dieser Recherche, vor Implementierung erneut verifizieren)
+
+Direkter Zugriff auf `developers.lexware.io`/`help.lexware.de` war aus
+dieser Sandbox heraus nicht möglich (vom Netzwerk-Egress-Proxy
+blockiert) -- die folgenden Punkte stammen aus Websuche-Treffern
+(u. a. offizielle Lexware-Partnerseiten, Hilfe-Center-Artikel,
+Drittanbieter-Integrationsguides), nicht aus der Originaldokumentation
+selbst:
+
+- **Voraussetzung:** Tarif XL (bestätigt den vom Auftrag genannten
+  Blocker).
+- **Base-URL:** `https://api.lexware.io` (Stand Recherche; die API hieß
+  früher `lexoffice`, `api.lexoffice.io` galt bis zum Rebranding im Mai
+  2025 -- unbedingt vor Implementierung erneut prüfen, welche Domain
+  aktuell gültig ist).
+- **Auth:** statischer API-Key als `Authorization: Bearer <Key>`-Header,
+  erzeugt in der Lexware-Oberfläche unter Einstellungen → Öffentliche
+  API. Kein OAuth-Flow.
+- **Rate-Limit:** rund 2 Requests/Sekunde pro Client (Drittquelle,
+  Größenordnung vor Implementierung verifizieren).
+- **Rechnung erstellen:** `POST /v1/invoices` -- landet standardmäßig
+  als Entwurf, ein Parameter kann die Rechnung direkt als "offen"/
+  finalisiert anlegen.
+- **Kontakt anlegen/finden:** `POST /v1/contacts` (Rollen wie `customer`,
+  Name/E-Mail als Body). Ob es einen dokumentierten Weg gibt, einen
+  bestehenden Kontakt gezielt per E-Mail zu finden statt Duplikate
+  anzulegen, ließ sich aus der Sandbox nicht abschließend klären --
+  vor Implementierung in der echten Doku nachschlagen.
+- **Voraussetzung für rechtsgültige Rechnungen:** Firmendaten (Name,
+  Adresse) müssen vorher einmalig in den Lexware-Office-Einstellungen
+  hinterlegt sein.
+
+### Integrationskonzept (Skizze)
+
+- **Auslöser:** der bereits bestehende Stripe-Webhook
+  (`api/webhooks/stripe.js`, `checkout.session.completed`) -- der Moment
+  des Kaufabschlusses ist ohnehin schon der richtige Zeitpunkt, kein
+  neuer Cron-Job oder Trigger nötig.
+- **Ablauf (Vorschlag):**
+  1. Lexware-Kontakt für die Käufer-E-Mail suchen bzw. anlegen.
+  2. Rechnung mit dem gekauften Programm als Position erstellen
+     (Betrag aus `programme.preis_cent`, ggf. `einfuehrungspreis_cent`
+     falls zum Kaufzeitpunkt aktiv).
+  3. Rechnung zunächst als **Entwurf** anlegen, nicht direkt
+     finalisieren -- Marcel behält die Kontrolle, bis Vertrauen in die
+     Automatisierung besteht; Umstellung auf automatische Finalisierung
+     wäre später eine reine Konfigurationsänderung.
+- **Function-Budget:** würde in die bestehende Datei
+  `api/webhooks/stripe.js` eingebaut, keine 13. Function nötig (aktuell
+  12/12 belegt).
+- **Neue Umgebungsvariable:** `LEXWARE_API_KEY` (server-only).
+- **Fehlerbehandlung:** analog zum bereits bestehenden
+  Empfehlungsprogramm-Tracking im selben Webhook -- ein Fehler bei der
+  Rechnungserstellung darf den Kauf/die Programmfreischaltung nicht
+  blockieren (best-effort, mit Logging).
+
+### Offene Fragen (zur Klärung, sobald der Tarif gebucht ist)
+
+- Rechnung automatisch finalisieren, oder erstmal als Entwurf zur
+  manuellen Prüfung durch Marcel?
+- Soll Lexware die Rechnung direkt per E-Mail an den Kunden verschicken,
+  oder bleibt das intern für die Buchhaltung?
+- Für jeden Kauf automatisch eine Rechnung, oder nur ab einer bestimmten
+  Preisschwelle / für bestimmte Programme?
+- Kleinunternehmerregelung (§19 UStG) oder Regelbesteuerung -- relevant
+  für den Steuerausweis auf der Rechnung?
+
+Sobald diese Fragen geklärt und `LEXWARE_API_KEY` in Vercel hinterlegt
+sind, ist die eigentliche Implementierung ein überschaubarer,
+eigenständiger PR.
