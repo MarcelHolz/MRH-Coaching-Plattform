@@ -569,6 +569,31 @@ curl -i -X POST "https://app.mrh-beratung.de/api/agent/inhalte" \
 `PATCH`/`DELETE` auf ein bereits veröffentlichtes Programm (bzw. dessen
 Module/Sessions) antworten mit `409` statt die Freigabe zu umgehen.
 
+### Review-Interface für Agent-Entwürfe
+
+Admin-Seite **Agent-Entwürfe** (`src/admin/AdminEntwuerfePage.jsx`,
+`api/admin/programme.js?resource=entwuerfe`), die alle noch nicht
+freigegebenen Programm-Entwürfe (`aktiv = false`) verschachtelt mit
+ihren Modulen/Sessions auflistet:
+
+- **Vorher/Nachher-Diff:** jede PATCH-Änderung des Agenten an einem
+  Entwurf wird in `entwurf_historie` protokolliert (siehe
+  `supabase_migrations/entwurf_historie.sql`, **manuell im Supabase SQL
+  Editor ausführen**) und im Review-Interface je geändertem Feld als
+  "alter Wert → neuer Wert" angezeigt. Brandneue, noch nie bearbeitete
+  Entwürfe zeigen naturgemäß keinen Verlauf.
+- **Freigeben:** veröffentlicht das komplette Programm (`aktiv = true`),
+  identisch zum bestehenden "Aktivieren"-Button unter **Programme** --
+  kein separater Freigabe-Mechanismus, dieselbe RLS-/Sichtbarkeitslogik.
+- **Ablehnen:** verwirft den kompletten Entwurf inklusive aller Module
+  und Sessions unwiderruflich. Nutzt denselben `DELETE`-Endpunkt wie das
+  Löschen unter **Programme**, der für noch nie veröffentlichte Entwürfe
+  (`aktiv = false`) kaskadierend löscht -- der bestehende
+  Abhängigkeits-Schutz ("Programm hat noch X Sessions...") bleibt für
+  bereits veröffentlichte Programme unverändert bestehen, er soll ein
+  LIVE-Programm vor versehentlichem Löschen schützen, nicht das gezielte
+  Verwerfen eines Entwurfs erschweren.
+
 Zusätzlich verwaltet dieselbe Route eine FAQ-Wissensbasis für den unten
 beschriebenen FAQ-Chat: `GET/POST/PATCH/DELETE
 /api/agent/inhalte?resource=faq` (Felder: `frage`, `antwort`,
@@ -674,7 +699,9 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   (Produktagent, siehe README-Abschnitt
   "Produktagent").
 - `api/admin/programme.js` — Standard (Programme), `?resource=testimonials`,
-  `?resource=faq` (FAQ-Pflege für den Coachie-Chat).
+  `?resource=entwuerfe` (rein lesend, Review-Interface für
+  Agent-Entwürfe, siehe README-Abschnitt "Review-Interface für
+  Agent-Entwürfe"), `?resource=faq` (FAQ-Pflege für den Coachie-Chat).
 - `api/certificate.js` — Standard/GET (PDF-Zertifikat), `?resource=faq-chat`
   (POST, FAQ-Chat für Coachies, siehe README-Abschnitt "FAQ-Chat für
   Coachies").

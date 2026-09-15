@@ -9,7 +9,13 @@ import { useAdminAuth } from './AdminAuthContext'
 // fester Startpunkt.
 const NAV_GROUPS = [
   { items: [{ to: '/admin', label: 'Übersicht', end: true }] },
-  { label: 'Kurse', items: [{ to: '/admin/programme', label: 'Programme' }] },
+  {
+    label: 'Kurse',
+    items: [
+      { to: '/admin/programme', label: 'Programme' },
+      { to: '/admin/entwuerfe', label: 'Agent-Entwürfe' },
+    ],
+  },
   {
     label: 'Coachies',
     items: [

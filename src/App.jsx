@@ -24,6 +24,7 @@ import AdminProgramDetailPage from './admin/AdminProgramDetailPage'
 import AdminCoachiesPage from './admin/AdminCoachiesPage'
 import AdminProgressPage from './admin/AdminProgressPage'
 import AdminTestimonialsPage from './admin/AdminTestimonialsPage'
+import AdminEntwuerfePage from './admin/AdminEntwuerfePage'
 import AdminFaqPage from './admin/AdminFaqPage'
 import AdminVollstaendigkeitPage from './admin/AdminVollstaendigkeitPage'
 
@@ -85,6 +86,7 @@ export default function App() {
               <Route path="coachies" element={<AdminCoachiesPage />} />
               <Route path="fortschritt" element={<AdminProgressPage />} />
               <Route path="testimonials" element={<AdminTestimonialsPage />} />
+              <Route path="entwuerfe" element={<AdminEntwuerfePage />} />
               <Route path="faq" element={<AdminFaqPage />} />
               <Route
                 path="vollstaendigkeit"
