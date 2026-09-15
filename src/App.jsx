@@ -18,6 +18,7 @@ import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
 import AdminLoginPage from './admin/AdminLoginPage'
 import AdminLayout from './admin/AdminLayout'
+import AdminDashboardPage from './admin/AdminDashboardPage'
 import AdminProgrammePage from './admin/AdminProgrammePage'
 import AdminProgramDetailPage from './admin/AdminProgramDetailPage'
 import AdminCoachiesPage from './admin/AdminCoachiesPage'
@@ -74,7 +75,7 @@ export default function App() {
                 </AdminProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="programme" replace />} />
+              <Route index element={<AdminDashboardPage />} />
               <Route path="programme" element={<AdminProgrammePage />} />
               <Route
                 path="programme/:programId"
