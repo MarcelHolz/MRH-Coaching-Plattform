@@ -262,7 +262,7 @@ export default function AdminProgrammePage() {
         <div className="space-y-3">
           {programme.map((programm) => (
             <div key={programm.id} className="rounded-xl bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="font-semibold text-slate-800">
@@ -309,7 +309,7 @@ export default function AdminProgrammePage() {
                     </a>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <Link
                     to={`/admin/programme/${programm.id}`}
                     className="text-sm text-mrh-navy hover:underline"

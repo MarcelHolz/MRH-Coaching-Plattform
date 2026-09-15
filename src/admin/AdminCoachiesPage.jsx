@@ -295,14 +295,14 @@ export default function AdminCoachiesPage() {
                 key={coachie.id}
                 className="rounded-xl bg-white p-4 shadow-sm"
               >
-                <div className="mb-2 flex items-start justify-between gap-3">
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                   <div>
                     <h3 className="font-semibold text-slate-800">
                       {coachie.name}
                     </h3>
                     <p className="text-sm text-slate-500">{coachie.email}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
                       onClick={() =>
                         setExpandedId(expandedId === coachie.id ? null : coachie.id)

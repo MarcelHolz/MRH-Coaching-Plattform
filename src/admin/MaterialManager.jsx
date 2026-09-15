@@ -152,12 +152,12 @@ export default function MaterialManager({ sessionId, programmId }) {
         <ul className="mb-3 space-y-1">
           {materialien.map((material, index) => (
             <li key={material.id} className="text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0 break-words">
                   {material.titel}
                   {material.typ ? ` (${material.typ})` : ''}
                 </span>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleMove(index, -1)}
                     disabled={index === 0}

@@ -380,7 +380,7 @@ export default function AdminProgramDetailPage() {
                           key={session.id}
                           className="rounded-xl bg-white p-4 shadow-sm"
                         >
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <h2 className="font-semibold text-slate-800">
                                 {session.titel}
@@ -398,7 +398,7 @@ export default function AdminProgramDetailPage() {
                                 </p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 onClick={() => handleMove(index, -1)}
                                 disabled={index === 0}
