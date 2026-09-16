@@ -926,3 +926,31 @@ selbst:
 Sobald diese Fragen geklärt und `LEXWARE_API_KEY` in Vercel hinterlegt
 sind, ist die eigentliche Implementierung ein überschaubarer,
 eigenständiger PR.
+
+## Fortschritts-Badges (privat, kein Leaderboard)
+
+Bewusst kein öffentliches Ranking zwischen Coachies -- private
+Meilensteine, die ausschließlich der jeweilige Coachie selbst sieht
+(auch nicht innerhalb der Peer Group). Neue Seite
+`src/pages/MeilensteinePage.jsx` (`/coachie/meilensteine`, neuer
+Nav-Eintrag "Meilensteine").
+
+**Bewusst keine neue Migration/Tabelle.** Die Meilensteine werden rein
+clientseitig aus bereits vorhandenen Daten abgeleitet
+(`coachie_programme`, `module`, `sessions`, `coachie_status`) --
+`berechneMeilensteine()` (reine, isoliert getestete Funktion am Anfang
+der Datei) erzeugt daraus:
+
+- "Modul '…' abgeschlossen", sobald alle Sessions eines Moduls den
+  Status `abgeschlossen` haben.
+- "Halbzeit bei '…' (50 %)" bzw. "'…' abgeschlossen" anhand des
+  Gesamtfortschritts eines Programms.
+
+Das "Datum" je Meilenstein ist eine Näherung: der späteste
+`aktualisiert_am`-Zeitpunkt der beteiligten `coachie_status`-Zeilen, da
+kein exakter Erreichungs-Zeitpunkt je Schwelle gespeichert wird.
+
+**Privatsphäre:** Da `coachie_status` per RLS ohnehin nur die eigenen
+Zeilen liefert (`coachie_id = auth.uid()`), ist diese Seite bereits
+durch die bestehende RLS korrekt abgeschottet -- keine neue
+Policy/Migration nötig, keine Sichtbarkeit für andere Coachies.
