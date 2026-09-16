@@ -9,6 +9,79 @@ function formatDatum(iso) {
   })
 }
 
+// Bewertungslink (Google/Trustpilot), der der automatischen
+// Testimonial-Einladungsmail nach 100% Kursabschluss beigefügt wird
+// (api/cron/erinnerungen.js) -- hier statt auf einer eigenen Seite
+// untergebracht, da beides zur selben Mail gehört.
+function BewertungslinkSection() {
+  const [link, setLink] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [speichert, setSpeichert] = useState(false)
+  const [gespeichert, setGespeichert] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function laden() {
+      try {
+        const data = await adminFetch('/api/admin/programme?resource=plattform-einstellungen')
+        setLink(data.einstellungen?.bewertung_link ?? '')
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    laden()
+  }, [])
+
+  async function handleSpeichern(event) {
+    event.preventDefault()
+    setSpeichert(true)
+    setError('')
+    setGespeichert(false)
+    try {
+      await adminFetch('/api/admin/programme?resource=plattform-einstellungen', {
+        method: 'PATCH',
+        body: JSON.stringify({ bewertung_link: link }),
+      })
+      setGespeichert(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSpeichert(false)
+    }
+  }
+
+  if (loading) return null
+
+  return (
+    <div className="mb-6 rounded-xl bg-white p-5 shadow-sm">
+      <h2 className="mb-1 font-semibold text-slate-800">Bewertungslink</h2>
+      <p className="mb-3 text-sm text-mrh-grey">
+        Wird der automatischen Einladungsmail nach 100% Kursabschluss beigefügt (z. B. Google- oder Trustpilot-Profil). Leer lassen, um den Absatz wegzulassen.
+      </p>
+      <form onSubmit={handleSpeichern} className="flex flex-wrap gap-2">
+        <input
+          type="url"
+          placeholder="https://g.page/r/…"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-navy focus:outline-none focus:ring-1 focus:ring-mrh-navy"
+        />
+        <button
+          type="submit"
+          disabled={speichert}
+          className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
+        >
+          {speichert ? 'Speichert…' : 'Speichern'}
+        </button>
+      </form>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {gespeichert && <p className="mt-2 text-sm text-mrh-gold-dark">Gespeichert.</p>}
+    </div>
+  )
+}
+
 // Sichtung eingereichter Testimonials (Feature 2) -- bewusst kein
 // automatischer Weg zur Freigabe: jedes Testimonial muss hier einzeln
 // von Hand freigegeben werden, bevor es auf der Verkaufsseite
@@ -78,6 +151,8 @@ export default function AdminTestimonialsPage() {
       <h1 className="mb-6 text-2xl font-semibold text-mrh-navy">Testimonials</h1>
 
       {error && <p className="mb-4 text-red-600">{error}</p>}
+
+      <BewertungslinkSection />
 
       <div className="mb-6 flex gap-2">
         {[

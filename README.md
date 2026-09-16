@@ -1353,6 +1353,30 @@ Bewusst kein volles Benachrichtigungscenter -- zwei konkrete Auslöser:
   Batch-Versand umgestellt werden. Keine neue Migration, keine neue
   RLS -- reine Backend-Logik auf Basis bereits bestehender Tabellen.
 
+## Bewertungslink in der Testimonial-Einladung
+
+Die bereits bestehende automatische Testimonial-Einladungsmail
+(`api/cron/erinnerungen.js`, siehe Testimonial-Sammelmechanismus oben)
+verschickt einmalig pro Coachie/Programm eine Mail, sobald alle
+Sessions abgeschlossen sind -- das war schon vor diesem Auftrag
+vollständig umgesetzt. Neu ist ausschließlich ein optionaler,
+admin-pflegbarer externer Bewertungslink (Google/Trustpilot o. Ä.), der
+dieser Mail als zusätzlicher Absatz beigefügt wird, sobald er
+hinterlegt ist -- ohne hinterlegten Link bleibt der Absatz weg, kein
+kaputter/leerer Link wird verschickt. Ein eigenes Antwort-Formular gibt
+es bewusst nicht, ein "Antworten" auf die Mail landet direkt im
+bestehenden Postfach `info@mrh-beratung.de`.
+
+**Admin-Pflege:** neue Sektion "Bewertungslink" oben auf der
+bestehenden Seite **Admin → Qualität → Testimonials** (kein neuer
+Nav-Punkt, gehört inhaltlich zur selben Mail) --
+`api/admin/programme.js?resource=plattform-einstellungen` (GET/PATCH).
+
+**Migration:** `supabase_migrations/bewertungslink.sql` -- rein
+additiv (neue Singleton-Tabelle `plattform_einstellungen`, analog zu
+`mitgliedschaft_einstellungen`), noch nicht auf der Live-DB
+ausgeführt.
+
 ## DSGVO-Selbstauskunft im Coachie-Bereich
 
 Neuer Bereich "Meine Daten" in den Coachie-Einstellungen
