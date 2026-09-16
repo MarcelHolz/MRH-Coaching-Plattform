@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import { requireAdmin } from '../_lib/adminAuth.js'
 import { requireCoachie } from '../_lib/coachieAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { sendMail } from '../_lib/mailer.js'
 
 const BILD_BUCKET = 'programm-bilder'
 
@@ -296,6 +297,66 @@ async function handleFaq(req, res, supabase) {
 // sonst nur für Coachies mit einer coachie_programme-Zeile für dieses
 // Programm (siehe RLS-Policy in der Migration). Coachies lesen die
 // Liste direkt über den Supabase-Client, hier nur die Admin-Pflege.
+// E-Mail-Benachrichtigung bei neuem Termin (Punkt 4, bewusst schlank --
+// kein Benachrichtigungscenter, nur dieser eine Auslöser). Ermittelt
+// die Empfänger nach derselben Filterlogik wie die bestehende
+// Coachie-seitige RLS-Policy auf events (programm_id/nur_mitglieder,
+// siehe supabase_migrations/events.sql bzw. mitgliederbereich.sql),
+// damit niemand eine Mail zu einem Termin bekommt, den er in der
+// Termine-Liste ohnehin nicht sehen würde. Best-effort: ein
+// Mailversand-Fehler lässt weder die anderen Empfänger noch das
+// Anlegen des Termins selbst scheitern. Sequenzielle Versendung ohne
+// Warteschlange, bewusst schlank gehalten -- bei einer sehr großen
+// Coachie-Anzahl (deutlich über den aktuell üblichen Größenordnungen
+// dieser Plattform) müsste das auf einen asynchronen Batch-Versand
+// umgestellt werden.
+async function benachrichtigeUeberNeuenTermin(event, supabase) {
+  let coachieIds = null
+
+  if (event.programm_id) {
+    const { data: zuordnungen } = await supabase
+      .from('coachie_programme')
+      .select('coachie_id')
+      .eq('programm_id', event.programm_id)
+    coachieIds = new Set((zuordnungen ?? []).map((z) => z.coachie_id))
+  }
+
+  if (event.nur_mitglieder) {
+    const { data: mitgliedschaften } = await supabase
+      .from('mitgliedschaften')
+      .select('coachie_id')
+      .eq('status', 'aktiv')
+    const mitgliederIds = new Set((mitgliedschaften ?? []).map((m) => m.coachie_id))
+    coachieIds = coachieIds
+      ? new Set([...coachieIds].filter((id) => mitgliederIds.has(id)))
+      : mitgliederIds
+  }
+
+  if (coachieIds && coachieIds.size === 0) return
+
+  const { data: coachies } = coachieIds
+    ? await supabase.from('coachies').select('email').in('id', [...coachieIds])
+    : await supabase.from('coachies').select('email')
+
+  const zeitpunkt = new Date(event.start_zeitpunkt).toLocaleString('de-DE', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+
+  for (const coachie of coachies ?? []) {
+    if (!coachie.email) continue
+    try {
+      await sendMail({
+        to: coachie.email,
+        subject: `Neuer Termin: ${event.titel}`,
+        text: `Hallo,\n\nes gibt einen neuen Termin: "${event.titel}" am ${zeitpunkt}.\n\nDetails findest du unter "Termine" im Coachie-Bereich.\n\nViele Grüße\nMRH Beratung & Coaching`,
+      })
+    } catch (err) {
+      console.error(`Termin-Benachrichtigung an ${coachie.email} fehlgeschlagen:`, err.message)
+    }
+  }
+}
+
 async function handleEvents(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
@@ -345,6 +406,12 @@ async function handleEvents(req, res, supabase) {
     if (error) {
       res.status(500).json({ error: error.message })
       return
+    }
+
+    try {
+      await benachrichtigeUeberNeuenTermin(data, supabase)
+    } catch (err) {
+      console.error('Termin-Benachrichtigungen konnten nicht versendet werden:', err.message)
     }
 
     res.status(201).json({ event: data })
