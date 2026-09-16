@@ -1237,3 +1237,30 @@ ein Fehlversand blockiert die bereits ausgeführte Kündigung nicht mehr.
 (neue Tabelle `kuendigungen`, neue Spalte
 `coachie_programme.gekuendigt_am`), noch nicht auf der Live-DB
 ausgeführt.
+
+## E-Mail-Benachrichtigungen (Punkt 4, schlank gehalten)
+
+Bewusst kein volles Benachrichtigungscenter -- zwei konkrete Auslöser:
+
+- **Peer Group "Interesse zeigen"** -- bereits umgesetzt (PR für die
+  Peer Group, siehe README-Abschnitt "Peer Group (Opt-in, reziprok)"):
+  `api/certificate.js?resource=peer-interesse` verschickt schon seit
+  dieser PR eine E-Mail an den Zielcoachie. Keine Änderung in diesem
+  Auftrag nötig.
+- **Neuer Termin (neu in diesem Auftrag):** Beim Anlegen eines Termins
+  (`api/admin/programme.js?resource=events`, POST) verschickt
+  `benachrichtigeUeberNeuenTermin()` jetzt eine kurze E-Mail an alle
+  Coachies, für die der Termin laut den bestehenden Sichtbarkeits-
+  Regeln überhaupt sichtbar ist -- dieselbe Filterlogik wie die
+  Coachie-seitige RLS-Policy auf `events` (`programm_id`/
+  `nur_mitglieder`, siehe README-Abschnitte "Events-Kalender" und
+  "Mitgliederbereich"): plattformweite Termine gehen an alle Coachies,
+  programmgebundene nur an zugeordnete, `nur_mitglieder`-Termine
+  zusätzlich nur an aktive Mitglieder.
+
+  Best-effort: ein einzelner Mailversand-Fehler blockiert weder die
+  übrigen Empfänger noch das Anlegen des Termins selbst. Bewusst
+  sequenziell ohne Warteschlange -- bei einer deutlich größeren
+  Coachie-Anzahl als aktuell üblich müsste das auf einen asynchronen
+  Batch-Versand umgestellt werden. Keine neue Migration, keine neue
+  RLS -- reine Backend-Logik auf Basis bereits bestehender Tabellen.
