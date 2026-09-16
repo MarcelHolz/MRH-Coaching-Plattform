@@ -1348,3 +1348,25 @@ Bewusst kein volles Benachrichtigungscenter -- zwei konkrete Auslöser:
   Coachie-Anzahl als aktuell üblich müsste das auf einen asynchronen
   Batch-Versand umgestellt werden. Keine neue Migration, keine neue
   RLS -- reine Backend-Logik auf Basis bereits bestehender Tabellen.
+
+## LinkedIn-Share bei Meilensteinen
+
+Auf der bestehenden Meilensteine-Seite (`/coachie/meilensteine`,
+Fortschritts-Badges-Feature) gibt es jetzt pro Modul-/Programm-Abschluss-
+Badge einen "Auf LinkedIn teilen"-Button, ebenso auf dem
+"Geschafft!"-Abschluss-Bildschirm eines Programms
+(`CoachieProgramPage.jsx`).
+
+**Umsetzung als bewusster Kompromiss:** LinkedIns öffentlicher
+Share-Dialog (`linkedin.com/sharing/share-offsite`) akzeptiert seit
+einigen Jahren aus Anti-Spam-Gründen keinen vorbefüllten Beitragstext
+mehr, nur noch `url` als Parameter (LinkedIn liest die Vorschau-Kachel
+selbst aus den OG-Tags der URL). Der Button kopiert daher den
+vorformulierten Text ("Ich habe gerade … bei MRH Beratung & Coaching
+abgeschlossen") zusätzlich in die Zwischenablage und weist im UI
+darauf hin, ihn im sich öffnenden LinkedIn-Fenster einzufügen --
+funktional das bestmögliche Ergebnis ohne eigenen Grafik-Export oder
+LinkedIn-API-Integration, wie im Auftrag vorgesehen.
+
+**Komponente:** `src/components/LinkedInShareButton.jsx`. Rein
+clientseitig, keine neue Migration, kein neuer Endpunkt.
