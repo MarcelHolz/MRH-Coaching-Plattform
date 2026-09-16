@@ -13,6 +13,7 @@ import TestimonialFormPage from './pages/TestimonialFormPage'
 import SearchPage from './pages/SearchPage'
 import EinstellungenPage from './pages/EinstellungenPage'
 import ZertifikatePage from './pages/ZertifikatePage'
+import PeerGroupPage from './pages/PeerGroupPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="suche" element={<SearchPage />} />
               <Route path="einstellungen" element={<EinstellungenPage />} />
               <Route path="zertifikate" element={<ZertifikatePage />} />
+              <Route path="peer-group" element={<PeerGroupPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />

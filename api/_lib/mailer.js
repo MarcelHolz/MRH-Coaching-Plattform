@@ -27,7 +27,7 @@ function getTransporter() {
   return transporter
 }
 
-export async function sendMail({ to, subject, text }) {
+export async function sendMail({ to, subject, text, replyTo }) {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER
-  await getTransporter().sendMail({ from, to, subject, text })
+  await getTransporter().sendMail({ from, to, subject, text, replyTo })
 }

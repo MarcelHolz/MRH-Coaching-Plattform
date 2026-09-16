@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/coachie/auswertungen', label: 'Meine Auswertungen' },
   { to: '/coachie/suche', label: 'Suche' },
   { to: '/coachie/zertifikate', label: 'Meine Abschlüsse' },
+  { to: '/coachie/peer-group', label: 'Peer Group' },
   { to: '/coachie/einstellungen', label: 'Einstellungen' },
 ]
 

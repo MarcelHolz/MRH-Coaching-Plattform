@@ -706,7 +706,9 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 - `api/certificate.js` — Standard/GET (PDF-Zertifikat), `?resource=faq-chat`
   (POST, FAQ-Chat für Coachies, siehe README-Abschnitt "FAQ-Chat für
   Coachies"), `?resource=empfehlung` (GET, persönlicher Empfehlungscode
-  für den eingeloggten Coachie).
+  für den eingeloggten Coachie), `?resource=peer-interesse` (POST,
+  "Interesse zeigen" in der Peer Group, siehe README-Abschnitt "Peer
+  Group").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, jetzt mit
   optionalem `ref`-Empfehlungscode).
@@ -947,3 +949,54 @@ verschwinden, statt einmal vollständig durchlaufen zu werden.
 **Erneuter Aufruf:** "Rundgang"-Button im Header (`CoachieLayout.jsx`)
 öffnet die Tour jederzeit erneut -- rein clientseitiger State, keine
 Persistenz nötig.
+
+## Peer Group (Opt-in, reziprok)
+
+Kein offener Community-Feed, sondern eine reziproke Opt-in-Sichtbarkeit
+für Coachies, die gezielt andere Coachies auf ähnlichem Weg finden
+wollen. Neue Seite `src/pages/PeerGroupPage.jsx`
+(`/coachie/peer-group`, eigener Nav-Eintrag in `CoachieLayout.jsx`).
+
+**Schema:** `supabase_migrations/peer_group.sql` — zwei neue, additive
+Tabellen:
+
+- `peer_profile` (1:1 zu `coachies`, aber **bewusst getrennt** davon):
+  `sichtbar` (Schalter, Default `false`), `vorname`, `branche_rolle`,
+  `kurztext`. Getrennt von `coachies`, damit eine Sichtbarkeits-Policy
+  für andere Coachies niemals `coachies.email` oder andere sensible
+  Felder der Zeile mit ausliefert — exakt die im Auftrag geforderte
+  Grenze ("keine E-Mail-Adresse ... sichtbar").
+- `peer_interesse` — Protokoll ausgelöster "Interesse
+  zeigen"-Benachrichtigungen, dient serverseitig der Sperrfrist (14
+  Tage pro Zielperson) und dem UI-Status "Interesse bereits gezeigt".
+
+**RLS (hart durchgesetzt, siehe Migration):**
+
+- Eigene Zeile immer lesbar/schreibbar (`coachie_id = auth.uid()`).
+- Fremde Zeilen nur sichtbar, wenn **alle drei** Bedingungen gelten:
+  Zielzeile `sichtbar = true`, die eigene Zeile ebenfalls
+  `sichtbar = true` (reziprok — wer den Schalter deaktiviert hat, sieht
+  selbst auch keine Übersicht), und beide sind laut `coachie_programme`
+  im selben Programm eingeschrieben (keine Sicht über Programmgrenzen
+  hinweg).
+- `peer_interesse` ist nur für die eigenen, selbst ausgelösten
+  Einträge lesbar (`von_coachie_id = auth.uid()`) — eingehende
+  Kontaktaufnahmen sind darüber nicht einsehbar, das läuft
+  ausschließlich per E-Mail.
+
+**"Interesse zeigen":** Direkter Profil-Zugriff (Vorname, Kurzprofil)
+läuft über den Supabase-Client mit obiger RLS, ganz ohne eigenen
+Endpunkt. Nur der Mailversand braucht `service_role` (Zugriff auf
+`coachies.email`) und ist deshalb in
+`api/certificate.js?resource=peer-interesse` (POST) untergebracht —
+kein neuer Function-Endpunkt, Vercel Hobby war zum Zeitpunkt der
+Umsetzung bei 12 von 12 Functions. Der Endpunkt prüft dieselben drei
+Bedingungen (reziprokes Opt-in + gemeinsames Programm) serverseitig
+noch einmal explizit nach, da RLS nur für den anon/authenticated-Weg
+gilt, nicht für `getSupabaseAdmin()`. Die E-Mail an den Zielcoachie
+enthält den Vornamen des Absenders und setzt `Reply-To` auf dessen
+E-Mail-Adresse (`api/_lib/mailer.js` um `replyTo` erweitert) — der
+Zielcoachie kann direkt antworten, ohne dass Kontaktdaten je im UI
+angezeigt werden. Wiederholtes "Interesse zeigen" an dieselbe Person
+innerhalb von 14 Tagen löst keine erneute E-Mail aus
+(`peer_interesse`-Sperrfrist).
