@@ -199,6 +199,16 @@ async function handleCheckoutSession(req, res, supabase) {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/kaufen/${slug}?abgebrochen=1`,
+    // Bewusst KEIN explizites payment_method_types: ['card', 'klarna']
+    // -- ohne diesen Parameter zeigt Checkout automatisch alle im
+    // Stripe-Dashboard aktivierten, für Betrag/Währung/Land
+    // geeigneten Zahlungsarten an, Klarna eingeschlossen, sobald sie
+    // dort aktiviert ist. billing_address_collection/
+    // phone_number_collection sind bei vielen alternativen
+    // Zahlungsarten (u. a. Klarna) Voraussetzung, unabhängig davon,
+    // welche davon im Dashboard aktiv sind.
+    billing_address_collection: 'required',
+    phone_number_collection: { enabled: true },
     metadata: {
       programm_id: programm.id,
       ...(werberCoachieId ? { werber_coachie_id: werberCoachieId } : {}),

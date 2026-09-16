@@ -1172,3 +1172,47 @@ Stripe-Webhook-Endpunkt die drei neuen Event-Typen aktivieren
 `invoice.payment_failed`) -- der Endpunkt selbst ändert sich nicht
 (`api/webhooks/stripe.js`), nur die dort abonnierten Event-Typen in
 den Stripe-Webhook-Einstellungen.
+
+## Ratenzahlung über Klarna (3.900€-Stufe)
+
+Bewusst **keine** selbst gebaute Ratenplan-Logik -- Klarna läuft als
+Zahlungsmethode über den bestehenden Stripe-Checkout, trägt das
+Ausfallrisiko und zieht die Raten selbst beim Kunden ein. Das ist zum
+größten Teil eine **Stripe-Dashboard-Konfigurationsaufgabe**, kein
+Code, den diese Codebase steuern könnte:
+
+**Code-seitig ergänzt** (`api/checkout.js`, `handleCheckoutSession`,
+gilt für **alle** Kurskäufe, nicht nur die 3.900€-Stufe -- Klarna
+lässt sich pro Checkout-Session nicht auf einen bestimmten Preis
+beschränken, das steuert Stripe automatisch über Betrag/Währung/Land):
+
+- Bewusst **kein** explizites `payment_method_types: ['card',
+  'klarna']` -- ohne diesen Parameter zeigt Checkout automatisch alle
+  im Stripe-Dashboard aktivierten, für den jeweiligen Betrag/Land
+  geeigneten Zahlungsarten an. Stripes eigene kartenbasierte
+  "Installments"-Funktion wird dadurch nicht verwendet (die steht für
+  deutsche Karten ohnehin nicht zur Verfügung, wie im Auftrag
+  angemerkt).
+- `billing_address_collection: 'required'` und
+  `phone_number_collection: { enabled: true }` ergänzt -- Voraussetzung
+  für viele alternative Zahlungsarten, Klarna eingeschlossen.
+
+**Nicht code-seitig lösbar, das musst du im Stripe-Dashboard erledigen:**
+
+1. Klarna unter **Settings → Payment methods** aktivieren.
+2. Prüfen (ggf. mit Stripe/Klarna-Onboarding klären), ob Klarna für
+   3.900 € und die Produktkategorie "Bildungsleistung" grundsätzlich
+   freigeschaltet ist -- Klarnas längerfristige Ratenkauf-/
+   Finanzierungsoptionen (im Unterschied zu "Pay in 30 Tagen" oder
+   kurzen Slice-it-Raten) setzen oft eine gesonderte Freischaltung
+   durch Klarna voraus, die sich von hier aus nicht auslösen oder
+   prüfen lässt.
+
+**Zugriffsfreischaltung:** keine Änderung nötig. Der bestehende
+`checkout.session.completed`-Handler in `api/webhooks/stripe.js`
+behandelt eine per Klarna abgeschlossene Zahlung identisch zu einer
+Kartenzahlung -- Stripe schickt dieses Event für `mode: 'payment'`
+erst, wenn die Zahlung (bzw. bei Klarna: der Ratenplan) bei Stripe
+bestätigt ist, unabhängig von der gewählten Zahlungsart. Der Zugriff
+wird also, wie im Auftrag gefordert, sofort nach erfolgreicher
+Klarna-Bestätigung freigeschaltet, ohne gesonderte Wartelogik.
