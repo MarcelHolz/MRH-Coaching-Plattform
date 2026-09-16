@@ -66,6 +66,22 @@ async function findeOderErstelleCoachie(session, supabase, req) {
   return { coachieId: neuerCoachie.id }
 }
 
+// Speichert die Stripe-Customer-ID einmalig je Coachie (Rechnungs-
+// Download, Punkt 2) -- unabhängig davon, ob sie aus einem Kurskauf
+// oder der Mitgliedschaft stammt. Überschreibt einen bereits
+// gesetzten Wert bewusst nicht (derselbe Coachie sollte über
+// dieselbe E-Mail immer denselben Stripe-Customer bekommen, ein
+// erneutes Setzen wäre ein Hinweis auf einen Sonderfall, den wir
+// lieber unangetastet lassen als stillschweigend zu überschreiben).
+async function speichereStripeCustomerId(coachieId, stripeCustomerId, supabase) {
+  if (!stripeCustomerId) return
+  await supabase
+    .from('coachies')
+    .update({ stripe_customer_id: stripeCustomerId })
+    .eq('id', coachieId)
+    .is('stripe_customer_id', null)
+}
+
 // Liest den Abrechnungszeitraum robust gegen die Stripe-API-Umstellung,
 // bei der current_period_end von der Subscription auf die einzelnen
 // Subscription-Items gewandert ist (mehrere Preise pro Abo möglich) --
@@ -123,6 +139,9 @@ async function handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
   )
 
   if (error) return { error: error.message }
+
+  await speichereStripeCustomerId(coachieId, session.customer, supabase)
+
   return {}
 }
 
@@ -300,6 +319,8 @@ export default async function handler(req, res) {
     res.status(500).json({ error: assignmentError.message })
     return
   }
+
+  await speichereStripeCustomerId(coachieId, session.customer, supabase)
 
   // Empfehlungsprogramm: nur protokollieren, nicht den Webhook
   // scheitern lassen -- der Kauf selbst ist bereits abgeschlossen.

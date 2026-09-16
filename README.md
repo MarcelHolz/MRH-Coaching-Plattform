@@ -717,7 +717,8 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   Coachies"), `?resource=empfehlung` (GET, persönlicher Empfehlungscode
   für den eingeloggten Coachie), `?resource=peer-interesse` (POST,
   "Interesse zeigen" in der Peer Group, siehe README-Abschnitt "Peer
-  Group").
+  Group"), `?resource=rechnungen` (GET, Rechnungshistorie von Stripe,
+  siehe README-Abschnitt "Rechnungs-Download im Coachie-Bereich").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, jetzt mit
   optionalem `ref`-Empfehlungscode), `?resource=mitgliedschaft` (GET
@@ -1175,6 +1176,45 @@ Stripe-Webhook-Endpunkt die drei neuen Event-Typen aktivieren
 `invoice.payment_failed`) -- der Endpunkt selbst ändert sich nicht
 (`api/webhooks/stripe.js`), nur die dort abonnierten Event-Typen in
 den Stripe-Webhook-Einstellungen.
+
+## Rechnungs-Download im Coachie-Bereich
+
+Keine eigene Rechnungserzeugung -- Stripe legt Rechnungen (mit PDF und
+Hosted-Invoice-Link) automatisch selbst an, diese Funktion listet sie
+nur auf. Neue Seite `src/pages/RechnungenPage.jsx`
+(`/coachie/rechnungen`, neuer Nav-Eintrag).
+
+**Voraussetzung: eine gespeicherte `stripe_customer_id` je Coachie.**
+Bisher gab es die nur auf `mitgliedschaften` (nicht auf `coachies`
+selbst), und nur Subscriptions erzeugen bei Stripe automatisch
+Invoice-Objekte -- Kurskäufe (Payment-Mode-Checkout) bislang nicht.
+Beides ergänzt:
+
+- `coachies.stripe_customer_id` (neue Spalte,
+  `supabase_migrations/rechnungen.sql`) -- `api/webhooks/stripe.js`
+  setzt sie jetzt bei **beiden** Kauf-Flows (Mitgliedschaft und
+  Kurskauf), sofern noch nicht gesetzt.
+- `api/checkout.js` (Kurskauf-Zweig, `handleCheckoutSession`):
+  `customer_creation: 'always'` (sonst kein zuverlässiger
+  Stripe-Customer bei Payment-Mode) und `invoice_creation: { enabled:
+  true }` (sonst gar kein Invoice-Objekt bei Payment-Mode) ergänzt.
+  **Gilt nur für ab jetzt neu erstellte Checkout-Sessions** --
+  bestehende, bereits abgeschlossene Käufe bekommen dadurch nicht
+  rückwirkend eine Rechnung.
+
+**Endpunkt:** `api/certificate.js?resource=rechnungen` (GET,
+coachie-authentifiziert, kein neuer Function-Endpunkt) -- liest
+`stripe.invoices.list({ customer: coachie.stripe_customer_id })` und
+liefert Nummer, Datum, Betrag, Status sowie `hosted_invoice_url`/
+`invoice_pdf` direkt von Stripe durch. Ohne gespeicherte
+`stripe_customer_id` (z. B. noch nie über Stripe bezahlt) liefert der
+Endpunkt eine leere Liste statt eines Fehlers.
+
+**Migration:** `supabase_migrations/rechnungen.sql` -- eine neue
+Spalte, keine neue RLS-Policy nötig (die bestehende Policy, über die
+ein Coachie schon heute seine eigene `coachies`-Zeile lesen kann,
+deckt die neue Spalte automatisch mit ab). Noch nicht auf der Live-DB
+ausgeführt.
 
 ## Kündigungsbutton (§ 312k BGB)
 
