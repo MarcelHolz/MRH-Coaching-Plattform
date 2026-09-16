@@ -74,6 +74,64 @@ async function handleVorschau(req, res, supabase) {
   })
 }
 
+// Öffentliche Vorschau der Mitgliedschafts-Einstellungen (Titel, Preis,
+// Bezahltext) für die eigenständige Verkaufsseite (Punkt 5) -- analog
+// zu handleVorschau, aber gegen die Singleton-Tabelle
+// mitgliedschaft_einstellungen statt gegen ein einzelnes Programm.
+async function handleMitgliedschaftVorschau(req, res, supabase) {
+  const { data, error } = await supabase
+    .from('mitgliedschaft_einstellungen')
+    .select('titel, beschreibung, preis_cent, bezahltext')
+    .eq('id', true)
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ mitgliedschaft: data })
+}
+
+// Erstellt eine Stripe-Subscription-Checkout-Session (mode: 'subscription'
+// statt 'payment') -- eigenständig buchbar, unabhängig von jedem
+// Kurskauf. Der eigentliche Mitgliedschafts-Datensatz wird erst im
+// Webhook (checkout.session.completed mit session.mode ===
+// 'subscription') angelegt, wie beim bestehenden Kurs-Kauf-Flow.
+async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
+  const { data: einstellungen, error } = await supabase
+    .from('mitgliedschaft_einstellungen')
+    .select('stripe_price_id')
+    .eq('id', true)
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  if (!einstellungen?.stripe_price_id) {
+    res.status(404).json({ error: 'Mitgliedschaft ist aktuell nicht buchbar.' })
+    return
+  }
+
+  const appUrl =
+    process.env.APP_URL ||
+    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+
+  const stripe = getStripe()
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: einstellungen.stripe_price_id, quantity: 1 }],
+    success_url: `${appUrl}/kauf-erfolgreich`,
+    cancel_url: `${appUrl}/mitgliedschaft?abgebrochen=1`,
+    metadata: { typ: 'mitgliedschaft' },
+  })
+
+  res.status(200).json({ url: session.url })
+}
+
 async function handleCheckoutSession(req, res, supabase) {
   const { slug, ref } = req.body ?? {}
 
@@ -152,6 +210,19 @@ async function handleCheckoutSession(req, res, supabase) {
 
 export default async function handler(req, res) {
   const supabase = getSupabaseAdmin()
+
+  if (req.query.resource === 'mitgliedschaft') {
+    if (req.method === 'GET') {
+      await handleMitgliedschaftVorschau(req, res, supabase)
+      return
+    }
+    if (req.method === 'POST') {
+      await handleMitgliedschaftCheckoutSession(req, res, supabase)
+      return
+    }
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
 
   if (req.method === 'GET') {
     await handleVorschau(req, res, supabase)

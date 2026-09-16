@@ -313,8 +313,15 @@ async function handleEvents(req, res, supabase) {
   }
 
   if (req.method === 'POST') {
-    const { titel, beschreibung, start_zeitpunkt, ende_zeitpunkt, link, programm_id } =
-      req.body ?? {}
+    const {
+      titel,
+      beschreibung,
+      start_zeitpunkt,
+      ende_zeitpunkt,
+      link,
+      programm_id,
+      nur_mitglieder,
+    } = req.body ?? {}
 
     if (!titel || !start_zeitpunkt) {
       res.status(400).json({ error: 'titel und start_zeitpunkt sind erforderlich.' })
@@ -330,6 +337,7 @@ async function handleEvents(req, res, supabase) {
         ende_zeitpunkt: ende_zeitpunkt || null,
         link: link || null,
         programm_id: programm_id || null,
+        nur_mitglieder: Boolean(nur_mitglieder),
       })
       .select()
       .single()
@@ -389,6 +397,201 @@ async function handleEvents(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Admin-Pflege der Mitgliedschafts-Einstellungen (Preis, Stripe-Price-ID,
+// Bezahltext, Mitgliederbereich Punkt 1+5) -- Singleton-Zeile
+// (mitgliedschaft_einstellungen.id = true), daher rein GET/PATCH ohne
+// id im Body. Preis steht laut Auftrag noch nicht fest, deshalb hier
+// konfigurierbar statt hart codiert, analog zu programme.preis_cent.
+async function handleMitgliedschaftEinstellungen(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('mitgliedschaft_einstellungen')
+      .select('*')
+      .eq('id', true)
+      .maybeSingle()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ einstellungen: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { titel, beschreibung, preis_cent, stripe_price_id, bezahltext } =
+      req.body ?? {}
+
+    const { data, error } = await supabase
+      .from('mitgliedschaft_einstellungen')
+      .update({
+        titel,
+        beschreibung: beschreibung || null,
+        preis_cent: preis_cent != null ? preis_cent : null,
+        stripe_price_id: stripe_price_id || null,
+        bezahltext: bezahltext || null,
+        aktualisiert_am: new Date().toISOString(),
+      })
+      .eq('id', true)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ einstellungen: data })
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
+// Admin-CRUD für Mitglieder-Inhalte (Mitgliederbereich Punkt 4) --
+// analog zum bestehenden Material-Upload-Muster (siehe
+// handleBildUploadUrl/api/admin/sessions.js): der eigentliche
+// Datei-Upload läuft per Einweg-Signed-URL direkt vom Browser zum
+// privaten Bucket "mitglieder-inhalte", hier nur Metadaten-CRUD plus
+// die Erzeugung des Upload-Tokens.
+const MITGLIEDER_BUCKET = 'mitglieder-inhalte'
+
+const ERLAUBTE_MITGLIEDER_DATEI_TYPEN = {
+  'application/pdf': 'pdf',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+}
+
+async function handleMitgliederDateiUpload(req, res, supabase) {
+  const { contentType, dateiname } = req.body ?? {}
+  const endung = ERLAUBTE_MITGLIEDER_DATEI_TYPEN[contentType]
+
+  if (!endung) {
+    res
+      .status(400)
+      .json({ error: 'Nur PDF, MP3, WAV, JPG oder PNG sind erlaubt.' })
+    return
+  }
+
+  const sichererDateiname = String(dateiname || `datei.${endung}`).replace(
+    /[^a-zA-Z0-9._-]/g,
+    '_',
+  )
+  const pfad = `${Date.now()}-${sichererDateiname}`
+
+  const { data, error } = await supabase.storage
+    .from(MITGLIEDER_BUCKET)
+    .createSignedUploadUrl(pfad)
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ pfad: data.path, token: data.token })
+}
+
+async function handleMitgliederInhalte(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('mitglieder_inhalte')
+      .select('*')
+      .order('veroeffentlicht_am', { ascending: false })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ mitglieder_inhalte: data })
+    return
+  }
+
+  if (req.method === 'POST') {
+    const { typ, titel, beschreibung, datei_url, link_url, veroeffentlicht_am } =
+      req.body ?? {}
+
+    if (!typ || !titel) {
+      res.status(400).json({ error: 'typ und titel sind erforderlich.' })
+      return
+    }
+
+    if (!datei_url && !link_url) {
+      res.status(400).json({ error: 'datei_url oder link_url ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('mitglieder_inhalte')
+      .insert({
+        typ,
+        titel,
+        beschreibung: beschreibung || null,
+        datei_url: datei_url || null,
+        link_url: link_url || null,
+        veroeffentlicht_am: veroeffentlicht_am || new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ mitglieder_inhalt: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, ...updates } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('mitglieder_inhalte')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ mitglieder_inhalt: data })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { error } = await supabase.from('mitglieder_inhalte').delete().eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
   // Coachie-Selbstbedienung für das eigene Profilbild (Feature 2,
   // EinstellungenPage.jsx) -- bewusst vor dem requireAdmin-Gate, da
@@ -430,6 +633,21 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'events') {
     await handleEvents(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'mitgliedschaft-einstellungen') {
+    await handleMitgliedschaftEinstellungen(req, res, supabase)
+    return
+  }
+
+  if (req.method === 'POST' && req.query.resource === 'mitglieder-datei-upload') {
+    await handleMitgliederDateiUpload(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'mitglieder-inhalte') {
+    await handleMitgliederInhalte(req, res, supabase)
     return
   }
 

@@ -8,6 +8,7 @@ const LEERES_FORMULAR = {
   ende_zeitpunkt: '',
   link: '',
   programm_id: '',
+  nur_mitglieder: false,
 }
 
 // Admin-Pflege des Events-Kalenders (Live-Calls/Webinare/Gruppen-
@@ -57,6 +58,7 @@ export default function AdminEventsPage() {
         : null,
       link: formular.link.trim() || null,
       programm_id: formular.programm_id || null,
+      nur_mitglieder: formular.nur_mitglieder,
     }
   }
 
@@ -89,6 +91,7 @@ export default function AdminEventsPage() {
       ende_zeitpunkt: termin.ende_zeitpunkt?.slice(0, 16) ?? '',
       link: termin.link ?? '',
       programm_id: termin.programm_id ?? '',
+      nur_mitglieder: termin.nur_mitglieder ?? false,
     })
   }
 
@@ -221,6 +224,17 @@ export default function AdminEventsPage() {
             ))}
           </select>
         </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={neu.nur_mitglieder}
+            onChange={(event) =>
+              setNeu((prev) => ({ ...prev, nur_mitglieder: event.target.checked }))
+            }
+            className="h-4 w-4 accent-mrh-navy"
+          />
+          Nur für Mitglieder (aktive Mitgliedschaft erforderlich)
+        </label>
         <button
           type="submit"
           disabled={speichertNeu || !neu.titel.trim() || !neu.start_zeitpunkt}
@@ -307,6 +321,20 @@ export default function AdminEventsPage() {
                       </option>
                     ))}
                   </select>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={bearbeitung.nur_mitglieder}
+                      onChange={(event) =>
+                        setBearbeitung((prev) => ({
+                          ...prev,
+                          nur_mitglieder: event.target.checked,
+                        }))
+                      }
+                      className="h-4 w-4 accent-mrh-navy"
+                    />
+                    Nur für Mitglieder
+                  </label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => bearbeitungSpeichern(termin.id)}
@@ -326,8 +354,15 @@ export default function AdminEventsPage() {
                 <>
                   <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium text-slate-800">{termin.titel}</p>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                      {termin.programme?.titel ?? 'Plattformweit'}
+                    <span className="flex gap-1.5">
+                      {termin.nur_mitglieder && (
+                        <span className="rounded-full bg-mrh-gold/15 px-2 py-0.5 text-xs font-medium text-mrh-gold-dark">
+                          Nur Mitglieder
+                        </span>
+                      )}
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                        {termin.programme?.titel ?? 'Plattformweit'}
+                      </span>
                     </span>
                   </div>
                   <p className="mb-2 text-sm text-mrh-grey">

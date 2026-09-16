@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { formatPreis } from '../lib/preis'
 import { stripMarkdown } from '../lib/markdown'
+import MitgliedschaftHinweis from '../components/MitgliedschaftHinweis'
 
 function ProgressRing({ prozent }) {
   const size = 88
@@ -487,6 +488,10 @@ export default function CoachieDashboardPage() {
           </div>
         </div>
       )}
+
+      <div className="mt-8">
+        <MitgliedschaftHinweis />
+      </div>
     </div>
   )
 }
