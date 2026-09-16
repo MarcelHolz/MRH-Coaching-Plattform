@@ -146,6 +146,232 @@ function EmpfehlungsprogrammSection({ accessToken }) {
   )
 }
 
+function formatDatum(iso) {
+  if (!iso) return '–'
+  return new Date(iso).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+// DSGVO-Selbstauskunft (Art. 15/17 DSGVO). "Meine Daten anzeigen" liest
+// ausschließlich bereits bestehende Tabellen direkt über den
+// Supabase-Client -- kein neuer Endpunkt nötig, coachies/
+// coachie_programme/coachie_testergebnisse haben bereits eine
+// "coachie sieht eigene Zeile"-RLS-Policy (siehe u. a.
+// AuthContext.jsx, MeilensteinePage.jsx, testergebnisse.sql). Lädt erst
+// bei Klick, nicht automatisch beim Öffnen der Einstellungen.
+function MeineDatenSection({ coachie, accessToken }) {
+  const [offen, setOffen] = useState(false)
+  const [laedt, setLaedt] = useState(false)
+  const [fehler, setFehler] = useState('')
+  const [programme, setProgramme] = useState(null)
+  const [testergebnisse, setTestergebnisse] = useState(null)
+
+  const [loeschungLaedt, setLoeschungLaedt] = useState(false)
+  const [loeschungFehler, setLoeschungFehler] = useState('')
+  const [loeschungBeantragt, setLoeschungBeantragt] = useState(false)
+
+  async function handleAnzeigen() {
+    if (offen) {
+      setOffen(false)
+      return
+    }
+
+    setOffen(true)
+    if (programme !== null) return // schon geladen
+
+    setLaedt(true)
+    setFehler('')
+    try {
+      const { data: zuordnungen, error: zuordnungenError } = await supabase
+        .from('coachie_programme')
+        .select('programm_id, zugewiesen_am, zugriff_bis, programme(titel)')
+        .eq('coachie_id', coachie.id)
+
+      if (zuordnungenError) throw zuordnungenError
+
+      const programmIds = (zuordnungen ?? []).map((z) => z.programm_id)
+      let sessions = []
+      let statusListe = []
+
+      if (programmIds.length > 0) {
+        const { data: sessionsData } = await supabase
+          .from('sessions')
+          .select('id, programm_id')
+          .in('programm_id', programmIds)
+        sessions = sessionsData ?? []
+
+        const sessionIds = sessions.map((s) => s.id)
+        if (sessionIds.length > 0) {
+          const { data: statusData } = await supabase
+            .from('coachie_status')
+            .select('session_id, status')
+            .eq('coachie_id', coachie.id)
+            .in('session_id', sessionIds)
+          statusListe = statusData ?? []
+        }
+      }
+
+      const statusBySession = new Map(statusListe.map((s) => [s.session_id, s.status]))
+
+      setProgramme(
+        (zuordnungen ?? []).map((z) => {
+          const programmSessions = sessions.filter((s) => s.programm_id === z.programm_id)
+          const abgeschlossen = programmSessions.filter(
+            (s) => statusBySession.get(s.id) === 'abgeschlossen',
+          ).length
+          const prozent =
+            programmSessions.length > 0
+              ? Math.round((abgeschlossen / programmSessions.length) * 100)
+              : 0
+
+          return {
+            id: z.programm_id,
+            titel: z.programme?.titel ?? 'Programm',
+            zugewiesenAm: z.zugewiesen_am,
+            zugriffBis: z.zugriff_bis,
+            prozent,
+          }
+        }),
+      )
+
+      const { data: testergebnisseData, error: testergebnisseError } = await supabase
+        .from('coachie_testergebnisse')
+        .select('id, test_typ, verknuepft_am')
+        .eq('coachie_id', coachie.id)
+        .order('verknuepft_am', { ascending: false })
+
+      if (testergebnisseError) throw testergebnisseError
+      setTestergebnisse(testergebnisseData ?? [])
+    } catch (err) {
+      setFehler(err.message)
+    } finally {
+      setLaedt(false)
+    }
+  }
+
+  async function handleLoeschungBeantragen() {
+    if (
+      !window.confirm(
+        'Löschung deiner Daten beantragen? Das löst noch keine automatische Löschung aus -- Marcel prüft den Antrag manuell.',
+      )
+    ) {
+      return
+    }
+
+    setLoeschungLaedt(true)
+    setLoeschungFehler('')
+    try {
+      const response = await fetch('/api/certificate?resource=dsgvo-loeschung', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Antrag konnte nicht übermittelt werden.')
+      }
+
+      setLoeschungBeantragt(true)
+    } catch (err) {
+      setLoeschungFehler(err.message)
+    } finally {
+      setLoeschungLaedt(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h2 className="mb-1 font-semibold text-slate-800">Meine Daten</h2>
+      <p className="mb-4 text-sm text-mrh-grey">
+        Auskunft über deine bei uns gespeicherten Daten (DSGVO) sowie die
+        Möglichkeit, ihre Löschung zu beantragen.
+      </p>
+
+      <button
+        onClick={handleAnzeigen}
+        className="rounded-lg border border-mrh-navy px-4 py-2 text-sm font-medium text-mrh-navy transition hover:bg-mrh-navy/5"
+      >
+        {offen ? 'Meine Daten ausblenden' : 'Meine Daten anzeigen'}
+      </button>
+
+      {offen && (
+        <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
+          {laedt && <p className="text-sm text-mrh-grey">Lädt…</p>}
+          {fehler && <p className="text-sm text-red-600">{fehler}</p>}
+
+          {!laedt && !fehler && (
+            <>
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Stammdaten
+                </p>
+                <p className="text-sm text-slate-700">Name: {coachie?.name ?? '–'}</p>
+                <p className="text-sm text-slate-700">E-Mail: {coachie?.email ?? '–'}</p>
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Kursfortschritt
+                </p>
+                {programme && programme.length === 0 ? (
+                  <p className="text-sm text-mrh-grey">Keine Programme zugeordnet.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {(programme ?? []).map((p) => (
+                      <li key={p.id} className="text-sm text-slate-700">
+                        {p.titel} -- {p.prozent}% abgeschlossen, zugeordnet seit{' '}
+                        {formatDatum(p.zugewiesenAm)}
+                        {p.zugriffBis && `, Zugriff bis ${formatDatum(p.zugriffBis)}`}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Testergebnisse
+                </p>
+                {testergebnisse && testergebnisse.length === 0 ? (
+                  <p className="text-sm text-mrh-grey">Keine verknüpft.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {(testergebnisse ?? []).map((t) => (
+                      <li key={t.id} className="text-sm text-slate-700">
+                        {t.test_typ} -- verknüpft am {formatDatum(t.verknuepft_am)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        {loeschungBeantragt ? (
+          <p className="text-sm text-mrh-gold-dark">
+            Löschungsantrag eingereicht -- wir melden uns bei dir.
+          </p>
+        ) : (
+          <button
+            onClick={handleLoeschungBeantragen}
+            disabled={loeschungLaedt}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+          >
+            {loeschungLaedt ? 'Wird gesendet…' : 'Löschung beantragen'}
+          </button>
+        )}
+        {loeschungFehler && <p className="mt-2 text-sm text-red-600">{loeschungFehler}</p>}
+      </div>
+    </div>
+  )
+}
+
 // Passwort-Änderung direkt über den Supabase-Client (kein eigener
 // API-Endpunkt nötig, RLS/Auth regelt das schon). Das "aktuelle
 // Passwort" wird über einen erneuten signInWithPassword-Aufruf
@@ -249,6 +475,8 @@ export default function EinstellungenPage() {
       </div>
 
       <EmpfehlungsprogrammSection accessToken={session?.access_token} />
+
+      <MeineDatenSection coachie={coachie} accessToken={session?.access_token} />
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-semibold text-slate-800">Passwort ändern</h2>
