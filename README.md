@@ -441,6 +441,39 @@ Struktur ist bewusst so angelegt (eigenes `test_typ`-Feld, eigene
 Tabelle), dass sie sich später um Zertifikate erweitern lässt, ohne
 etwas Bestehendes umbauen zu müssen.
 
+### Bugfix: unbehandelter Netzwerkfehler bei nicht erreichbarem Profil-Quiz-Projekt
+
+**Symptom aus den Vercel-Laufzeit-Logs:** `TypeError: fetch failed` /
+`getaddrinfo ENOTFOUND <projekt>.supabase.co` auf
+`routes=/api/admin/testergebnisse`.
+
+**Ursache -- kein falscher/vertauschter Supabase-Client:**
+`api/admin/testergebnisse.js` verwendet für die Coaching-Plattform-DB
+ausschließlich den zentralen `getSupabaseAdmin()`-Client
+(`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`) -- dort liegt kein Fehler
+vor. Der Fehler stammt aus dem separaten `fetch()`-Aufruf gegen die
+Profil-Quiz-Edge-Function (`PROFIL_QUIZ_URL`, siehe oben), der **by
+design** ein komplett anderes, unabhängiges Supabase-Projekt
+anspricht. `getaddrinfo ENOTFOUND` bedeutet, dass dieser Hostname
+nicht mehr auflösbar ist -- typischerweise, weil das dortige
+Supabase-Projekt (insbesondere im kostenlosen Tarif) nach Inaktivität
+automatisch pausiert oder gelöscht wurde. **Das lässt sich nicht aus
+diesem Repository heraus beheben** -- bitte im Profil-Quiz-Projekt
+(Supabase-Dashboard) prüfen, ob es noch existiert/aktiv ist, es bei
+Bedarf reaktivieren bzw. gemäß "Einmalige Einrichtung" oben neu
+aufsetzen, und `PROFIL_QUIZ_URL` in Vercel auf die dann aktuelle
+Projekt-URL setzen.
+
+**Was hier trotzdem gefixt wurde:** Der `fetch()`-Aufruf war nicht in
+ein `try/catch` eingebettet -- ein Netzwerkfehler (DNS, Verbindung,
+Timeout) wirft dabei eine Exception, bevor überhaupt eine `Response`
+existiert, und blieb dadurch unbehandelt (nur das bereits vorhandene
+`!response.ok`-Handling für erreichbare, aber fehlerhaft antwortende
+Server griff). Die Route stürzte dadurch mit dem rohen Node-Stacktrace
+ab, statt eine verständliche Fehlermeldung im Admin-Bereich
+anzuzeigen. Jetzt liefert die Route bei einem solchen Netzwerkfehler
+sauber `502` mit einem Hinweis auf die vermutliche Ursache.
+
 ## Produktagent (eigenständige Kursanlage als Entwurf)
 
 Ein externer Produktagent kann über eine eigene API-Route (`api/agent/
