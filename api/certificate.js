@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { requireCoachie } from './_lib/coachieAuth.js'
+import { sendMail } from './_lib/mailer.js'
 
 // Serverseitige PDF-Erzeugung mit pdf-lib (leichtgewichtig, kein
 // Headless-Browser nötig). Kein Bild-Logo eingebunden -- es liegt
@@ -213,6 +214,122 @@ async function handleFaqChat(req, res, supabase) {
   }
 }
 
+// "Interesse zeigen" in der Peer Group (Feature Peer Group): löst eine
+// E-Mail an den Zielcoachie aus, statt Kontaktdaten direkt im UI
+// preiszugeben -- der Zielcoachie entscheidet selbst, ob er antwortet
+// (Reply-To zeigt auf den Absender). RLS auf peer_profile erlaubt zwar
+// bereits nur reziprok sichtbare, programmgleiche Profile zu lesen,
+// aber der eigentliche Mailversand braucht service_role (Zugriff auf
+// coachies.email) und prüft die Bedingungen serverseitig deshalb noch
+// einmal explizit nach -- RLS gilt nur für den anon/authenticated-Weg,
+// nicht für getSupabaseAdmin().
+const PEER_INTERESSE_SPERRFRIST_TAGE = 14
+
+async function handlePeerInteresse(req, res, supabase) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
+  const coachieId = await requireCoachie(req, res, supabase)
+  if (!coachieId) return
+
+  const { zielCoachieId } = req.body ?? {}
+  if (!zielCoachieId || typeof zielCoachieId !== 'string') {
+    res.status(400).json({ error: 'zielCoachieId ist erforderlich.' })
+    return
+  }
+
+  if (zielCoachieId === coachieId) {
+    res.status(400).json({ error: 'Kein Interesse am eigenen Profil möglich.' })
+    return
+  }
+
+  const [{ data: ich }, { data: ziel }] = await Promise.all([
+    supabase
+      .from('peer_profile')
+      .select('sichtbar, vorname')
+      .eq('coachie_id', coachieId)
+      .maybeSingle(),
+    supabase
+      .from('peer_profile')
+      .select('sichtbar')
+      .eq('coachie_id', zielCoachieId)
+      .maybeSingle(),
+  ])
+
+  if (!ich?.sichtbar || !ziel?.sichtbar) {
+    res.status(403).json({ error: 'Peer Group ist für dich oder das Zielprofil nicht aktiv.' })
+    return
+  }
+
+  const [{ data: meineProgramme }, { data: zielProgramme }] = await Promise.all([
+    supabase.from('coachie_programme').select('programm_id').eq('coachie_id', coachieId),
+    supabase.from('coachie_programme').select('programm_id').eq('coachie_id', zielCoachieId),
+  ])
+
+  const zielProgrammIds = new Set((zielProgramme ?? []).map((p) => p.programm_id))
+  const gemeinsam = (meineProgramme ?? []).some((p) => zielProgrammIds.has(p.programm_id))
+
+  if (!gemeinsam) {
+    res.status(403).json({ error: 'Kein gemeinsames Programm mit diesem Profil.' })
+    return
+  }
+
+  const sperrfristGrenze = new Date(
+    Date.now() - PEER_INTERESSE_SPERRFRIST_TAGE * 24 * 60 * 60 * 1000,
+  ).toISOString()
+
+  const { data: kuerzlich } = await supabase
+    .from('peer_interesse')
+    .select('id')
+    .eq('von_coachie_id', coachieId)
+    .eq('zu_coachie_id', zielCoachieId)
+    .gte('erstellt_am', sperrfristGrenze)
+    .limit(1)
+    .maybeSingle()
+
+  if (kuerzlich) {
+    res.status(200).json({ status: 'bereits_gesendet' })
+    return
+  }
+
+  const [{ data: absender }, { data: empfaenger }] = await Promise.all([
+    supabase.from('coachies').select('email').eq('id', coachieId).maybeSingle(),
+    supabase.from('coachies').select('email').eq('id', zielCoachieId).maybeSingle(),
+  ])
+
+  if (!absender?.email || !empfaenger?.email) {
+    res.status(500).json({ error: 'E-Mail-Adresse konnte nicht ermittelt werden.' })
+    return
+  }
+
+  const absenderName = ich.vorname?.trim() || 'Ein anderer Coachie aus deiner Peer Group'
+
+  try {
+    await sendMail({
+      to: empfaenger.email,
+      subject: 'Jemand aus deiner Peer Group möchte sich austauschen',
+      text: `Hallo,\n\n${absenderName} hat in deiner Peer Group Interesse an einem Austausch gezeigt.\n\nDu kannst einfach auf diese E-Mail antworten, wenn du magst -- ansonsten musst du nichts weiter tun.\n\nViele Grüße\nMRH Beratung & Coaching`,
+      replyTo: absender.email,
+    })
+  } catch {
+    res.status(500).json({ error: 'Nachricht konnte nicht versendet werden.' })
+    return
+  }
+
+  const { error: logError } = await supabase
+    .from('peer_interesse')
+    .insert({ von_coachie_id: coachieId, zu_coachie_id: zielCoachieId })
+
+  if (logError) {
+    res.status(500).json({ error: logError.message })
+    return
+  }
+
+  res.status(200).json({ status: 'gesendet' })
+}
+
 async function handleZertifikat(req, res, supabase) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Methode nicht erlaubt.' })
@@ -380,6 +497,11 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'faq-chat') {
     await handleFaqChat(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'peer-interesse') {
+    await handlePeerInteresse(req, res, supabase)
     return
   }
 
