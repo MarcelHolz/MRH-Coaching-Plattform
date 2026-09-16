@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
 
@@ -140,6 +140,13 @@ export default function LoginPage() {
               </div>
             </form>
           )}
+
+          <Link
+            to="/vertrag-kuendigen"
+            className="mt-6 block text-sm text-mrh-grey hover:underline"
+          >
+            Vertrag kündigen
+          </Link>
         </div>
       </div>
 
