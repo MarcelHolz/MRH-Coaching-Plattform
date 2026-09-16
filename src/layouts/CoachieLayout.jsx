@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { initialen } from '../lib/initialen'
 import FaqChatWidget from '../components/FaqChatWidget'
+import OnboardingTour from '../components/OnboardingTour'
 
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
@@ -25,9 +26,16 @@ const MARKEN_LINKS = [
 ]
 
 export default function CoachieLayout() {
-  const { coachie, session, logout } = useAuth()
+  const { coachie, session, logout, istErsterLogin } = useAuth()
   const navigate = useNavigate()
   const [menuOffen, setMenuOffen] = useState(false)
+  // Einmal beim Mount erfassen (nicht bei jedem Render neu aus dem
+  // Context lesen): CoachieDashboardPage konsumiert istErsterLogin in
+  // einem eigenen Effekt und setzt es kurz danach auf false zurück --
+  // ohne den Lazy-Initializer würde das Tour-Overlay dadurch sofort
+  // wieder verschwinden, statt einmal vollständig durchlaufen zu
+  // werden.
+  const [tourOffen, setTourOffen] = useState(() => istErsterLogin)
 
   async function handleLogout() {
     await logout()
@@ -60,6 +68,12 @@ export default function CoachieLayout() {
                 {coachie.name}
               </span>
             )}
+            <button
+              onClick={() => setTourOffen(true)}
+              className="rounded-lg border border-white/30 px-3 py-1.5 transition hover:bg-white/10"
+            >
+              Rundgang
+            </button>
             <button
               onClick={handleLogout}
               className="rounded-lg border border-white/30 px-3 py-1.5 transition hover:bg-white/10"
@@ -153,6 +167,7 @@ export default function CoachieLayout() {
         </div>
       </footer>
       {session?.access_token && <FaqChatWidget accessToken={session.access_token} />}
+      <OnboardingTour offen={tourOffen} onClose={() => setTourOffen(false)} />
     </div>
   )
 }
