@@ -13,6 +13,7 @@ import TestimonialFormPage from './pages/TestimonialFormPage'
 import SearchPage from './pages/SearchPage'
 import EinstellungenPage from './pages/EinstellungenPage'
 import ZertifikatePage from './pages/ZertifikatePage'
+import MeilensteinePage from './pages/MeilensteinePage'
 import EventsPage from './pages/EventsPage'
 import PeerGroupPage from './pages/PeerGroupPage'
 
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="suche" element={<SearchPage />} />
               <Route path="einstellungen" element={<EinstellungenPage />} />
               <Route path="zertifikate" element={<ZertifikatePage />} />
+              <Route path="meilensteine" element={<MeilensteinePage />} />
               <Route path="termine" element={<EventsPage />} />
               <Route path="peer-group" element={<PeerGroupPage />} />
             </Route>
