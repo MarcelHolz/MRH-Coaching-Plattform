@@ -14,6 +14,7 @@ import SearchPage from './pages/SearchPage'
 import EinstellungenPage from './pages/EinstellungenPage'
 import ZertifikatePage from './pages/ZertifikatePage'
 import MeilensteinePage from './pages/MeilensteinePage'
+import EventsPage from './pages/EventsPage'
 import PeerGroupPage from './pages/PeerGroupPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
@@ -30,6 +31,7 @@ import AdminEmpfehlungenPage from './admin/AdminEmpfehlungenPage'
 import AdminEntwuerfePage from './admin/AdminEntwuerfePage'
 import AdminFaqPage from './admin/AdminFaqPage'
 import AdminVollstaendigkeitPage from './admin/AdminVollstaendigkeitPage'
+import AdminEventsPage from './admin/AdminEventsPage'
 
 export default function App() {
   return (
@@ -69,6 +71,7 @@ export default function App() {
               <Route path="einstellungen" element={<EinstellungenPage />} />
               <Route path="zertifikate" element={<ZertifikatePage />} />
               <Route path="meilensteine" element={<MeilensteinePage />} />
+              <Route path="termine" element={<EventsPage />} />
               <Route path="peer-group" element={<PeerGroupPage />} />
             </Route>
 
@@ -98,6 +101,7 @@ export default function App() {
                 path="vollstaendigkeit"
                 element={<AdminVollstaendigkeitPage />}
               />
+              <Route path="events" element={<AdminEventsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" replace />} />

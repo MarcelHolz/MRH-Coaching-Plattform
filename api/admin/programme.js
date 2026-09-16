@@ -291,6 +291,104 @@ async function handleFaq(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Admin-CRUD für den Events-Kalender (Live-Calls/Webinare/Gruppen-
+// termine, events.sql). programm_id = null -> plattformweit sichtbar,
+// sonst nur für Coachies mit einer coachie_programme-Zeile für dieses
+// Programm (siehe RLS-Policy in der Migration). Coachies lesen die
+// Liste direkt über den Supabase-Client, hier nur die Admin-Pflege.
+async function handleEvents(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, programme(titel)')
+      .order('start_zeitpunkt', { ascending: true })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ events: data })
+    return
+  }
+
+  if (req.method === 'POST') {
+    const { titel, beschreibung, start_zeitpunkt, ende_zeitpunkt, link, programm_id } =
+      req.body ?? {}
+
+    if (!titel || !start_zeitpunkt) {
+      res.status(400).json({ error: 'titel und start_zeitpunkt sind erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        titel,
+        beschreibung: beschreibung || null,
+        start_zeitpunkt,
+        ende_zeitpunkt: ende_zeitpunkt || null,
+        link: link || null,
+        programm_id: programm_id || null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ event: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, ...updates } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ event: data })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.body ?? {}
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    const { error } = await supabase.from('events').delete().eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
   // Coachie-Selbstbedienung für das eigene Profilbild (Feature 2,
   // EinstellungenPage.jsx) -- bewusst vor dem requireAdmin-Gate, da
@@ -327,6 +425,11 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'faq') {
     await handleFaq(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'events') {
+    await handleEvents(req, res, supabase)
     return
   }
 
