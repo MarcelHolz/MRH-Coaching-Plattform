@@ -760,6 +760,10 @@ Development) zu setzen, siehe `.env.example`:
   `Authorization: Bearer $CRON_SECRET` bei jedem Cron-Aufruf.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` --
   All-Inkl-Postfachzugang für `info@mrh-beratung.de`.
+- `ADMIN_EMAIL` -- optional, Ziel-Adresse für interne Admin-
+  Benachrichtigungen (z. B. DSGVO-Löschungsanträge). Ohne gesetzte
+  Variable fällt der Versand auf `SMTP_FROM`/`SMTP_USER` zurück, d. h.
+  standardmäßig dasselbe Postfach `info@mrh-beratung.de`.
 
 ## Empfehlungsprogramm (technische Grundstruktur)
 
@@ -1348,3 +1352,36 @@ Bewusst kein volles Benachrichtigungscenter -- zwei konkrete Auslöser:
   Coachie-Anzahl als aktuell üblich müsste das auf einen asynchronen
   Batch-Versand umgestellt werden. Keine neue Migration, keine neue
   RLS -- reine Backend-Logik auf Basis bereits bestehender Tabellen.
+
+## DSGVO-Selbstauskunft im Coachie-Bereich
+
+Neuer Bereich "Meine Daten" in den Coachie-Einstellungen
+(`/coachie/einstellungen`), zweigeteilt:
+
+- **Meine Daten anzeigen:** strukturierte Übersicht der beim Coachie
+  gespeicherten Daten -- Stammdaten (Name, E-Mail), Kursfortschritt je
+  zugeordnetem Programm (Titel, Zeitpunkt der Zuordnung, Zugriff bis,
+  Fortschritt in %) und Testergebnisse (`coachie_testergebnisse`,
+  sofern über das Profil-Quiz verknüpft). Läuft komplett clientseitig
+  über den bestehenden Supabase-Client mit RLS ("coachie sieht eigene
+  Zeile/eigene Testergebnisse") -- kein neuer Endpunkt nötig, da diese
+  Policies für `coachies`, `coachie_programme` und
+  `coachie_testergebnisse` bereits bestehen. Lädt erst bei Klick, nicht
+  automatisch beim Öffnen der Einstellungen.
+- **Löschung beantragen:** löst **keine** automatische Löschung aus --
+  Löschung kollidiert potenziell mit bestehenden Vertrags-/
+  Rechnungsaufbewahrungspflichten. Stattdessen protokolliert der
+  Endpunkt den Antrag in der neuen Tabelle `loeschungsantraege` und
+  verschickt eine E-Mail an den Admin (`ADMIN_EMAIL`, siehe
+  Umgebungsvariablen oben) zur manuellen Prüfung und Bearbeitung. Der
+  Coachie bekommt zusätzlich eine Bestätigungsmail, dass der Antrag
+  eingegangen ist (best-effort, blockiert die eigentliche
+  Protokollierung/Admin-Benachrichtigung nicht).
+
+**Backend:** `api/certificate.js?resource=dsgvo-loeschung` (POST,
+coachie-authentifiziert über `requireCoachie`, kein neuer
+Function-Endpunkt).
+
+**Migration:** `supabase_migrations/dsgvo_loeschungsantrag.sql` --
+rein additiv (neue Tabelle `loeschungsantraege`), noch nicht auf der
+Live-DB ausgeführt.
