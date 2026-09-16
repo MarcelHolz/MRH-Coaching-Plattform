@@ -14,6 +14,7 @@ import SearchPage from './pages/SearchPage'
 import EinstellungenPage from './pages/EinstellungenPage'
 import ZertifikatePage from './pages/ZertifikatePage'
 import EventsPage from './pages/EventsPage'
+import PeerGroupPage from './pages/PeerGroupPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="einstellungen" element={<EinstellungenPage />} />
               <Route path="zertifikate" element={<ZertifikatePage />} />
               <Route path="termine" element={<EventsPage />} />
+              <Route path="peer-group" element={<PeerGroupPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
