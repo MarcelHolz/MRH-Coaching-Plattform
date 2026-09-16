@@ -170,10 +170,14 @@ async function ermittleTestimonialKandidaten(supabase, coachieId) {
   return kandidaten
 }
 
-function testimonialEinladungsText(coachie, kandidat, appUrl) {
+// bewertungLink kommt aus plattform_einstellungen.bewertung_link (admin-
+// pflegbar, siehe bewertungslink.sql) und ist optional -- solange der
+// Admin noch keinen Link hinterlegt hat, bleibt der Absatz einfach weg,
+// statt einen leeren/kaputten Link zu verschicken.
+function testimonialEinladungsText(coachie, kandidat, appUrl, bewertungLink) {
   const anrede = coachie.name ? `Hallo ${coachie.name},` : 'Hallo,'
 
-  return [
+  const zeilen = [
     anrede,
     '',
     `du hast "${kandidat.programmTitel}" komplett abgeschlossen -- herzlichen Glückwunsch!`,
@@ -181,7 +185,16 @@ function testimonialEinladungsText(coachie, kandidat, appUrl) {
     `Magst du kurz teilen, wie es für dich war? Das hilft anderen bei der Entscheidung: ${appUrl}/coachie/testimonial/${kandidat.programmId}`,
     '',
     'Nur wenn du möchtest -- ganz ohne Verpflichtung, und natürlich prüfen wir jeden Text, bevor er irgendwo erscheint.',
-  ].join('\n')
+  ]
+
+  if (bewertungLink) {
+    zeilen.push(
+      '',
+      `Falls du uns zusätzlich auch öffentlich eine Bewertung hinterlassen möchtest, würden wir uns riesig freuen: ${bewertungLink}`,
+    )
+  }
+
+  return zeilen.join('\n')
 }
 
 export default async function handler(req, res) {
@@ -194,6 +207,13 @@ export default async function handler(req, res) {
   const supabase = getSupabaseAdmin()
   const appUrl = process.env.APP_URL
   const jetzt = new Date()
+
+  const { data: einstellungen } = await supabase
+    .from('plattform_einstellungen')
+    .select('bewertung_link')
+    .eq('id', true)
+    .maybeSingle()
+  const bewertungLink = einstellungen?.bewertung_link || null
 
   const { data: coachies, error: coachiesError } = await supabase
     .from('coachies')
@@ -237,7 +257,7 @@ export default async function handler(req, res) {
           await sendMail({
             to: coachie.email,
             subject: `Herzlichen Glückwunsch zum Abschluss von "${testimonialKandidat.programmTitel}"`,
-            text: testimonialEinladungsText(coachie, testimonialKandidat, appUrl),
+            text: testimonialEinladungsText(coachie, testimonialKandidat, appUrl, bewertungLink),
           })
 
           await supabase

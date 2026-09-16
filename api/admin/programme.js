@@ -516,6 +516,52 @@ async function handleMitgliedschaftEinstellungen(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Admin-Pflege des externen Bewertungslinks (Google/Trustpilot), der
+// der automatischen Testimonial-Einladungsmail beigefügt wird
+// (api/cron/erinnerungen.js) -- Singleton-Muster analog zu
+// handleMitgliedschaftEinstellungen.
+async function handlePlattformEinstellungen(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('plattform_einstellungen')
+      .select('*')
+      .eq('id', true)
+      .maybeSingle()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ einstellungen: data })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { bewertung_link } = req.body ?? {}
+
+    const { data, error } = await supabase
+      .from('plattform_einstellungen')
+      .update({
+        bewertung_link: bewertung_link || null,
+        aktualisiert_am: new Date().toISOString(),
+      })
+      .eq('id', true)
+      .select()
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ einstellungen: data })
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 // Admin-CRUD für Mitglieder-Inhalte (Mitgliederbereich Punkt 4) --
 // analog zum bestehenden Material-Upload-Muster (siehe
 // handleBildUploadUrl/api/admin/sessions.js): der eigentliche
@@ -705,6 +751,11 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'mitgliedschaft-einstellungen') {
     await handleMitgliedschaftEinstellungen(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'plattform-einstellungen') {
+    await handlePlattformEinstellungen(req, res, supabase)
     return
   }
 
