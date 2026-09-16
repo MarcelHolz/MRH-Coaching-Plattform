@@ -99,10 +99,24 @@ async function handleMitgliedschaftVorschau(req, res, supabase) {
 // Kurskauf. Der eigentliche Mitgliedschafts-Datensatz wird erst im
 // Webhook (checkout.session.completed mit session.mode ===
 // 'subscription') angelegt, wie beim bestehenden Kurs-Kauf-Flow.
+//
+// Bugfix: line_items[].price verlangt zwingend die ID eines
+// bestehenden Stripe-Price-Objekts, niemals einen rohen Betrag --
+// das vorher hier verwendete stripe_price_id-Feld setzte voraus, dass
+// vorab manuell ein echter Price in Stripe angelegt und seine ID
+// admin-seitig eingetragen wird. Fehlte dieser Schritt oder wurde
+// versehentlich der Betrag statt einer price_...-ID eingetragen, schlug
+// JEDER Checkout mit "The price parameter should be the ID of a price
+// object, rather than the literal numerical price." fehl. price_data
+// erzeugt den Price stattdessen bei jedem Checkout automatisch inline
+// aus dem ohnehin admin-pflegbaren preis_cent -- kein manueller
+// Stripe-Dashboard-Schritt mehr nötig, und derselbe Wert steuert damit
+// sowohl die öffentliche Vorschau (handleMitgliedschaftVorschau) als
+// auch den tatsächlichen Checkout-Preis.
 async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
   const { data: einstellungen, error } = await supabase
     .from('mitgliedschaft_einstellungen')
-    .select('stripe_price_id')
+    .select('titel, preis_cent')
     .eq('id', true)
     .maybeSingle()
 
@@ -111,7 +125,7 @@ async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
     return
   }
 
-  if (!einstellungen?.stripe_price_id) {
+  if (!einstellungen?.preis_cent) {
     res.status(404).json({ error: 'Mitgliedschaft ist aktuell nicht buchbar.' })
     return
   }
@@ -124,7 +138,17 @@ async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
 
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
-    line_items: [{ price: einstellungen.stripe_price_id, quantity: 1 }],
+    line_items: [
+      {
+        price_data: {
+          currency: 'eur',
+          unit_amount: einstellungen.preis_cent,
+          recurring: { interval: 'month' },
+          product_data: { name: einstellungen.titel || 'MRH Community-Mitgliedschaft' },
+        },
+        quantity: 1,
+      },
+    ],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/mitgliedschaft?abgebrochen=1`,
     metadata: { typ: 'mitgliedschaft' },
