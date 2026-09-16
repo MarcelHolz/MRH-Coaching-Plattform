@@ -30,6 +30,7 @@ function formatDatum(iso) {
 export default function AdminMitgliedschaftPage() {
   const [einstellungen, setEinstellungen] = useState(null)
   const [mitgliedschaften, setMitgliedschaften] = useState([])
+  const [coachies, setCoachies] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [speichert, setSpeichert] = useState(false)
@@ -41,13 +42,18 @@ export default function AdminMitgliedschaftPage() {
   const [stripePriceId, setStripePriceId] = useState('')
   const [bezahltext, setBezahltext] = useState('')
 
+  const [ausgewaehlterCoachie, setAusgewaehlterCoachie] = useState('')
+  const [hinzufuegen, setHinzufuegen] = useState(false)
+  const [entfernenId, setEntfernenId] = useState(null)
+
   async function laden() {
     setLoading(true)
     setError('')
     try {
-      const [einstellungenData, mitgliedschaftenData] = await Promise.all([
+      const [einstellungenData, mitgliedschaftenData, coachiesData] = await Promise.all([
         adminFetch('/api/admin/programme?resource=mitgliedschaft-einstellungen'),
         adminFetch('/api/admin/coachies?resource=mitgliedschaften'),
+        adminFetch('/api/admin/coachies'),
       ])
       const e = einstellungenData.einstellungen
       setEinstellungen(e)
@@ -57,6 +63,7 @@ export default function AdminMitgliedschaftPage() {
       setStripePriceId(e?.stripe_price_id ?? '')
       setBezahltext(e?.bezahltext ?? '')
       setMitgliedschaften(mitgliedschaftenData.mitgliedschaften ?? [])
+      setCoachies(coachiesData.coachies ?? [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -67,6 +74,51 @@ export default function AdminMitgliedschaftPage() {
   useEffect(() => {
     laden()
   }, [])
+
+  // Coachies, die noch keine Mitgliedschafts-Zeile haben (egal welchen
+  // Status) -- coachie_id ist in mitgliedschaften unique, ein Coachie
+  // mit bestehender (auch gekündigter) Zeile kann hier also nicht
+  // erneut manuell hinzugefügt werden.
+  const coachiesOhneMitgliedschaft = coachies.filter(
+    (c) => !mitgliedschaften.some((m) => m.coachie_id === c.id),
+  )
+
+  async function handleHinzufuegen(event) {
+    event.preventDefault()
+    if (!ausgewaehlterCoachie) return
+
+    setHinzufuegen(true)
+    setError('')
+    try {
+      await adminFetch('/api/admin/coachies?resource=mitgliedschaften', {
+        method: 'POST',
+        body: JSON.stringify({ coachie_id: ausgewaehlterCoachie }),
+      })
+      setAusgewaehlterCoachie('')
+      await laden()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setHinzufuegen(false)
+    }
+  }
+
+  async function handleEntfernen(id) {
+    if (!window.confirm('Mitgliedschaft wirklich entfernen?')) return
+
+    setEntfernenId(id)
+    setError('')
+    try {
+      await adminFetch(`/api/admin/coachies?resource=mitgliedschaften&id=${id}`, {
+        method: 'DELETE',
+      })
+      await laden()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setEntfernenId(null)
+    }
+  }
 
   async function handleSpeichern(event) {
     event.preventDefault()
@@ -191,6 +243,47 @@ export default function AdminMitgliedschaftPage() {
       </form>
 
       <h2 className="mb-3 font-semibold text-slate-800">Mitglieder</h2>
+
+      <form
+        onSubmit={handleHinzufuegen}
+        className="mb-4 flex flex-wrap items-end gap-2 rounded-xl bg-white p-4 shadow-sm"
+      >
+        <div className="min-w-[14rem] flex-1">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            Coachie manuell als Mitglied hinzufügen
+          </label>
+          <select
+            value={ausgewaehlterCoachie}
+            onChange={(e) => setAusgewaehlterCoachie(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-gold focus:outline-none"
+          >
+            <option value="">Coachie wählen…</option>
+            {coachiesOhneMitgliedschaft.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.email})
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="submit"
+          disabled={!ausgewaehlterCoachie || hinzufuegen}
+          className="rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark disabled:opacity-50"
+        >
+          {hinzufuegen ? 'Fügt hinzu…' : 'Hinzufügen'}
+        </button>
+      </form>
+      {coachiesOhneMitgliedschaft.length === 0 && coachies.length > 0 && (
+        <p className="mb-4 text-xs text-mrh-grey">
+          Alle Coachies haben bereits eine Mitgliedschaft.
+        </p>
+      )}
+      <p className="mb-4 text-xs text-mrh-grey">
+        Manuell hinzugefügte Mitglieder (z. B. Freiplätze) laufen ohne
+        Stripe-Abo -- es findet keine Abbuchung statt und &bdquo;Nächste
+        Abrechnung&ldquo; bleibt leer.
+      </p>
+
       {mitgliedschaften.length === 0 ? (
         <p className="text-sm text-slate-400">Noch keine Mitgliedschaften.</p>
       ) : (
@@ -214,6 +307,13 @@ export default function AdminMitgliedschaftPage() {
                 >
                   {STATUS_LABEL[m.status] ?? m.status}
                 </span>
+                <button
+                  onClick={() => handleEntfernen(m.id)}
+                  disabled={entfernenId === m.id}
+                  className="rounded-lg border border-red-300 px-2 py-1 text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                >
+                  {entfernenId === m.id ? 'Entfernt…' : 'Entfernen'}
+                </button>
               </div>
             </div>
           ))}

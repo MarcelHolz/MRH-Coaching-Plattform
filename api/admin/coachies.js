@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { requireAdmin } from '../_lib/adminAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
@@ -198,26 +199,93 @@ async function handleEmpfehlungen(req, res, supabase) {
   res.status(200).json({ empfehlungen: data })
 }
 
-// Admin-Übersicht der Mitgliedschaften (Mitgliederbereich Punkt 1) --
-// rein lesend, Status/Abrechnung werden ausschließlich über den
-// Stripe-Webhook gepflegt (siehe api/webhooks/stripe.js).
+// Admin-Übersicht der Mitgliedschaften (Mitgliederbereich Punkt 1).
+// Status/Abrechnung einer echten (bezahlten) Mitgliedschaft werden
+// weiterhin ausschließlich über den Stripe-Webhook gepflegt (siehe
+// api/webhooks/stripe.js) -- POST/DELETE hier decken ausschließlich den
+// Sonderfall ab, dass ein Admin einen Coachie manuell (z. B. als
+// Freiplatz/Ehrenmitgliedschaft) als Mitglied hinzufügen bzw. eine so
+// manuell angelegte Mitgliedschaft wieder entfernen möchte -- ohne
+// jeden Bezug zu Stripe.
 async function handleMitgliedschaften(req, res, supabase) {
-  if (req.method !== 'GET') {
-    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('mitgliedschaften')
+      .select('*, coachies(name, email)')
+      .order('start_datum', { ascending: false })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ mitgliedschaften: data })
     return
   }
 
-  const { data, error } = await supabase
-    .from('mitgliedschaften')
-    .select('*, coachies(name, email)')
-    .order('start_datum', { ascending: false })
+  if (req.method === 'POST') {
+    const { coachie_id } = req.body ?? {}
 
-  if (error) {
-    res.status(500).json({ error: error.message })
+    if (!coachie_id) {
+      res.status(400).json({ error: 'coachie_id ist erforderlich.' })
+      return
+    }
+
+    // stripe_subscription_id ist in der Tabelle not null + unique (siehe
+    // mitgliederbereich.sql) -- ein "manual-..."-Präfix statt eines
+    // echten Stripe-Werts macht auf einen Blick erkennbar, dass diese
+    // Zeile nicht über einen Kauf, sondern manuell entstanden ist, und
+    // stellt zugleich die Eindeutigkeit sicher.
+    const { data, error } = await supabase
+      .from('mitgliedschaften')
+      .insert({
+        coachie_id,
+        status: 'aktiv',
+        stripe_subscription_id: `manual-${crypto.randomUUID()}`,
+      })
+      .select('*, coachies(name, email)')
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        res.status(409).json({
+          error: 'Dieser Coachie hat bereits eine Mitgliedschaft (siehe Liste unten).',
+        })
+        return
+      }
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(201).json({ mitgliedschaft: data })
     return
   }
 
-  res.status(200).json({ mitgliedschaften: data })
+  if (req.method === 'DELETE') {
+    const { id } = req.query
+
+    if (!id) {
+      res.status(400).json({ error: 'id ist erforderlich.' })
+      return
+    }
+
+    // Entfernt ausschließlich die Datenbankzeile. Bei einer echten,
+    // über Stripe bezahlten Mitgliedschaft läuft die zugehörige
+    // Stripe-Subscription dadurch NICHT mit -- die müsste separat im
+    // Stripe-Dashboard gekündigt werden, sonst wird der Coachie
+    // weiterbelastet, obwohl die App ihn nicht mehr als Mitglied führt.
+    const { error } = await supabase.from('mitgliedschaften').delete().eq('id', id)
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(204).end()
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
 async function handleAssignments(req, res, supabase) {

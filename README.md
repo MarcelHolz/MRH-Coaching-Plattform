@@ -1430,3 +1430,32 @@ LinkedIn-API-Integration, wie im Auftrag vorgesehen.
 
 **Komponente:** `src/components/LinkedInShareButton.jsx`. Rein
 clientseitig, keine neue Migration, kein neuer Endpunkt.
+
+## Mitglied manuell hinzufügen (Admin)
+
+Bugfix: Mitgliedschaften (`mitgliedschaften`) wurden bisher ausschließlich
+über den Stripe-Webhook angelegt -- **Admin → Community → Mitgliedschaft**
+zeigte sie nur rein lesend an, ohne Möglichkeit, einen Coachie ohne
+Stripe-Kauf als Mitglied hinzuzufügen (z. B. für Freiplätze/
+Ehrenmitgliedschaften).
+
+Neu: ein Formular "Coachie manuell als Mitglied hinzufügen" oberhalb
+der Mitgliederliste sowie ein "Entfernen"-Button je Zeile.
+`stripe_subscription_id` ist in der Tabelle `not null unique` -- eine
+manuell angelegte Zeile bekommt daher einen synthetischen Wert
+(`manual-<uuid>`), erkennbar am Präfix, statt echter Stripe-Daten.
+Ein Coachie kann laut Schema nur eine Mitgliedschaft haben
+(`coachie_id` unique); der Coachie-Picker im Formular zeigt deshalb nur
+Coachies ohne bestehende Zeile an.
+
+**Wichtig:** "Entfernen" löscht ausschließlich die Datenbankzeile. Bei
+einer echten, über Stripe bezahlten Mitgliedschaft läuft die
+zugehörige Stripe-Subscription dadurch **nicht** mit -- die muss
+zusätzlich im Stripe-Dashboard gekündigt werden, sonst wird der
+Coachie weiterbelastet, obwohl die App ihn nicht mehr als Mitglied
+führt.
+
+**Backend:** `api/admin/coachies.js?resource=mitgliedschaften` (POST/
+DELETE ergänzt, GET unverändert) -- kein neuer Function-Endpunkt, keine
+neue Migration, keine RLS-Änderung (der Admin-Zugriff läuft ohnehin
+über `service_role` und umgeht RLS).
