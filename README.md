@@ -722,7 +722,10 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   `api/public/programme.js`), POST (Stripe Checkout Session, jetzt mit
   optionalem `ref`-Empfehlungscode), `?resource=mitgliedschaft` (GET
   öffentliche Preis-/Textvorschau, POST Subscription-Checkout-Session
-  für die Mitgliedschaft, siehe README-Abschnitt "Mitgliederbereich").
+  für die Mitgliedschaft, siehe README-Abschnitt "Mitgliederbereich"),
+  `?resource=kuendigung` (POST, öffentlich, Kündigungsbutton § 312k
+  BGB für beide Vertragsarten, siehe README-Abschnitt
+  "Kündigungsbutton (§ 312k BGB)").
 
 Ergebnis: 12 Functions (`admin/coachies.js`, `admin/login.js`,
 `admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
@@ -1172,3 +1175,65 @@ Stripe-Webhook-Endpunkt die drei neuen Event-Typen aktivieren
 `invoice.payment_failed`) -- der Endpunkt selbst ändert sich nicht
 (`api/webhooks/stripe.js`), nur die dort abonnierten Event-Typen in
 den Stripe-Webhook-Einstellungen.
+
+## Kündigungsbutton (§ 312k BGB)
+
+Permanent erreichbare, eigenständige Seite `/vertrag-kuendigen`
+(`src/pages/VertragKuendigenPage.jsx`) -- **ohne Login-Zwang**,
+verlinkt von der Login-Seite (`LoginPage.jsx`) und zusätzlich im
+Footer des Coachie-Bereichs (`CoachieLayout.jsx`). Bewusst **ein
+generischer Baustein für beide Vertragsarten** (Mitgliedschaft und
+Kurszugriff) statt zweier getrennter Lösungen, wie im Auftrag
+gefordert.
+
+> **Kein Ersatz für rechtliche Prüfung.** Diese Umsetzung folgt der im
+> Auftrag beschriebenen Rechtslage (u. a. eine für Juli 2026 genannte
+> BGH-Entscheidung), die sich in der Sandbox, in der dieser Code
+> entstanden ist, nicht unabhängig verifizieren ließ (kein Zugriff auf
+> eine juristische Datenbank). Vor dem Live-Einsatz bitte juristisch
+> gegenprüfen -- insbesondere ob eine **sofortige** Kündigung der
+> Mitgliedschaft (statt zum Ende der bereits bezahlten Abrechnungs-
+> periode) hier tatsächlich zutreffend ist; aktuell ist es sofort
+> umgesetzt, siehe unten.
+
+**Ablauf (eine Seite, drei interne Schritte, keine Marketing-Elemente,
+kein Nav):**
+
+1. E-Mail-Adresse eingeben.
+2. Liste der kündbaren Verträge (aktive Mitgliedschaft und/oder nicht
+   bereits gekündigte Kurszugänge) -- bei unbekannter E-Mail-Adresse
+   bewusst dieselbe neutrale "kein Vertrag gefunden"-Anzeige statt
+   eines Fehlers, analog zum bestehenden Passwort-vergessen-Muster
+   (verrät nicht, ob eine E-Mail-Adresse als Coachie existiert).
+3. Bestätigungsseite -- **ausschließlich** die Kündigungsbestätigung,
+   keine weiteren Inhalte, keine Angebote, kein Zurück-Link.
+
+**Backend:** `api/checkout.js?resource=kuendigung` (POST, öffentlich,
+kein neuer Function-Endpunkt) -- ein Zweig für die Vertragssuche
+({email}), ein Zweig für die Ausführung ({email, vertragTyp,
+vertragId}):
+
+- **Mitgliedschaft:** `stripe.subscriptions.cancel()` (sofortige
+  Kündigung, nicht `cancel_at_period_end`) + `mitgliedschaften.status
+  = 'gekuendigt'` sofort -- Zugriff auf Mitglieder-Inhalte/-Termine
+  endet damit sofort (RLS greift unmittelbar).
+- **Kurszugriff:** kein Stripe-Vorgang nötig (Einmalzahlung, keine
+  Subscription) -- setzt nur `coachie_programme.gekuendigt_am`
+  (neue Spalte). **Kein sofortiger Zugriffsentzug:**
+  `zugriff_bis` bleibt unverändert maßgeblich, der bereits bezahlte
+  Zeitraum bleibt nutzbar; `gekuendigt_am` hält nur fest, dass keine
+  automatische Verlängerung mehr stattfinden soll, falls es künftig
+  einmal eine gäbe (aktuell gibt es keine).
+
+**Nachweis:** Jede ausgeführte Kündigung wird in der neuen Tabelle
+`kuendigungen` protokolliert (Zeitpunkt, E-Mail, betroffener Vertrag)
+-- unveränderlicher Beleg unabhängig vom späteren Stand von
+`mitgliedschaften.status`/`coachie_programme.gekuendigt_am`. Zusätzlich
+verschickt der Endpunkt eine Bestätigungsmail an den Kunden ("Eingang
+deiner Kündigung vom ...") als Nachweis für den Zugang der Erklärung --
+ein Fehlversand blockiert die bereits ausgeführte Kündigung nicht mehr.
+
+**Migration:** `supabase_migrations/kuendigung.sql` -- rein additiv
+(neue Tabelle `kuendigungen`, neue Spalte
+`coachie_programme.gekuendigt_am`), noch nicht auf der Live-DB
+ausgeführt.

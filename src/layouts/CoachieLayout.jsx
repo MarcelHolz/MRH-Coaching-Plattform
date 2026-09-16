@@ -165,6 +165,12 @@ export default function CoachieLayout() {
               </a>
             ))}
           </div>
+          <Link
+            to="/vertrag-kuendigen"
+            className="mt-4 inline-block text-xs text-mrh-grey hover:underline"
+          >
+            Vertrag kündigen
+          </Link>
         </div>
       </footer>
       {session?.access_token && <FaqChatWidget accessToken={session.access_token} />}
