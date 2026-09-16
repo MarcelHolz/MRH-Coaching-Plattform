@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { requireCoachie } from './_lib/coachieAuth.js'
 import { sendMail } from './_lib/mailer.js'
+import { getStripe } from './_lib/stripeClient.js'
 
 // Serverseitige PDF-Erzeugung mit pdf-lib (leichtgewichtig, kein
 // Headless-Browser nötig). Kein Bild-Logo eingebunden -- es liegt
@@ -487,11 +488,70 @@ async function handleZertifikat(req, res, supabase) {
   res.status(200).end(Buffer.from(pdfBytes))
 }
 
+// Rechnungs-Download im Coachie-Bereich (Punkt 2): keine eigene
+// Rechnungserzeugung -- Stripe liefert die PDFs/Hosted-Invoice-Links
+// bereits automatisch (Subscriptions immer, Payment-Mode-Sessions seit
+// der customer_creation/invoice_creation-Ergänzung in
+// api/checkout.js). Diese Route liest nur, was Stripe über die
+// gespeicherte stripe_customer_id ohnehin schon bereitstellt.
+async function handleRechnungen(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const coachieId = await requireCoachie(req, res, supabase)
+  if (!coachieId) return
+
+  const { data: coachie, error: coachieError } = await supabase
+    .from('coachies')
+    .select('stripe_customer_id')
+    .eq('id', coachieId)
+    .maybeSingle()
+
+  if (coachieError) {
+    res.status(500).json({ error: coachieError.message })
+    return
+  }
+
+  if (!coachie?.stripe_customer_id) {
+    res.status(200).json({ rechnungen: [] })
+    return
+  }
+
+  try {
+    const stripe = getStripe()
+    const invoices = await stripe.invoices.list({
+      customer: coachie.stripe_customer_id,
+      limit: 100,
+    })
+
+    const rechnungen = invoices.data.map((invoice) => ({
+      nummer: invoice.number,
+      datum: new Date(invoice.created * 1000).toISOString(),
+      betragCent: invoice.amount_paid,
+      waehrung: invoice.currency,
+      status: invoice.status,
+      hostedInvoiceUrl: invoice.hosted_invoice_url,
+      invoicePdf: invoice.invoice_pdf,
+    }))
+
+    res.status(200).json({ rechnungen })
+  } catch (err) {
+    res.status(502).json({ error: `Rechnungen konnten nicht geladen werden: ${err.message}` })
+  }
+}
+
 export default async function handler(req, res) {
   const supabase = getSupabaseAdmin()
 
   if (req.query.resource === 'empfehlung') {
     await handleEmpfehlung(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'rechnungen') {
+    await handleRechnungen(req, res, supabase)
     return
   }
 

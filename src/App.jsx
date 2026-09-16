@@ -18,6 +18,7 @@ import EventsPage from './pages/EventsPage'
 import PeerGroupPage from './pages/PeerGroupPage'
 import MitgliedschaftPage from './pages/MitgliedschaftPage'
 import MitgliederBereichPage from './pages/MitgliederBereichPage'
+import RechnungenPage from './pages/RechnungenPage'
 import VertragKuendigenPage from './pages/VertragKuendigenPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
@@ -81,6 +82,7 @@ export default function App() {
               <Route path="termine" element={<EventsPage />} />
               <Route path="peer-group" element={<PeerGroupPage />} />
               <Route path="mitgliederbereich" element={<MitgliederBereichPage />} />
+              <Route path="rechnungen" element={<RechnungenPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
