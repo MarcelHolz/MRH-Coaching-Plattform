@@ -13,6 +13,7 @@ import TestimonialFormPage from './pages/TestimonialFormPage'
 import SearchPage from './pages/SearchPage'
 import EinstellungenPage from './pages/EinstellungenPage'
 import ZertifikatePage from './pages/ZertifikatePage'
+import EventsPage from './pages/EventsPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -28,6 +29,7 @@ import AdminEmpfehlungenPage from './admin/AdminEmpfehlungenPage'
 import AdminEntwuerfePage from './admin/AdminEntwuerfePage'
 import AdminFaqPage from './admin/AdminFaqPage'
 import AdminVollstaendigkeitPage from './admin/AdminVollstaendigkeitPage'
+import AdminEventsPage from './admin/AdminEventsPage'
 
 export default function App() {
   return (
@@ -66,6 +68,7 @@ export default function App() {
               <Route path="suche" element={<SearchPage />} />
               <Route path="einstellungen" element={<EinstellungenPage />} />
               <Route path="zertifikate" element={<ZertifikatePage />} />
+              <Route path="termine" element={<EventsPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -94,6 +97,7 @@ export default function App() {
                 path="vollstaendigkeit"
                 element={<AdminVollstaendigkeitPage />}
               />
+              <Route path="events" element={<AdminEventsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" replace />} />

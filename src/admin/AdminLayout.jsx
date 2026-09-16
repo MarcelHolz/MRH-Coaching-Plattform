@@ -35,6 +35,10 @@ const NAV_GROUPS = [
     label: 'Wissen',
     items: [{ to: '/admin/faq', label: 'FAQ-Chat' }],
   },
+  {
+    label: 'Community',
+    items: [{ to: '/admin/events', label: 'Events' }],
+  },
 ]
 
 function NavLinks({ onNavigate }) {
