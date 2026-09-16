@@ -4,11 +4,20 @@ import { useAuth } from '../context/AuthContext'
 import AvatarUpload from '../components/AvatarUpload'
 import { initialen } from '../lib/initialen'
 
+function formatEmpfehlungsDatum(iso) {
+  return new Date(iso).toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
 // Empfehlungsprogramm: zeigt den persönlichen, lazy vergebenen
 // Empfehlungscode (api/certificate.js?resource=empfehlung) plus einen
-// fertigen Beispiellink zum Kopieren. Belohnungslogik (Rabatt,
-// Guthaben, o.ä.) ist bewusst noch nicht abgebildet -- das entscheidet
-// Marcel später, siehe README-Abschnitt "Empfehlungsprogramm".
+// fertigen Beispiellink zum Kopieren und eine Liste der eigenen
+// erfolgreichen Empfehlungen. Belohnungslogik (Rabatt, Guthaben, o.ä.)
+// ist bewusst noch nicht abgebildet -- das entscheidet Marcel später,
+// siehe README-Abschnitt "Empfehlungsprogramm".
 function EmpfehlungsprogrammSection({ accessToken }) {
   const [daten, setDaten] = useState(null)
   const [fehler, setFehler] = useState('')
@@ -103,6 +112,36 @@ function EmpfehlungsprogrammSection({ accessToken }) {
           </div>
         </>
       )}
+
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+          Deine erfolgreichen Empfehlungen
+        </p>
+        {daten.empfehlungen.length === 0 ? (
+          <p className="text-sm text-mrh-grey">
+            Noch keine -- teile deinen Code oder Link, um loszulegen.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {daten.empfehlungen.map((eintrag) => (
+              <li
+                key={eintrag.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-sm"
+              >
+                <span className="text-slate-700">
+                  {eintrag.geworbener?.name ?? 'Unbekannt'}
+                  {eintrag.programme?.titel && (
+                    <span className="text-mrh-grey"> · {eintrag.programme.titel}</span>
+                  )}
+                </span>
+                <span className="text-xs text-mrh-grey">
+                  {formatEmpfehlungsDatum(eintrag.erstellt_am)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }

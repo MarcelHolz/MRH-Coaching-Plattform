@@ -85,7 +85,25 @@ async function handleEmpfehlung(req, res, supabase) {
     .limit(1)
     .maybeSingle()
 
-  res.status(200).json({ code, beispielProgramm: beispielProgramm ?? null })
+  // Eigene erfolgreiche Empfehlungen, wie im Auftrag beschrieben
+  // ("wen er bereits erfolgreich geworben hat") -- Name des geworbenen
+  // Coachies plus Programm und Datum.
+  const { data: empfehlungen, error: empfehlungenError } = await supabase
+    .from('empfehlungen')
+    .select('id, erstellt_am, geworbener:coachies!geworbener_coachie_id(name), programme(titel)')
+    .eq('werber_coachie_id', coachieId)
+    .order('erstellt_am', { ascending: false })
+
+  if (empfehlungenError) {
+    res.status(500).json({ error: empfehlungenError.message })
+    return
+  }
+
+  res.status(200).json({
+    code,
+    beispielProgramm: beispielProgramm ?? null,
+    empfehlungen: empfehlungen ?? [],
+  })
 }
 
 // FAQ-Chat im Coachie-Bereich (Feature "KI-Chat für FAQs"): rein auf
