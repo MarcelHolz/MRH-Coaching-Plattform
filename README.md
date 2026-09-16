@@ -702,7 +702,9 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 - `api/admin/programme.js` — Standard (Programme), `?resource=testimonials`,
   `?resource=entwuerfe` (rein lesend, Review-Interface für
   Agent-Entwürfe, siehe README-Abschnitt "Review-Interface für
-  Agent-Entwürfe"), `?resource=faq` (FAQ-Pflege für den Coachie-Chat).
+  Agent-Entwürfe"), `?resource=faq` (FAQ-Pflege für den Coachie-Chat),
+  `?resource=events` (Admin-CRUD für den Events-Kalender, siehe
+  README-Abschnitt "Events-Kalender").
 - `api/certificate.js` — Standard/GET (PDF-Zertifikat), `?resource=faq-chat`
   (POST, FAQ-Chat für Coachies, siehe README-Abschnitt "FAQ-Chat für
   Coachies"), `?resource=empfehlung` (GET, persönlicher Empfehlungscode
@@ -928,6 +930,32 @@ selbst:
 Sobald diese Fragen geklärt und `LEXWARE_API_KEY` in Vercel hinterlegt
 sind, ist die eigentliche Implementierung ein überschaubarer,
 eigenständiger PR.
+
+## Events-Kalender
+
+Kalender-Bereich im Coachie-Bereich für Live-Calls, Webinare oder
+Gruppentermine. Neue, additive Tabelle `events`
+(`supabase_migrations/events.sql`): Titel, Beschreibung,
+Start-/Endzeitpunkt, optionaler Link (z. B. zu einem Videocall) und
+optionale `programm_id`.
+
+- `programm_id = NULL` → Termin ist **plattformweit** für alle
+  eingeloggten Coachies sichtbar.
+- `programm_id` gesetzt → Termin ist nur für Coachies mit einer
+  Zuordnung zu diesem Programm sichtbar (`coachie_programme`).
+
+**Admin-Pflege:** `src/admin/AdminEventsPage.jsx` (**Events** im
+Admin-Menü, neue Gruppe "Community") — Anlegen/Bearbeiten/Löschen,
+läuft über `api/admin/programme.js?resource=events` (`service_role`,
+kein neuer Function-Endpunkt).
+
+**Coachie-Ansicht:** `src/pages/EventsPage.jsx`
+(`/coachie/termine`, neuer Nav-Eintrag "Termine") — zeigt nur
+zukünftige Termine, sortiert nach Startzeitpunkt. Liest die Liste
+direkt über den Supabase-Client mit RLS (analog zu
+Testimonials/Lesezeichen), ganz ohne eigenen Endpunkt: Die Policy in
+`events.sql` filtert serverseitig bereits auf eigene Programme oder
+plattformweite Termine.
 
 ## Peer Group (Opt-in, reziprok)
 
