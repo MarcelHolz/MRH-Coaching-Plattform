@@ -331,6 +331,78 @@ async function handlePeerInteresse(req, res, supabase) {
   res.status(200).json({ status: 'gesendet' })
 }
 
+// DSGVO-Löschungsantrag (Art. 17 DSGVO): löst bewusst KEINE automatische
+// Löschung aus -- Löschung kollidiert potenziell mit bestehenden
+// Vertrags-/Rechnungsaufbewahrungspflichten (Stripe-Kaufhistorie u. Ä.),
+// deshalb hier nur Protokollierung + Benachrichtigung an den Admin zur
+// manuellen Prüfung. Die lesende Gegenseite ("Meine Daten anzeigen")
+// braucht keinen eigenen Endpunkt -- läuft clientseitig direkt über den
+// Supabase-Client mit RLS (coachies/coachie_programme/
+// coachie_testergebnisse haben bereits "coachie sieht eigene Zeile"-
+// Policies, siehe EinstellungenPage.jsx).
+async function handleDsgvoLoeschung(req, res, supabase) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
+  const coachieId = await requireCoachie(req, res, supabase)
+  if (!coachieId) return
+
+  const { data: coachie, error: coachieError } = await supabase
+    .from('coachies')
+    .select('name, email')
+    .eq('id', coachieId)
+    .maybeSingle()
+
+  if (coachieError) {
+    res.status(500).json({ error: coachieError.message })
+    return
+  }
+
+  const { error: insertError } = await supabase
+    .from('loeschungsantraege')
+    .insert({ coachie_id: coachieId })
+
+  if (insertError) {
+    res.status(500).json({ error: insertError.message })
+    return
+  }
+
+  // Benachrichtigung an den Admin ist der eigentliche Zweck dieses
+  // Endpunkts -- hier wird bewusst NICHT best-effort verfahren (anders
+  // als bei der Bestätigungsmail unten), da ohne diese Mail niemand von
+  // dem Antrag erfährt.
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER
+  try {
+    await sendMail({
+      to: adminEmail,
+      subject: 'DSGVO-Löschungsantrag eingegangen',
+      text: `Ein Coachie hat die Löschung seiner Daten beantragt.\n\nName: ${coachie?.name ?? 'unbekannt'}\nE-Mail: ${coachie?.email ?? 'unbekannt'}\n\nBitte manuell prüfen und bearbeiten -- keine automatische Löschung erfolgt, da dies mit bestehenden Vertrags-/Rechnungspflichten kollidieren kann.`,
+      replyTo: coachie?.email,
+    })
+  } catch (err) {
+    res.status(500).json({ error: `Benachrichtigung konnte nicht versendet werden: ${err.message}` })
+    return
+  }
+
+  // Bestätigung an den Coachie ist rein informativ -- ein Fehlversand
+  // blockiert den bereits protokollierten/gemeldeten Antrag nicht mehr.
+  if (coachie?.email) {
+    try {
+      await sendMail({
+        to: coachie.email,
+        subject: 'Dein Löschungsantrag ist eingegangen',
+        text: `Hallo${coachie.name ? ' ' + coachie.name : ''},\n\nwir haben deinen Antrag auf Löschung deiner Daten erhalten und prüfen ihn manuell -- das kann etwas dauern, insbesondere wenn bestehende Vertrags- oder Rechnungspflichten dem entgegenstehen. Wir melden uns bei dir.\n\nViele Grüße\nMRH Beratung & Coaching`,
+      })
+    } catch (err) {
+      console.error('Bestätigungsmail für Löschungsantrag konnte nicht versendet werden:', err.message)
+    }
+  }
+
+  res.status(200).json({ status: 'eingereicht' })
+}
+
 async function handleZertifikat(req, res, supabase) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Methode nicht erlaubt.' })
@@ -562,6 +634,11 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'peer-interesse') {
     await handlePeerInteresse(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'dsgvo-loeschung') {
+    await handleDsgvoLoeschung(req, res, supabase)
     return
   }
 
