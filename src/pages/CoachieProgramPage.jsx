@@ -6,6 +6,7 @@ import { toYoutubeEmbedUrl } from '../lib/youtube'
 import { toVimeoEmbedUrl } from '../lib/vimeo'
 import CalendlyWidget from '../components/CalendlyWidget'
 import ZertifikatButton from '../components/ZertifikatButton'
+import LinkedInShareButton from '../components/LinkedInShareButton'
 import { getSignedMaterialUrl } from '../lib/storage'
 import { renderMarkdown } from '../lib/markdown'
 
@@ -817,6 +818,10 @@ export default function CoachieProgramPage() {
           >
             Zurück zum Dashboard
           </Link>
+          <LinkedInShareButton
+            text={`Ich habe gerade ${programm?.titel ?? 'ein Programm'} bei MRH Beratung & Coaching abgeschlossen 🎉`}
+            url={window.location.origin}
+          />
           {hatZuordnung && session?.access_token && (
             <ZertifikatButton
               programmId={programId}

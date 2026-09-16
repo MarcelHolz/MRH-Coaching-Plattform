@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import LinkedInShareButton from '../components/LinkedInShareButton'
 
 // Reine, isoliert testbare Berechnungsfunktion (Feature "Fortschritts-
 // Badges"): leitet private Meilensteine ausschließlich aus bereits
@@ -36,6 +37,7 @@ export function berechneMeilensteine({ zuordnungen, module, sessions, statusList
         id: `programm-100-${zuordnung.programm_id}`,
         titel: `"${titel}" abgeschlossen`,
         datum: spaetestesDatum(abgeschlossen),
+        teilbar: `Programm "${titel}"`,
       })
     } else if (prozent >= 50) {
       badges.push({
@@ -58,6 +60,7 @@ export function berechneMeilensteine({ zuordnungen, module, sessions, statusList
           id: `modul-${modul.id}`,
           titel: `Modul "${modul.titel}" abgeschlossen`,
           datum: spaetestesDatum(modulSessions),
+          teilbar: `Modul "${modul.titel}"`,
         })
       }
     }
@@ -176,10 +179,18 @@ export default function MeilensteinePage() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mrh-gold/15 text-lg">
                 🏅
               </span>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="font-medium text-slate-800">{badge.titel}</p>
                 {badge.datum && (
                   <p className="text-xs text-mrh-grey">{formatDatum(badge.datum)}</p>
+                )}
+                {badge.teilbar && (
+                  <div className="mt-2">
+                    <LinkedInShareButton
+                      text={`Ich habe gerade ${badge.teilbar} bei MRH Beratung & Coaching abgeschlossen 🎉`}
+                      url={window.location.origin}
+                    />
+                  </div>
                 )}
               </div>
             </li>
