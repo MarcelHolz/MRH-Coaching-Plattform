@@ -931,6 +931,27 @@ Sobald diese Fragen geklärt und `LEXWARE_API_KEY` in Vercel hinterlegt
 sind, ist die eigentliche Implementierung ein überschaubarer,
 eigenständiger PR.
 
+## Automatisierte Onboarding-Sequenz
+
+Kurzes, geführtes Overlay (`src/components/OnboardingTour.jsx`) direkt
+nach dem allerersten Login, das auf die wichtigsten Bereiche hinweist:
+aktuelles Programm, Fortschrittsübersicht ("Meine Auswertungen"),
+FAQ-Chat, Lesezeichen-Funktion.
+
+**Bewusst keine neue Migration.** Das "einmalig automatisch zeigen"
+nutzt das bereits bestehende `erster_login_am`/`istErsterLogin` aus
+`AuthContext.jsx` (Feature "Aktives Onboarding nach Login", Phase 1) --
+`CoachieLayout.jsx` erfasst dessen Wert per Lazy-Initializer einmalig
+beim Mount (`useState(() => istErsterLogin)`). Nötig, weil
+`CoachieDashboardPage.jsx` denselben Flag in einem eigenen Effekt kurz
+danach konsumiert und auf `false` zurücksetzt -- ohne den
+Lazy-Initializer würde das Tour-Overlay dadurch sofort wieder
+verschwinden, statt einmal vollständig durchlaufen zu werden.
+
+**Erneuter Aufruf:** "Rundgang"-Button im Header (`CoachieLayout.jsx`)
+öffnet die Tour jederzeit erneut -- rein clientseitiger State, keine
+Persistenz nötig.
+
 ## Events-Kalender
 
 Kalender-Bereich im Coachie-Bereich für Live-Calls, Webinare oder
