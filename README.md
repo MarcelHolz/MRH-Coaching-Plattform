@@ -769,7 +769,8 @@ eigenständige, spätere Entscheidung. Ein Vorschlag dazu:
   Coachies) -- deckt so auch bereits bestehende Coachies ab, ohne
   Backfill-Migration. Sichtbar unter **Einstellungen** im Coachie-Bereich,
   zusammen mit einem fertigen Beispiellink (`/kaufen/<slug>?ref=<Code>`)
-  zum Kopieren.
+  zum Kopieren, sowie einer Liste der eigenen erfolgreichen Empfehlungen
+  (`empfehlungen` gefiltert auf `werber_coachie_id`, derselbe Endpunkt).
 - **Zuordnung:** `KaufenPage.jsx` merkt `?ref=` in `sessionStorage` und
   schickt es beim Checkout mit. `api/checkout.js` löst den Code zu einer
   `werber_coachie_id` auf und legt sie in die Stripe-Session-Metadaten --
