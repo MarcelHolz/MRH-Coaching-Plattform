@@ -199,6 +199,15 @@ async function handleCheckoutSession(req, res, supabase) {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/kaufen/${slug}?abgebrochen=1`,
+    // customer_creation: Payment-Mode-Sessions legen sonst nicht
+    // zuverlässig einen Stripe-Customer an -- ohne den gibt es später
+    // keine stripe_customer_id für den Rechnungs-Download (Punkt 2).
+    // invoice_creation: Payment-Mode-Sessions erzeugen sonst KEIN
+    // Stripe-Invoice-Objekt (das passiert automatisch nur bei
+    // Subscriptions) -- ohne das keine hosted_invoice_url/invoice_pdf.
+    // Gilt nur für ab jetzt neu erstellte Sessions, nicht rückwirkend.
+    customer_creation: 'always',
+    invoice_creation: { enabled: true },
     metadata: {
       programm_id: programm.id,
       ...(werberCoachieId ? { werber_coachie_id: werberCoachieId } : {}),
