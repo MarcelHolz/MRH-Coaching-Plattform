@@ -16,6 +16,8 @@ import ZertifikatePage from './pages/ZertifikatePage'
 import MeilensteinePage from './pages/MeilensteinePage'
 import EventsPage from './pages/EventsPage'
 import PeerGroupPage from './pages/PeerGroupPage'
+import MitgliedschaftPage from './pages/MitgliedschaftPage'
+import MitgliederBereichPage from './pages/MitgliederBereichPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -32,6 +34,8 @@ import AdminEntwuerfePage from './admin/AdminEntwuerfePage'
 import AdminFaqPage from './admin/AdminFaqPage'
 import AdminVollstaendigkeitPage from './admin/AdminVollstaendigkeitPage'
 import AdminEventsPage from './admin/AdminEventsPage'
+import AdminMitgliedschaftPage from './admin/AdminMitgliedschaftPage'
+import AdminMitgliederInhaltePage from './admin/AdminMitgliederInhaltePage'
 
 export default function App() {
   return (
@@ -42,6 +46,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/kaufen/:slug" element={<KaufenPage />} />
+            <Route path="/mitgliedschaft" element={<MitgliedschaftPage />} />
             <Route path="/kauf-erfolgreich" element={<KaufErfolgPage />} />
             <Route
               path="/passwort-festlegen"
@@ -73,6 +78,7 @@ export default function App() {
               <Route path="meilensteine" element={<MeilensteinePage />} />
               <Route path="termine" element={<EventsPage />} />
               <Route path="peer-group" element={<PeerGroupPage />} />
+              <Route path="mitgliederbereich" element={<MitgliederBereichPage />} />
             </Route>
 
             <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -102,6 +108,11 @@ export default function App() {
                 element={<AdminVollstaendigkeitPage />}
               />
               <Route path="events" element={<AdminEventsPage />} />
+              <Route path="mitgliedschaft" element={<AdminMitgliedschaftPage />} />
+              <Route
+                path="mitglieder-inhalte"
+                element={<AdminMitgliederInhaltePage />}
+              />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" replace />} />

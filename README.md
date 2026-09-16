@@ -687,7 +687,9 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
 - `api/admin/coachies.js` — Standard (Coachies), `?resource=resend`
   (Einladung erneut senden), `?resource=assignments`
   (Programm-Zuordnungen), `?resource=empfehlungen` (rein lesend,
-  Empfehlungsprogramm-Übersicht).
+  Empfehlungsprogramm-Übersicht), `?resource=mitgliedschaften` (rein
+  lesend, Mitgliedschafts-Übersicht, siehe README-Abschnitt
+  "Mitgliederbereich").
 - `api/admin/sessions.js` — Standard (Sessions), `?resource=materials`
   (Session-Materialien), `?resource=module` (Modul-Ebene).
 - `api/admin/testergebnisse.js` — Standard (Verknüpfen/Liste),
@@ -704,7 +706,12 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   Agent-Entwürfe, siehe README-Abschnitt "Review-Interface für
   Agent-Entwürfe"), `?resource=faq` (FAQ-Pflege für den Coachie-Chat),
   `?resource=events` (Admin-CRUD für den Events-Kalender, siehe
-  README-Abschnitt "Events-Kalender").
+  README-Abschnitt "Events-Kalender"),
+  `?resource=mitgliedschaft-einstellungen` (Preis/Bezahltext),
+  `?resource=mitglieder-inhalte` (Admin-CRUD),
+  `?resource=mitglieder-datei-upload` (Signed-Upload-URL) — die letzten
+  drei für den Mitgliederbereich, siehe README-Abschnitt
+  "Mitgliederbereich".
 - `api/certificate.js` — Standard/GET (PDF-Zertifikat), `?resource=faq-chat`
   (POST, FAQ-Chat für Coachies, siehe README-Abschnitt "FAQ-Chat für
   Coachies"), `?resource=empfehlung` (GET, persönlicher Empfehlungscode
@@ -713,13 +720,16 @@ Routing-Parameter zusammengefasst, ohne Verhalten zu ändern:
   Group").
 - `api/checkout.js` — GET (öffentliche Programm-Vorschau, vormals
   `api/public/programme.js`), POST (Stripe Checkout Session, jetzt mit
-  optionalem `ref`-Empfehlungscode).
+  optionalem `ref`-Empfehlungscode), `?resource=mitgliedschaft` (GET
+  öffentliche Preis-/Textvorschau, POST Subscription-Checkout-Session
+  für die Mitgliedschaft, siehe README-Abschnitt "Mitgliederbereich").
 
-Ergebnis: 10 Functions (`admin/coachies.js`, `admin/login.js`,
+Ergebnis: 12 Functions (`admin/coachies.js`, `admin/login.js`,
 `admin/programme.js`, `admin/progress.js`, `admin/sessions.js`,
-`admin/testergebnisse.js`, `agent/inhalte.js`, `checkout.js`,
-`cron/erinnerungen.js`, `webhooks/stripe.js`) — weiterhin unter dem
-Hobby-Limit von 12, ohne Funktionsverlust.
+`admin/testergebnisse.js`, `agent/inhalte.js`, `certificate.js`,
+`checkout.js`, `cron/erinnerungen.js`, `webhooks/calendly.js`,
+`webhooks/stripe.js`) — exakt am Hobby-Limit von 12, jeder weitere
+Endpunkt muss über eine bestehende Datei laufen.
 
 ## Erinnerungsautomation bei Inaktivität
 
@@ -1056,3 +1066,109 @@ Zielcoachie kann direkt antworten, ohne dass Kontaktdaten je im UI
 angezeigt werden. Wiederholtes "Interesse zeigen" an dieselbe Person
 innerhalb von 14 Tagen löst keine erneute E-Mail aus
 (`peer_interesse`-Sperrfrist).
+
+## Mitgliederbereich (Community-Abo)
+
+Eigenständiges, wiederkehrendes Community-Abo (Stripe Subscription),
+unabhängig von jedem Kurskauf -- ein Coachie kann Mitglied sein, ohne
+je ein Programm gekauft zu haben, und umgekehrt.
+
+**Schema:** `supabase_migrations/mitgliederbereich.sql` -- additiv, mit
+einer Ausnahme (siehe unten):
+
+- `mitgliedschaften`: `coachie_id` (unique), `status`
+  (`aktiv`/`gekuendigt`/`zahlung_fehlgeschlagen`),
+  `stripe_subscription_id`, `start_datum`, `naechste_abrechnung`.
+  Status wird ausschließlich über den Stripe-Webhook gepflegt, nie
+  direkt vom Client (nur eine SELECT-Policy für die eigene Zeile).
+- `mitglieder_inhalte`: `typ`
+  (`kpi_handbuch`/`audio`/`tipp`/`sonstiges`), `titel`, `beschreibung`,
+  `datei_url` oder `link_url`, `veroeffentlicht_am`, `aktiv`. Nur bei
+  `mitgliedschaften.status = 'aktiv'` sichtbar (RLS). "Live-Sitzung" ist
+  bewusst **kein** eigener Typ hier, sondern ein `nur_mitglieder`-Termin
+  im Events-Kalender (nächster Punkt) -- vermeidet eine zweite
+  Terminverwaltung, wie im Auftrag gefordert.
+- `mitgliedschaft_einstellungen`: Singleton-Zeile (Preis, Stripe Price
+  ID, Titel/Beschreibung/Bezahltext) -- **Preis und Bezahltext sind
+  admin-konfigurierbar statt hart codiert**, analog zu
+  `programme.preis_cent`. RLS aktiv, aber ohne Policies (nur
+  `service_role`/Admin und der öffentliche Vorschau-Endpunkt lesen sie,
+  siehe unten).
+- Privater Storage-Bucket `mitglieder-inhalte` (20 MB Limit, PDF/MP3/
+  WAV/JPG/PNG) mit eigener Storage-Policy (aktive Mitgliedschaft statt
+  `coachie_programme`) -- bewusst ein eigener Bucket statt eines
+  weiteren Sonderfalls in der bestehenden `Programme`-Bucket-Policy.
+
+**Die eine Ausnahme -- bestehende Policy ersetzt:** Die Events-Select-
+Policy aus `events.sql` wird um eine `nur_mitglieder`-Bedingung
+ergänzt (`events.nur_mitglieder boolean default false`, neue Spalte).
+Admin kann beim Anlegen eines Termins "nur für Mitglieder" wählen; die
+Filterung läuft serverseitig über RLS, nicht nur im Frontend
+ausgeblendet -- exakt wie im Auftrag gefordert. Coachie-seitig ändert
+sich sonst nichts: `EventsPage.jsx` zeigt zusätzlich ein
+"Mitglieder"-Badge, blendet aber nichts eigenständig aus (die Zeile
+kommt von der DB schlicht nicht zurück, wenn nicht berechtigt).
+
+**Stripe-Abo-Anbindung:** `api/checkout.js?resource=mitgliedschaft` --
+GET liefert die öffentliche Preis-/Textvorschau (Verkaufsseite), POST
+erstellt eine Checkout-Session mit `mode: 'subscription'` (statt
+`'payment'` beim Kurskauf). `api/webhooks/stripe.js` erkennt
+Mitgliedschafts-Checkouts über `session.mode === 'subscription'` (kein
+`programm_id` in den Metadaten) und legt die `mitgliedschaften`-Zeile
+an; die Coachie-Anlage/Einladung teilt sich denselben, dafür
+extrahierten Code-Pfad (`findeOderErstelleCoachie()`) mit dem
+bestehenden Kurs-Kauf-Flow. Lifecycle-Events
+(`customer.subscription.updated`/`.deleted`, `invoice.payment_failed`)
+aktualisieren `status`/`naechste_abrechnung` der bestehenden Zeile.
+Bei `zahlung_fehlgeschlagen`/`gekuendigt` verliert der Coachie
+automatisch den Zugriff auf die Mitglieder-Inhalte/-Termine (RLS
+greift sofort) -- der sonstige Kurszugriff (`coachie_programme`) bleibt
+komplett unberührt, andere Tabelle.
+
+**Nicht in dieser Sandbox gegen einen echten Stripe-Account
+verifiziert:** Das Auslesen des Abrechnungszeitraums
+(`ermittleNaechsteAbrechnung()` in `api/webhooks/stripe.js`) ist wegen
+einer Stripe-API-Umstellung (`current_period_end` wanderte von der
+Subscription auf die Subscription-Items) defensiv mit Fallback
+geschrieben -- vor dem ersten Live-Abo einmal gegen die tatsächlich
+verwendete Stripe-API-Version prüfen.
+
+**Admin-Pflege:**
+
+- `src/admin/AdminMitgliedschaftPage.jsx` (**Mitgliedschaft** im
+  Admin-Menü) -- Preis/Stripe-Price-ID/Bezahltext-Einstellungen plus
+  rein lesende Mitgliederübersicht
+  (`api/admin/coachies.js?resource=mitgliedschaften`).
+- `src/admin/AdminMitgliederInhaltePage.jsx` (**Mitglieder-Inhalte**)
+  -- CRUD, Datei-Upload analog zum bestehenden Material-Upload-Muster
+  (`MitgliederDateiUpload.jsx`, Signed-Upload-URL über
+  `?resource=mitglieder-datei-upload`) oder alternativ ein externer
+  Link.
+- `src/admin/AdminEventsPage.jsx` -- neue Checkbox "Nur für Mitglieder"
+  beim Anlegen/Bearbeiten eines Termins.
+
+**Coachie-Seite:**
+
+- `src/pages/MitgliederBereichPage.jsx` (`/coachie/mitgliederbereich`,
+  neuer Nav-Eintrag) -- bei aktiver Mitgliedschaft die nach Datum
+  sortierte Inhaltsliste (Dateien über eine on-demand angeforderte
+  Signed URL, `getSignedMitgliederDateiUrl()`), sonst ein kompakter
+  Upsell-Hinweis auf derselben Seite statt eines Fehlers.
+- `src/pages/MitgliedschaftPage.jsx` (`/mitgliedschaft`, öffentlich,
+  auch ohne Login/Kurskauf erreichbar) -- eigenständige Verkaufsseite,
+  analog zu `KaufenPage.jsx`, aber ohne `:slug` (ein einzelnes Produkt
+  statt vieler Programme).
+- `src/components/MitgliedschaftHinweis.jsx` -- dezenter Hinweis für
+  Nicht-Mitglieder im Coachie-Dashboard (schmale Textzeile mit Link,
+  kein Banner/Modal, rendert nichts für aktive Mitglieder oder solange
+  der Status noch lädt).
+
+**Einrichtung:** `supabase_migrations/mitgliederbereich.sql` muss
+manuell im Supabase SQL Editor laufen. Zusätzlich in Stripe: Produkt +
+monatlichen Preis anlegen (Betrag steht laut Auftrag noch nicht fest),
+die Price ID danach in **Mitgliedschaft** im Admin eintragen, und im
+Stripe-Webhook-Endpunkt die drei neuen Event-Typen aktivieren
+(`customer.subscription.updated`, `customer.subscription.deleted`,
+`invoice.payment_failed`) -- der Endpunkt selbst ändert sich nicht
+(`api/webhooks/stripe.js`), nur die dort abonnierten Event-Typen in
+den Stripe-Webhook-Einstellungen.

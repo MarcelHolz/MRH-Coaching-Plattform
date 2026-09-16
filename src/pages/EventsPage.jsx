@@ -17,7 +17,9 @@ export default function EventsPage() {
     async function laden() {
       const { data, error } = await supabase
         .from('events')
-        .select('id, titel, beschreibung, start_zeitpunkt, ende_zeitpunkt, link, programme(titel)')
+        .select(
+          'id, titel, beschreibung, start_zeitpunkt, ende_zeitpunkt, link, nur_mitglieder, programme(titel)',
+        )
         .gte('start_zeitpunkt', new Date().toISOString())
         .order('start_zeitpunkt', { ascending: true })
 
@@ -70,8 +72,15 @@ export default function EventsPage() {
             <div key={termin.id} className="rounded-2xl bg-white p-5 shadow-sm">
               <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold text-slate-800">{termin.titel}</p>
-                <span className="rounded-full bg-mrh-gold/15 px-2 py-0.5 text-xs font-medium text-mrh-gold-dark">
-                  {termin.programme?.titel ?? 'Plattformweit'}
+                <span className="flex gap-1.5">
+                  {termin.nur_mitglieder && (
+                    <span className="rounded-full bg-mrh-navy/10 px-2 py-0.5 text-xs font-medium text-mrh-navy">
+                      Mitglieder
+                    </span>
+                  )}
+                  <span className="rounded-full bg-mrh-gold/15 px-2 py-0.5 text-xs font-medium text-mrh-gold-dark">
+                    {termin.programme?.titel ?? 'Plattformweit'}
+                  </span>
                 </span>
               </div>
               <p className="mb-2 text-sm text-mrh-grey">

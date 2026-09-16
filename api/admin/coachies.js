@@ -198,6 +198,28 @@ async function handleEmpfehlungen(req, res, supabase) {
   res.status(200).json({ empfehlungen: data })
 }
 
+// Admin-Übersicht der Mitgliedschaften (Mitgliederbereich Punkt 1) --
+// rein lesend, Status/Abrechnung werden ausschließlich über den
+// Stripe-Webhook gepflegt (siehe api/webhooks/stripe.js).
+async function handleMitgliedschaften(req, res, supabase) {
+  if (req.method !== 'GET') {
+    res.status(405).json({ error: 'Methode nicht erlaubt -- dieser Pfad ist rein lesend.' })
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('mitgliedschaften')
+    .select('*, coachies(name, email)')
+    .order('start_datum', { ascending: false })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.status(200).json({ mitgliedschaften: data })
+}
+
 async function handleAssignments(req, res, supabase) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('coachie_programme').select('*')
@@ -320,6 +342,11 @@ export default async function handler(req, res) {
 
   if (resource === 'empfehlungen') {
     await handleEmpfehlungen(req, res, supabase)
+    return
+  }
+
+  if (resource === 'mitgliedschaften') {
+    await handleMitgliedschaften(req, res, supabase)
     return
   }
 

@@ -37,7 +37,11 @@ const NAV_GROUPS = [
   },
   {
     label: 'Community',
-    items: [{ to: '/admin/events', label: 'Events' }],
+    items: [
+      { to: '/admin/events', label: 'Events' },
+      { to: '/admin/mitgliedschaft', label: 'Mitgliedschaft' },
+      { to: '/admin/mitglieder-inhalte', label: 'Mitglieder-Inhalte' },
+    ],
   },
 ]
 

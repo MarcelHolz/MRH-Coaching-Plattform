@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/coachie/meilensteine', label: 'Meilensteine' },
   { to: '/coachie/termine', label: 'Termine' },
   { to: '/coachie/peer-group', label: 'Peer Group' },
+  { to: '/coachie/mitgliederbereich', label: 'Mitgliederbereich' },
   { to: '/coachie/einstellungen', label: 'Einstellungen' },
 ]
 
