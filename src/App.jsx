@@ -19,6 +19,7 @@ import PeerGroupPage from './pages/PeerGroupPage'
 import MitgliedschaftPage from './pages/MitgliedschaftPage'
 import MitgliederBereichPage from './pages/MitgliederBereichPage'
 import RechnungenPage from './pages/RechnungenPage'
+import VertragKuendigenPage from './pages/VertragKuendigenPage'
 
 import { AdminAuthProvider } from './admin/AdminAuthContext'
 import AdminProtectedRoute from './admin/AdminProtectedRoute'
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/kaufen/:slug" element={<KaufenPage />} />
             <Route path="/mitgliedschaft" element={<MitgliedschaftPage />} />
+            <Route path="/vertrag-kuendigen" element={<VertragKuendigenPage />} />
             <Route path="/kauf-erfolgreich" element={<KaufErfolgPage />} />
             <Route
               path="/passwort-festlegen"
