@@ -48,7 +48,10 @@ export default function FaqChatWidget({ accessToken }) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-40">
+    // bottom/right nutzen zusätzlich env(safe-area-inset-*): ohne den
+    // Abstand landet der Button auf Handys mit Home-Indikator/Wisch-Geste
+    // genau in der System-Gesten-Zone und ist dort nicht anklickbar.
+    <div className="fixed z-40 bottom-[calc(1rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))]">
       {offen && (
         <div className="mb-3 flex h-96 w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
           <div className="flex items-center justify-between bg-mrh-navy px-4 py-3 text-white">
