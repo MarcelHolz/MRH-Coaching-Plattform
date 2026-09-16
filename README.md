@@ -760,6 +760,10 @@ Development) zu setzen, siehe `.env.example`:
   `Authorization: Bearer $CRON_SECRET` bei jedem Cron-Aufruf.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` --
   All-Inkl-Postfachzugang für `info@mrh-beratung.de`.
+- `ADMIN_EMAIL` -- optional, Ziel-Adresse für interne Admin-
+  Benachrichtigungen (z. B. DSGVO-Löschungsanträge). Ohne gesetzte
+  Variable fällt der Versand auf `SMTP_FROM`/`SMTP_USER` zurück, d. h.
+  standardmäßig dasselbe Postfach `info@mrh-beratung.de`.
 
 ## Empfehlungsprogramm (technische Grundstruktur)
 
@@ -1348,3 +1352,79 @@ Bewusst kein volles Benachrichtigungscenter -- zwei konkrete Auslöser:
   Coachie-Anzahl als aktuell üblich müsste das auf einen asynchronen
   Batch-Versand umgestellt werden. Keine neue Migration, keine neue
   RLS -- reine Backend-Logik auf Basis bereits bestehender Tabellen.
+
+## Bewertungslink in der Testimonial-Einladung
+
+Die bereits bestehende automatische Testimonial-Einladungsmail
+(`api/cron/erinnerungen.js`, siehe Testimonial-Sammelmechanismus oben)
+verschickt einmalig pro Coachie/Programm eine Mail, sobald alle
+Sessions abgeschlossen sind -- das war schon vor diesem Auftrag
+vollständig umgesetzt. Neu ist ausschließlich ein optionaler,
+admin-pflegbarer externer Bewertungslink (Google/Trustpilot o. Ä.), der
+dieser Mail als zusätzlicher Absatz beigefügt wird, sobald er
+hinterlegt ist -- ohne hinterlegten Link bleibt der Absatz weg, kein
+kaputter/leerer Link wird verschickt. Ein eigenes Antwort-Formular gibt
+es bewusst nicht, ein "Antworten" auf die Mail landet direkt im
+bestehenden Postfach `info@mrh-beratung.de`.
+
+**Admin-Pflege:** neue Sektion "Bewertungslink" oben auf der
+bestehenden Seite **Admin → Qualität → Testimonials** (kein neuer
+Nav-Punkt, gehört inhaltlich zur selben Mail) --
+`api/admin/programme.js?resource=plattform-einstellungen` (GET/PATCH).
+
+**Migration:** `supabase_migrations/bewertungslink.sql` -- rein
+additiv (neue Singleton-Tabelle `plattform_einstellungen`, analog zu
+`mitgliedschaft_einstellungen`), noch nicht auf der Live-DB
+ausgeführt.
+
+## DSGVO-Selbstauskunft im Coachie-Bereich
+
+Neuer Bereich "Meine Daten" in den Coachie-Einstellungen
+(`/coachie/einstellungen`), zweigeteilt:
+
+- **Meine Daten anzeigen:** strukturierte Übersicht der beim Coachie
+  gespeicherten Daten -- Stammdaten (Name, E-Mail, Profilbild),
+  Kursfortschritt je zugeordnetem Programm (Titel, Zeitpunkt der
+  Zuordnung, Zugriff bis, Fortschritt in %) und Testergebnisse
+  (`coachie_testergebnisse`, sofern über das Profil-Quiz verknüpft).
+  Läuft komplett clientseitig über den bestehenden Supabase-Client mit
+  RLS ("coachie sieht eigene Zeile/eigene Testergebnisse") -- kein
+  neuer Endpunkt nötig, da diese Policies für `coachies`,
+  `coachie_programme` und `coachie_testergebnisse` bereits bestehen.
+- **Löschung beantragen:** löst **keine** automatische Löschung aus --
+  Löschung kollidiert potenziell mit bestehenden Vertrags-/
+  Rechnungsaufbewahrungspflichten. Stattdessen protokolliert der
+  Endpunkt den Antrag in der neuen Tabelle `loeschungsantraege` und
+  verschickt eine E-Mail an den Admin (`ADMIN_EMAIL`, fällt ohne
+  gesetzte Variable auf `SMTP_FROM`/`SMTP_USER` zurück, d. h.
+  standardmäßig dasselbe Postfach `info@mrh-beratung.de`) zur
+  manuellen Prüfung und Bearbeitung. Der Coachie bekommt zusätzlich
+  eine Bestätigungsmail, dass der Antrag eingegangen ist
+  (best-effort, blockiert die eigentliche Protokollierung nicht).
+
+**Backend:** `api/certificate.js?resource=dsgvo-loeschung` (POST,
+coachie-authentifiziert über `requireCoachie`, kein neuer
+Function-Endpunkt).
+
+**Migration:** `supabase_migrations/dsgvo_loeschungsantrag.sql` --
+rein additiv (neue Tabelle `loeschungsantraege`), noch nicht auf der
+Live-DB ausgeführt.
+
+## LinkedIn-Share bei Meilensteinen
+
+Auf der bestehenden Meilensteine-Seite (`/coachie/meilensteine`,
+Fortschritts-Badges-Feature) sowie auf dem "Geschafft!"-Abschluss-
+Bildschirm eines Programms (`CoachieProgramPage.jsx`) gibt es jetzt
+einen "Auf LinkedIn teilen"-Button pro Modul-/Programm-Abschluss.
+
+**Umsetzung als bewusster Kompromiss:** LinkedIns öffentlicher
+Share-Dialog (`linkedin.com/sharing/share-offsite`) akzeptiert seit
+einigen Jahren aus Anti-Spam-Gründen keinen vorbefüllten Beitragstext
+mehr, nur noch `url` als Parameter (LinkedIn liest die
+Vorschau-Kachel selbst aus den OG-Tags der URL). Der Button kopiert
+daher den vorformulierten Text ("Ich habe gerade … bei MRH Beratung &
+Coaching abgeschlossen") zusätzlich in die Zwischenablage und weist im
+UI darauf hin, ihn im sich öffnenden LinkedIn-Fenster einzufügen --
+funktional das bestmögliche Ergebnis ohne eigenen Grafik-Export oder
+LinkedIn-API-Integration, wie im Auftrag vorgesehen. Rein
+clientseitig, keine neue Migration, kein neuer Endpunkt.
