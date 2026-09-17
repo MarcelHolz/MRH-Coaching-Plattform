@@ -23,14 +23,34 @@ async function callProfilQuizReader(action, payload, res) {
     return null
   }
 
-  const response = await fetch(`${profilQuizUrl}/functions/v1/testergebnisse-reader`, {
-    method: 'POST',
-    headers: {
-      'x-reader-secret': readerSecret,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ action, ...payload }),
-  })
+  // Bugfix: ein Netzwerkfehler beim fetch() selbst (DNS-Auflösung schlägt
+  // fehl, Verbindung abgelehnt, Timeout) wirft eine Exception, BEVOR eine
+  // Response überhaupt existiert -- ohne dieses try/catch verließ diese
+  // Exception unbehandelt die Function und Vercel protokollierte nur den
+  // rohen "TypeError: fetch failed"/"getaddrinfo ENOTFOUND ..."-Stack,
+  // ohne dass der Admin-Bereich eine verständliche Fehlermeldung bekam.
+  // Das darunterliegende `!response.ok`-Handling deckt nur HTTP-Fehler
+  // eines erreichbaren Servers ab, nicht diesen Fall. Behebt NICHT die
+  // eigentliche Ursache eines solchen Netzwerkfehlers (z. B. ein
+  // pausiertes/gelöschtes Profil-Quiz-Projekt) -- dafür muss PROFIL_QUIZ_URL
+  // in den Vercel-Umgebungsvariablen auf die aktuell aktive Projekt-URL
+  // zeigen, siehe README-Abschnitt "Testergebnisse".
+  let response
+  try {
+    response = await fetch(`${profilQuizUrl}/functions/v1/testergebnisse-reader`, {
+      method: 'POST',
+      headers: {
+        'x-reader-secret': readerSecret,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, ...payload }),
+    })
+  } catch (err) {
+    res.status(502).json({
+      error: `Profil-Quiz-Projekt nicht erreichbar (Netzwerkfehler): ${err.message}. Vermutlich ist das dort konfigurierte Supabase-Projekt (PROFIL_QUIZ_URL) pausiert, gelöscht oder die URL veraltet -- bitte in den Vercel-Umgebungsvariablen prüfen.`,
+    })
+    return null
+  }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '')
