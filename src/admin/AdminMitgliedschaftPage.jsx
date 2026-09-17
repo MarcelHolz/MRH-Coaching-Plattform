@@ -39,7 +39,6 @@ export default function AdminMitgliedschaftPage() {
   const [titel, setTitel] = useState('')
   const [beschreibung, setBeschreibung] = useState('')
   const [preis, setPreis] = useState('')
-  const [stripePriceId, setStripePriceId] = useState('')
   const [bezahltext, setBezahltext] = useState('')
 
   const [ausgewaehlterCoachie, setAusgewaehlterCoachie] = useState('')
@@ -60,7 +59,6 @@ export default function AdminMitgliedschaftPage() {
       setTitel(e?.titel ?? '')
       setBeschreibung(e?.beschreibung ?? '')
       setPreis(e?.preis_cent != null ? String(e.preis_cent / 100) : '')
-      setStripePriceId(e?.stripe_price_id ?? '')
       setBezahltext(e?.bezahltext ?? '')
       setMitgliedschaften(mitgliedschaftenData.mitgliedschaften ?? [])
       setCoachies(coachiesData.coachies ?? [])
@@ -132,7 +130,6 @@ export default function AdminMitgliedschaftPage() {
           titel,
           beschreibung: beschreibung.trim() || null,
           preis_cent: preis ? Math.round(Number(preis) * 100) : null,
-          stripe_price_id: stripePriceId.trim() || null,
           bezahltext: bezahltext.trim() || null,
         }),
       })
@@ -184,33 +181,23 @@ export default function AdminMitgliedschaftPage() {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-gold focus:outline-none"
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-              Preis pro Monat (€)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={preis}
-              onChange={(e) => setPreis(e.target.value)}
-              placeholder="noch nicht festgelegt"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-gold focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-              Stripe Price ID
-            </label>
-            <input
-              type="text"
-              value={stripePriceId}
-              onChange={(e) => setStripePriceId(e.target.value)}
-              placeholder="price_..."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-gold focus:outline-none"
-            />
-          </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            Preis pro Monat (€)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={preis}
+            onChange={(e) => setPreis(e.target.value)}
+            placeholder="noch nicht festgelegt"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-mrh-gold focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-mrh-grey">
+            Der Stripe-Preis wird beim Checkout automatisch aus diesem Betrag
+            erzeugt -- kein eigener Price in Stripe nötig.
+          </p>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -226,8 +213,8 @@ export default function AdminMitgliedschaftPage() {
 
         {!einstellungen?.preis_cent && (
           <p className="text-xs text-amber-700">
-            Ohne Preis und Stripe Price ID ist die Mitgliedschaft auf der
-            Verkaufsseite sichtbar, aber nicht buchbar.
+            Ohne Preis ist die Mitgliedschaft auf der Verkaufsseite sichtbar,
+            aber nicht buchbar.
           </p>
         )}
 

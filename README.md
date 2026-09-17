@@ -1459,3 +1459,43 @@ führt.
 DELETE ergänzt, GET unverändert) -- kein neuer Function-Endpunkt, keine
 neue Migration, keine RLS-Änderung (der Admin-Zugriff läuft ohnehin
 über `service_role` und umgeht RLS).
+
+## Bugfix: Mitgliedschafts-Checkout schlug bei jedem Versuch fehl
+
+**Ursache:** `handleMitgliedschaftCheckoutSession`
+(`api/checkout.js`) übergab Stripe im Line Item
+`price: mitgliedschaft_einstellungen.stripe_price_id` -- Stripe
+verlangt an dieser Stelle zwingend entweder die ID eines bereits in
+Stripe angelegten Price-Objekts oder ein `price_data`-Objekt, niemals
+einen rohen Betrag. `stripe_price_id` musste also vorab manuell im
+Stripe-Dashboard angelegt und die ID admin-seitig eingetragen werden --
+fehlte dieser Schritt (oder wurde versehentlich der Betrag statt einer
+`price_...`-ID eingetragen), schlug **jeder** Checkout mit
+`StripeInvalidRequestError: The price parameter should be the ID of a
+price object, rather than the literal numerical price.` fehl. Die
+öffentliche Vorschau (`handleMitgliedschaftVorschau`) prüfte dagegen
+nur `preis_cent` -- der "Jetzt Mitglied werden"-Button war also
+sichtbar/aktiv, obwohl der Checkout dahinter zwangsläufig scheiterte.
+
+**Fix:** `handleMitgliedschaftCheckoutSession` erzeugt den Stripe-Price
+jetzt bei jedem Checkout automatisch inline über `price_data`
+(`currency: 'eur'`, `unit_amount` aus `preis_cent`,
+`recurring: { interval: 'month' }`, `product_data.name` aus `titel`) --
+kein manueller Stripe-Dashboard-Schritt mehr nötig, derselbe
+`preis_cent`-Wert steuert damit sowohl die öffentliche Vorschau als
+auch den tatsächlichen Checkout-Preis, keine Diskrepanz mehr möglich.
+Das jetzt ungenutzte Feld `stripe_price_id` in
+`mitgliedschaft_einstellungen` wurde aus Admin-UI und
+PATCH-Handler entfernt (Spalte selbst bleibt in der DB bestehen, rein
+additiv, keine Migration nötig).
+
+**Verifikation:** In dieser Sandbox ohne Zugriff auf ein echtes
+Stripe-Testkonto nicht als Live-Checkout durchführbar. Stattdessen
+gegen die von der installierten `stripe`-Node-SDK-Version (22.x)
+mitgelieferten TypeScript-Definitionen für
+`Checkout.SessionCreateParams.LineItem.PriceData` geprüft (exakt
+`currency`, `unit_amount`, `recurring.interval`, `product_data.name`)
+sowie ein lokaler Dry-Run gegen `stripe.checkout.sessions.create()`
+mit abgefangenem Request bestätigt, dass die SDK das konstruierte
+Objekt ohne clientseitigen Validierungsfehler entgegennimmt. Bitte vor
+dem Merge zusätzlich einmal live im Stripe-Testmodus verifizieren.

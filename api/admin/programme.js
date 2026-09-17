@@ -487,8 +487,11 @@ async function handleMitgliedschaftEinstellungen(req, res, supabase) {
   }
 
   if (req.method === 'PATCH') {
-    const { titel, beschreibung, preis_cent, stripe_price_id, bezahltext } =
-      req.body ?? {}
+    // stripe_price_id wird seit dem price_data-Bugfix (siehe
+    // api/checkout.js, handleMitgliedschaftCheckoutSession) nicht mehr
+    // für den Checkout benötigt -- bewusst nicht mehr aus dem Body
+    // übernommen, um kein veraltetes/falsches Feld weiter zu pflegen.
+    const { titel, beschreibung, preis_cent, bezahltext } = req.body ?? {}
 
     const { data, error } = await supabase
       .from('mitgliedschaft_einstellungen')
@@ -496,7 +499,6 @@ async function handleMitgliedschaftEinstellungen(req, res, supabase) {
         titel,
         beschreibung: beschreibung || null,
         preis_cent: preis_cent != null ? preis_cent : null,
-        stripe_price_id: stripe_price_id || null,
         bezahltext: bezahltext || null,
         aktualisiert_am: new Date().toISOString(),
       })
