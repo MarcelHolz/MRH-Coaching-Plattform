@@ -21,6 +21,9 @@ export default function PeerGroupPage() {
   const [speichert, setSpeichert] = useState(false)
   const [fehler, setFehler] = useState('')
   const [gespeichert, setGespeichert] = useState(false)
+  // Tabelle fehlt (Migration peer_group_v2.sql noch nicht ausgeführt) oder
+  // Policy fehlerhaft: Seite zeigt einen Hinweis statt abzustürzen.
+  const [nichtEingerichtet, setNichtEingerichtet] = useState(false)
 
   const [sichtbar, setSichtbar] = useState(false)
   const [vorname, setVorname] = useState('')
@@ -42,7 +45,8 @@ export default function PeerGroupPage() {
       if (cancelled) return
 
       if (error) {
-        setFehler('Profil konnte nicht geladen werden.')
+        console.error('Peer Group konnte nicht geladen werden:', error.message)
+        setNichtEingerichtet(true)
         setLaedt(false)
         return
       }
@@ -145,12 +149,25 @@ export default function PeerGroupPage() {
 
   if (laedt) return null
 
+  if (nichtEingerichtet) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <h1 className="mb-2 text-xl font-semibold text-mrh-navy">Peer Group</h1>
+          <p className="text-sm text-mrh-grey">
+            Die Peer Group wird gerade eingerichtet. Schau bald wieder vorbei.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-mrh-navy">Peer Group</h1>
         <p className="mt-1 text-sm text-mrh-grey">
-          Finde andere Coachies auf ähnlichem Weg -- freiwillig und nur, wenn ihr
+          Finde andere Coachies auf ähnlichem Weg. Freiwillig und nur, wenn ihr
           euch beide sichtbar schaltet.
         </p>
       </div>
