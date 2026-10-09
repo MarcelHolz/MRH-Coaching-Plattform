@@ -491,7 +491,8 @@ async function handleMitgliedschaftEinstellungen(req, res, supabase) {
     // api/checkout.js, handleMitgliedschaftCheckoutSession) nicht mehr
     // für den Checkout benötigt -- bewusst nicht mehr aus dem Body
     // übernommen, um kein veraltetes/falsches Feld weiter zu pflegen.
-    const { titel, beschreibung, preis_cent, bezahltext } = req.body ?? {}
+    const { titel, beschreibung, preis_cent, bezahltext, mitgliedschaft_aktiv } =
+      req.body ?? {}
 
     const { data, error } = await supabase
       .from('mitgliedschaft_einstellungen')
@@ -500,6 +501,7 @@ async function handleMitgliedschaftEinstellungen(req, res, supabase) {
         beschreibung: beschreibung || null,
         preis_cent: preis_cent != null ? preis_cent : null,
         bezahltext: bezahltext || null,
+        mitgliedschaft_aktiv: mitgliedschaft_aktiv === true,
         aktualisiert_am: new Date().toISOString(),
       })
       .eq('id', true)

@@ -1,6 +1,11 @@
 import { getStripe } from './_lib/stripeClient.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendMail } from './_lib/mailer.js'
+import { ermittleAppUrl } from './_lib/appUrl.js'
+import {
+  findeOderErstelleCoachie,
+  normalisiereEmail,
+} from './_lib/coachieAnlage.js'
 
 // Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions).
 // GET ?slug= übernimmt die frühere api/public/programme.js (öffentliche
@@ -82,7 +87,7 @@ async function handleVorschau(req, res, supabase) {
 async function handleMitgliedschaftVorschau(req, res, supabase) {
   const { data, error } = await supabase
     .from('mitgliedschaft_einstellungen')
-    .select('titel, beschreibung, preis_cent, bezahltext')
+    .select('titel, beschreibung, preis_cent, bezahltext, mitgliedschaft_aktiv')
     .eq('id', true)
     .maybeSingle()
 
@@ -91,7 +96,23 @@ async function handleMitgliedschaftVorschau(req, res, supabase) {
     return
   }
 
-  res.status(200).json({ mitgliedschaft: data })
+  // Schalter aus (Default): keine Inhalte ausliefern, die Seite zeigt
+  // dann nur "startet in Kürze". Auch der Coachie-Bereich fragt hier ab,
+  // ob Hinweise auf die Mitgliedschaft angezeigt werden dürfen.
+  if (!data?.mitgliedschaft_aktiv) {
+    res.status(200).json({ mitgliedschaft: { aktiv: false } })
+    return
+  }
+
+  res.status(200).json({
+    mitgliedschaft: {
+      titel: data.titel,
+      beschreibung: data.beschreibung,
+      preis_cent: data.preis_cent,
+      bezahltext: data.bezahltext,
+      aktiv: true,
+    },
+  })
 }
 
 // Erstellt eine Stripe-Subscription-Checkout-Session (mode: 'subscription'
@@ -116,7 +137,7 @@ async function handleMitgliedschaftVorschau(req, res, supabase) {
 async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
   const { data: einstellungen, error } = await supabase
     .from('mitgliedschaft_einstellungen')
-    .select('titel, preis_cent')
+    .select('titel, preis_cent, mitgliedschaft_aktiv')
     .eq('id', true)
     .maybeSingle()
 
@@ -125,14 +146,12 @@ async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
     return
   }
 
-  if (!einstellungen?.preis_cent) {
+  if (!einstellungen?.mitgliedschaft_aktiv || !einstellungen?.preis_cent) {
     res.status(404).json({ error: 'Mitgliedschaft ist aktuell nicht buchbar.' })
     return
   }
 
-  const appUrl =
-    process.env.APP_URL ||
-    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+  const appUrl = ermittleAppUrl(req)
 
   const stripe = getStripe()
 
@@ -369,6 +388,145 @@ async function handleKuendigungBestaetigen(req, res, supabase) {
   res.status(200).json({ bezeichnung, zeitpunkt: jetzt.toISOString() })
 }
 
+// Gratis-Anmeldung für Programme mit preis_cent = 0 (z. B. die
+// Standortbestimmung): kein Stripe, direkt Coachie anlegen bzw. finden
+// und zuordnen. Alle Bedingungen werden serverseitig geprüft, nie dem
+// Client geglaubt. Die Antwort ist immer dieselbe, unabhängig davon, ob
+// die Adresse schon existiert (keine Enumeration).
+const GRATIS_LIMIT_PRO_TAG = 5
+const GRATIS_ERFOLG = { status: 'ok' }
+const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+async function handleGratisAnmeldung(req, res, supabase) {
+  const { slug, name, email, website } = req.body ?? {}
+
+  // Honeypot: echte Besucher sehen das Feld nicht. Still verwerfen, mit
+  // derselben Erfolgsantwort, damit Bots nichts lernen.
+  if (website) {
+    res.status(200).json(GRATIS_ERFOLG)
+    return
+  }
+
+  const normalisiert = normalisiereEmail(email)
+  const vorname = typeof name === 'string' ? name.trim().slice(0, 100) : ''
+
+  if (!slug || !vorname || !EMAIL_MUSTER.test(normalisiert) || normalisiert.length > 254) {
+    res.status(400).json({ error: 'Bitte Vorname und eine gültige E-Mail-Adresse angeben.' })
+    return
+  }
+
+  const { data: programm, error: programmError } = await supabase
+    .from('programme')
+    .select('id, titel, preis_cent, standard_zugriffsmonate')
+    .eq('slug', slug)
+    .eq('oeffentlich_kaufbar', true)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  if (programmError) {
+    res.status(500).json({ error: programmError.message })
+    return
+  }
+
+  if (!programm || programm.preis_cent !== 0) {
+    res.status(404).json({ error: 'Programm ist nicht kostenlos verfügbar.' })
+    return
+  }
+
+  // Missbrauchsbremse: höchstens 5 Anmeldungen pro Adresse in 24 Stunden.
+  const seit = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count, error: countError } = await supabase
+    .from('gratis_anmeldungen')
+    .select('id', { count: 'exact', head: true })
+    .eq('email', normalisiert)
+    .gte('erstellt_am', seit)
+
+  if (countError) {
+    res.status(500).json({ error: countError.message })
+    return
+  }
+
+  if ((count ?? 0) >= GRATIS_LIMIT_PRO_TAG) {
+    res.status(429).json({
+      error: 'Zu viele Anmeldungen mit dieser Adresse. Bitte versuche es morgen erneut.',
+    })
+    return
+  }
+
+  const { error: logError } = await supabase
+    .from('gratis_anmeldungen')
+    .insert({ email: normalisiert, programm_id: programm.id })
+
+  if (logError) {
+    res.status(500).json({ error: logError.message })
+    return
+  }
+
+  const appUrl = ermittleAppUrl(req)
+  const { coachieId, neu, error: coachieError } = await findeOderErstelleCoachie({
+    email: normalisiert,
+    name: vorname,
+    supabase,
+    appUrl,
+  })
+
+  if (coachieError) {
+    console.error('Gratis-Anmeldung: Coachie konnte nicht angelegt werden:', coachieError)
+    res.status(500).json({ error: 'Die Anmeldung konnte gerade nicht abgeschlossen werden.' })
+    return
+  }
+
+  const { data: zuordnung, error: zuordnungError } = await supabase
+    .from('coachie_programme')
+    .select('id')
+    .eq('coachie_id', coachieId)
+    .eq('programm_id', programm.id)
+    .maybeSingle()
+
+  if (zuordnungError) {
+    res.status(500).json({ error: zuordnungError.message })
+    return
+  }
+
+  if (!zuordnung) {
+    let zugriffBis = null
+    if (programm.standard_zugriffsmonate) {
+      const datum = new Date()
+      datum.setMonth(datum.getMonth() + programm.standard_zugriffsmonate)
+      zugriffBis = datum.toISOString()
+    }
+
+    const { error: insertError } = await supabase.from('coachie_programme').insert({
+      coachie_id: coachieId,
+      programm_id: programm.id,
+      zugewiesen_am: new Date().toISOString(),
+      zugriff_bis: zugriffBis,
+    })
+
+    // 23505: parallel angelegt, Ergebnis ist dasselbe.
+    if (insertError && insertError.code !== '23505') {
+      res.status(500).json({ error: insertError.message })
+      return
+    }
+  }
+
+  // Neu eingeladene Coachies haben die Supabase-Einladung bereits im
+  // Postfach. Bestehende bekommen stattdessen einen kurzen Hinweis.
+  if (!neu) {
+    try {
+      await sendMail({
+        to: normalisiert,
+        subject: 'Dein Kurs ist freigeschaltet',
+        text: `Hallo ${vorname},\n\n„${programm.titel}“ ist in deinem Bereich der MRH Coaching-Plattform freigeschaltet.\n\nHier meldest du dich an: ${appUrl}/login\n\nFalls du noch kein Passwort festgelegt hast, nutze auf der Login-Seite „Passwort vergessen“.\n\nViele Grüße\nMarcel Holz\nMRH Beratung & Coaching`,
+      })
+    } catch (err) {
+      console.error('Freischaltungsmail konnte nicht versendet werden:', err.message)
+    }
+  }
+
+  res.status(200).json(GRATIS_ERFOLG)
+}
+
 async function handleCheckoutSession(req, res, supabase) {
   const { slug, ref } = req.body ?? {}
 
@@ -425,9 +583,7 @@ async function handleCheckoutSession(req, res, supabase) {
     return
   }
 
-  const appUrl =
-    process.env.APP_URL ||
-    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+  const appUrl = ermittleAppUrl(req)
 
   const stripe = getStripe()
 
@@ -495,6 +651,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     await handleVorschau(req, res, supabase)
+    return
+  }
+
+  if (req.method === 'POST' && req.query.aktion === 'gratis') {
+    await handleGratisAnmeldung(req, res, supabase)
     return
   }
 

@@ -73,6 +73,19 @@ export default function MitgliedschaftPage() {
     )
   }
 
+  if (mitgliedschaft && !mitgliedschaft.aktiv) {
+    return (
+      <div className="min-h-screen bg-mrh-black text-white">
+        <div className="mx-auto max-w-2xl px-4 py-16">
+          <h1 className="mb-4 font-serif text-4xl font-semibold">
+            MRH Community-Mitgliedschaft
+          </h1>
+          <p className="text-white/70">Die Mitgliedschaft startet in Kürze.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-mrh-black text-white">
       <div className="mx-auto max-w-2xl px-4 py-16">

@@ -40,6 +40,7 @@ export default function AdminMitgliedschaftPage() {
   const [beschreibung, setBeschreibung] = useState('')
   const [preis, setPreis] = useState('')
   const [bezahltext, setBezahltext] = useState('')
+  const [aktiv, setAktiv] = useState(false)
 
   const [ausgewaehlterCoachie, setAusgewaehlterCoachie] = useState('')
   const [hinzufuegen, setHinzufuegen] = useState(false)
@@ -60,6 +61,7 @@ export default function AdminMitgliedschaftPage() {
       setBeschreibung(e?.beschreibung ?? '')
       setPreis(e?.preis_cent != null ? String(e.preis_cent / 100) : '')
       setBezahltext(e?.bezahltext ?? '')
+      setAktiv(e?.mitgliedschaft_aktiv === true)
       setMitgliedschaften(mitgliedschaftenData.mitgliedschaften ?? [])
       setCoachies(coachiesData.coachies ?? [])
     } catch (err) {
@@ -131,6 +133,7 @@ export default function AdminMitgliedschaftPage() {
           beschreibung: beschreibung.trim() || null,
           preis_cent: preis ? Math.round(Number(preis) * 100) : null,
           bezahltext: bezahltext.trim() || null,
+          mitgliedschaft_aktiv: aktiv,
         }),
       })
       setGespeichert(true)
@@ -159,6 +162,25 @@ export default function AdminMitgliedschaftPage() {
         onSubmit={handleSpeichern}
         className="mb-8 space-y-3 rounded-xl bg-white p-5 shadow-sm"
       >
+        <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+          <input
+            type="checkbox"
+            checked={aktiv}
+            onChange={(e) => setAktiv(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-mrh-navy"
+          />
+          <span>
+            <span className="block text-sm font-medium text-slate-800">
+              Mitgliedschaft aktiv
+            </span>
+            <span className="block text-xs text-mrh-grey">
+              Ausgeschaltet zeigt die Verkaufsseite nur &bdquo;Die Mitgliedschaft
+              startet in Kürze&ldquo;, der Checkout ist gesperrt und Hinweise im
+              Coachie-Bereich sind ausgeblendet.
+            </span>
+          </span>
+        </label>
+
         <div>
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
             Titel
@@ -211,7 +233,7 @@ export default function AdminMitgliedschaftPage() {
           />
         </div>
 
-        {!einstellungen?.preis_cent && (
+        {einstellungen?.mitgliedschaft_aktiv && !einstellungen?.preis_cent && (
           <p className="text-xs text-amber-700">
             Ohne Preis ist die Mitgliedschaft auf der Verkaufsseite sichtbar,
             aber nicht buchbar.
