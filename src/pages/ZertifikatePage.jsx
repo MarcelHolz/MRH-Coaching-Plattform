@@ -107,13 +107,13 @@ export default function ZertifikatePage() {
         Meine Abschlüsse
       </h1>
       <p className="mb-6 text-sm text-mrh-grey">
-        Alle Programme, die du zu 100% abgeschlossen hast.
+        Alle Programme, deren Sessions du vollständig bearbeitet hast.
       </p>
 
       {abschluesse.length === 0 ? (
         <p className="text-sm text-mrh-grey">
-          Noch keine Abschlüsse -- schließe ein Programm vollständig ab, um
-          hier dein Zertifikat zu finden.
+          Noch keine Abschlüsse. Bearbeite alle Sessions eines Programms, um
+          hier deine Teilnahmebestätigung zu finden.
         </p>
       ) : (
         <div className="space-y-3">

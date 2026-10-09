@@ -1,6 +1,17 @@
 {
   "rewrites": [
     {
+      "source": "/kaufen/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|linkedinbot|twitterbot|slackbot|slack-imgproxy|whatsapp|telegrambot|discordbot|skypeuripreview|pinterest|xing-contenttabreceiver|embedly|redditbot|mastodon).*"
+        }
+      ],
+      "destination": "/api/checkout?resource=linkvorschau&slug=:slug"
+    },
+    {
       "source": "/((?!api/|@vite/|@react-refresh|@id/|@fs/|src/|node_modules/|.*\\.[^/]+$).*)",
       "destination": "/index.html"
     }

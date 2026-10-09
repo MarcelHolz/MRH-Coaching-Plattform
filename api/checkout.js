@@ -20,6 +20,8 @@ import {
 // Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions), für
 // nicht eingeloggte Besucher gedacht, daher ohne requireAdmin:
 //   GET  ?slug=                     öffentliche Programm-Vorschau (/kaufen/:slug)
+//   GET  ?resource=uebersicht       Programmübersicht für die Startseite
+//   GET  ?resource=linkvorschau     HTML mit Open-Graph-Tags für Crawler
 //   POST                            Stripe Checkout Session (Kurskauf)
 //   POST ?aktion=gratis             Gratis-Anmeldung (preis_cent = 0)
 //   GET/POST ?resource=mitgliedschaft   Vorschau bzw. Checkout Mitgliedschaft
@@ -89,6 +91,93 @@ async function handleVorschau(req, res, supabase) {
       testimonials: testimonials.data ?? [],
     },
   })
+}
+
+// Öffentliche Programmübersicht für die Startseite (/). Nur Felder, die
+// ohnehin auf den Kaufseiten öffentlich sind. Läuft über service_role,
+// damit keine anonyme Policy auf programme nötig ist (siehe
+// launch_c6_freemium_nicht_anonym.sql).
+async function handleUebersicht(req, res, supabase) {
+  const { data, error } = await supabase
+    .from('programme')
+    .select(
+      'slug, titel, subline, bild_url, preis_cent, einfuehrungspreis_cent, einfuehrungspreis_gueltig_bis',
+    )
+    .eq('oeffentlich_kaufbar', true)
+    .eq('aktiv', true)
+    .not('slug', 'is', null)
+    .order('erstellt_am', { ascending: true })
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
+  res.status(200).json({ programme: data ?? [] })
+}
+
+// Programmspezifische Linkvorschau für Crawler (LinkedIn, WhatsApp,
+// Facebook, Slack ...). vercel.json leitet /kaufen/:slug nur für deren
+// User-Agents hierher um; echte Besucher bekommen weiter die SPA.
+const STANDARD_OG_BILD = '/brand/og-image.jpg'
+
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+async function handleLinkVorschau(req, res, supabase) {
+  const slug = typeof req.query.slug === 'string' ? req.query.slug : ''
+  const appUrl = ermittleAppUrl(req)
+
+  const { data: programm } = await supabase
+    .from('programme')
+    .select('titel, subline, beschreibung, bild_url')
+    .eq('slug', slug)
+    .eq('oeffentlich_kaufbar', true)
+    .eq('aktiv', true)
+    .maybeSingle()
+
+  const titel = programm ? `${programm.titel} | MRH Coaching` : 'MRH Coaching'
+  const beschreibung = (
+    programm?.subline ||
+    programm?.beschreibung ||
+    'Online-Programme für Führung, Persönlichkeit und Zahlen von MRH Beratung & Coaching.'
+  )
+    .replace(/\s+/g, ' ')
+    .slice(0, 200)
+  const bild = programm?.bild_url?.startsWith('https://')
+    ? programm.bild_url
+    : `${appUrl}${STANDARD_OG_BILD}`
+  const url = `${appUrl}/kaufen/${encodeURIComponent(slug)}`
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=3600')
+  res.status(programm ? 200 : 404).send(`<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(titel)}</title>
+<meta name="description" content="${escapeHtml(beschreibung)}" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MRH Coaching" />
+<meta property="og:title" content="${escapeHtml(titel)}" />
+<meta property="og:description" content="${escapeHtml(beschreibung)}" />
+<meta property="og:image" content="${escapeHtml(bild)}" />
+<meta property="og:url" content="${escapeHtml(url)}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(titel)}" />
+<meta name="twitter:description" content="${escapeHtml(beschreibung)}" />
+<meta name="twitter:image" content="${escapeHtml(bild)}" />
+<link rel="canonical" href="${escapeHtml(url)}" />
+</head>
+<body><a href="${escapeHtml(url)}">${escapeHtml(titel)}</a></body>
+</html>`)
 }
 
 // Öffentliche Vorschau der Mitgliedschafts-Einstellungen (Titel, Preis,
@@ -768,6 +857,16 @@ export default async function handler(req, res) {
       return
     }
     res.status(405).json({ error: 'Methode nicht erlaubt.' })
+    return
+  }
+
+  if (req.query.resource === 'uebersicht' && req.method === 'GET') {
+    await handleUebersicht(req, res, supabase)
+    return
+  }
+
+  if (req.query.resource === 'linkvorschau' && req.method === 'GET') {
+    await handleLinkVorschau(req, res, supabase)
     return
   }
 

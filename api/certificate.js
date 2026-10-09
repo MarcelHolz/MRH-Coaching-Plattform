@@ -16,7 +16,7 @@ const MRH_GOLD = rgb(0xb9 / 255, 0x91 / 255, 0x3f / 255)
 
 function dateiname(titel) {
   const sicher = titel.replace(/[^a-zA-Z0-9äöüÄÖÜß]+/g, '-').replace(/^-|-$/g, '')
-  return `Zertifikat-${sicher || 'Programm'}.pdf`
+  return `Teilnahmebestaetigung-${sicher || 'Programm'}.pdf`
 }
 
 // Vergibt einen neuen, eindeutigen Empfehlungscode für einen Coachie
@@ -526,7 +526,7 @@ async function handleZertifikat(req, res, supabase) {
     color: MRH_NAVY,
   })
 
-  const titelText = 'Teilnahmezertifikat'
+  const titelText = 'Teilnahmebestätigung'
   page.drawText(titelText, {
     x: width / 2 - serifBold.widthOfTextAtSize(titelText, 28) / 2,
     y: height - 190,
@@ -535,7 +535,7 @@ async function handleZertifikat(req, res, supabase) {
     color: MRH_NAVY,
   })
 
-  const name = coachie?.name || 'Teilnehmer:in'
+  const name = coachie?.name || 'Teilnehmende Person'
   page.drawText(name, {
     x: width / 2 - serifBold.widthOfTextAtSize(name, 22) / 2,
     y: height - 270,
@@ -544,7 +544,9 @@ async function handleZertifikat(req, res, supabase) {
     color: MRH_GOLD,
   })
 
-  const satz = `hat das Programm "${programm.titel}" erfolgreich abgeschlossen.`
+  // FernUSG: reine Teilnahmebestätigung, keine Aussage über eine
+  // Lernerfolgskontrolle.
+  const satz = `hat am Programm "${programm.titel}" teilgenommen.`
   page.drawText(satz, {
     x: width / 2 - serif.widthOfTextAtSize(satz, 14) / 2,
     y: height - 310,

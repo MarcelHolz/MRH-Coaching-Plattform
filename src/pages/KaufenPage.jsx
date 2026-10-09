@@ -374,6 +374,17 @@ export default function KaufenPage() {
     }
   }, [slug])
 
+  // Programmname im Browser-Tab; beim Verlassen der Seite zurück auf den
+  // Standardtitel aus index.html.
+  useEffect(() => {
+    if (!programm?.titel) return
+    const vorher = document.title
+    document.title = `${programm.titel} | MRH Coaching`
+    return () => {
+      document.title = vorher
+    }
+  }, [programm?.titel])
+
   async function handleKaufen() {
     setError('')
     setKaufLaeuft(true)

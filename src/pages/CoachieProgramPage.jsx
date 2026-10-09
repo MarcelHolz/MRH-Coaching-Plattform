@@ -886,8 +886,21 @@ export default function CoachieProgramPage() {
 
       {!hatZuordnung && programm.freemium_aktiv && (
         <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-          Du siehst hier die erste Session kostenlos als Vorschau. Für den
-          vollständigen Zugriff auf alle Sessions melde dich bei Marcel.
+          Du siehst hier die erste Session kostenlos als Vorschau.{' '}
+          {programm.oeffentlich_kaufbar && programm.slug ? (
+            <>
+              Den vollständigen Zugriff auf alle Sessions bekommst du{' '}
+              <a
+                href={`/kaufen/${programm.slug}`}
+                className="font-medium underline hover:text-emerald-900"
+              >
+                hier
+              </a>
+              .
+            </>
+          ) : (
+            'Für den vollständigen Zugriff auf alle Sessions melde dich bei Marcel.'
+          )}
         </div>
       )}
 

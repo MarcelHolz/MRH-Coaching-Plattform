@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import SetPasswordPage from './pages/SetPasswordPage'
 import KaufenPage from './pages/KaufenPage'
+import StartPage from './pages/StartPage'
 import KaufErfolgPage from './pages/KaufErfolgPage'
 import CoachieLayout from './layouts/CoachieLayout'
 import CoachieDashboardPage from './pages/CoachieDashboardPage'
@@ -45,7 +46,7 @@ export default function App() {
       <AuthProvider>
         <AdminAuthProvider>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<StartPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/kaufen/:slug" element={<KaufenPage />} />
             <Route path="/mitgliedschaft" element={<MitgliedschaftPage />} />
