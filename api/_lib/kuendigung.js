@@ -3,11 +3,19 @@ import { getStripe } from './stripeClient.js'
 
 // Signierter, zeitlich begrenzter Bestätigungslink für Kündigungen über
 // das öffentliche Formular (/vertrag-kuendigen). Gleiches Muster wie
-// adminAuth.js (HMAC-SHA256, base64url), eigenes Secret.
+// adminAuth.js (HMAC-SHA256, base64url), aber mit eigenem Pflicht-Secret
+// (kein Fallback auf ADMIN_TOKEN_SECRET) und Typ-Claim 'kuendigung',
+// damit ein Token nie als Token einer anderen Art durchgeht.
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const TOKEN_TYP = 'kuendigung'
+
+// Aufrufer prüfen das vor jeder Schreiboperation und brechen mit 500 ab.
+export function kuendigungTokenKonfiguriert() {
+  return Boolean(process.env.KUENDIGUNG_TOKEN_SECRET)
+}
 
 function secret() {
-  const wert = process.env.KUENDIGUNG_TOKEN_SECRET || process.env.ADMIN_TOKEN_SECRET
+  const wert = process.env.KUENDIGUNG_TOKEN_SECRET
   if (!wert) throw new Error('KUENDIGUNG_TOKEN_SECRET ist nicht gesetzt.')
   return wert
 }
@@ -18,7 +26,7 @@ function signiere(payload) {
 
 export function erstelleKuendigungsToken(erklaerungId) {
   const payload = Buffer.from(
-    JSON.stringify({ id: erklaerungId, exp: Date.now() + TOKEN_TTL_MS }),
+    JSON.stringify({ typ: TOKEN_TYP, id: erklaerungId, exp: Date.now() + TOKEN_TTL_MS }),
   ).toString('base64url')
   return `${payload}.${signiere(payload)}`
 }
@@ -36,7 +44,8 @@ export function pruefeKuendigungsToken(token) {
   }
 
   try {
-    const { id, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    const { typ, id, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    if (typ !== TOKEN_TYP) return null
     if (typeof id !== 'string' || typeof exp !== 'number' || exp < Date.now()) return null
     return id
   } catch {

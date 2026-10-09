@@ -18,8 +18,8 @@ export default function MitgliedschaftPage() {
   const [error, setError] = useState('')
   const [kaufLaeuft, setKaufLaeuft] = useState(false)
   const [zustimmung, setZustimmung] = useState({
-    agbAkzeptiertAm: null,
-    widerrufsverzichtAm: null,
+    agb: false,
+    widerrufsverzicht: false,
   })
 
   const abgebrochen = searchParams.get('abgebrochen') === '1'
@@ -144,8 +144,8 @@ export default function MitgliedschaftPage() {
             disabled={
               kaufLaeuft ||
               mitgliedschaft?.preis_cent == null ||
-              !zustimmung.agbAkzeptiertAm ||
-              !zustimmung.widerrufsverzichtAm
+              !zustimmung.agb ||
+              !zustimmung.widerrufsverzicht
             }
             className="w-full rounded-full bg-gradient-to-br from-mrh-gold to-mrh-gold-dark py-3 text-sm font-semibold text-white shadow-lg shadow-mrh-gold-dark/40 transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
           >

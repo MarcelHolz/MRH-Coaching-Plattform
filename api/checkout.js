@@ -13,6 +13,7 @@ import {
   formatZeitpunkt,
   fuehreKuendigungAus,
   normalisiereZeitpunkt,
+  kuendigungTokenKonfiguriert,
   pruefeKuendigungsToken,
   zeitpunktText,
 } from './_lib/kuendigung.js'
@@ -216,33 +217,19 @@ async function handleMitgliedschaftVorschau(req, res, supabase) {
 }
 
 // Zustimmung zu AGB und Widerrufsverzicht (§ 356 Abs. 5 BGB) muss vor
-// jedem kostenpflichtigen Checkout vorliegen. Der Client schickt die
-// Zeitpunkte des Anhakens; akzeptiert werden nur plausible Werte (nicht
-// älter als 24 Stunden, nicht in der Zukunft).
-const ZUSTIMMUNG_MAX_ALTER_MS = 24 * 60 * 60 * 1000
-const ZUSTIMMUNG_MAX_VORLAUF_MS = 5 * 60 * 1000
-
-function pruefeZeitpunkt(wert) {
-  if (typeof wert !== 'string') return null
-  const zeit = Date.parse(wert)
-  if (Number.isNaN(zeit)) return null
-  const jetzt = Date.now()
-  if (zeit < jetzt - ZUSTIMMUNG_MAX_ALTER_MS || zeit > jetzt + ZUSTIMMUNG_MAX_VORLAUF_MS) {
-    return null
-  }
-  return new Date(zeit).toISOString()
-}
-
+// jedem kostenpflichtigen Checkout vorliegen. Der Client meldet nur
+// agb = true und widerrufsverzicht = true; den Zeitpunkt setzt der Server
+// selbst. So hängt der Nachweis nicht an der (womöglich falsch gehenden)
+// Geräteuhr und kann vom Client nicht vordatiert werden.
 function pruefeKaufZustimmung(body) {
-  const agbAkzeptiertAm = pruefeZeitpunkt(body?.agbAkzeptiertAm)
-  const widerrufsverzichtAm = pruefeZeitpunkt(body?.widerrufsverzichtAm)
-  if (!agbAkzeptiertAm || !widerrufsverzichtAm) {
+  if (body?.agb !== true || body?.widerrufsverzicht !== true) {
     return {
       error:
         'Bitte bestätige die AGB und den Hinweis zum Widerrufsrecht, bevor du zur Bezahlung gehst.',
     }
   }
-  return { agbAkzeptiertAm, widerrufsverzichtAm }
+  const jetzt = new Date().toISOString()
+  return { agbAkzeptiertAm: jetzt, widerrufsverzichtAm: jetzt }
 }
 
 const WIDERRUFSVERZICHT_HINWEIS =
@@ -873,6 +860,18 @@ export default async function handler(req, res) {
   if (req.query.resource === 'kuendigung') {
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'Methode nicht erlaubt.' })
+      return
+    }
+    // Formular und Bestätigungslink brauchen das Token-Secret. Fehlt es,
+    // vor jeder Schreiboperation abbrechen (kein Fallback auf andere
+    // Secrets). Die Direktkündigung eingeloggter Coachies braucht kein
+    // Token und bleibt verfügbar.
+    if (req.query.aktion !== 'direkt' && !kuendigungTokenKonfiguriert()) {
+      console.error('KUENDIGUNG_TOKEN_SECRET ist nicht gesetzt.')
+      res.status(500).json({
+        error:
+          'Die Kündigung ist gerade technisch nicht möglich. Bitte kündige per E-Mail an info@mrh-beratung.de.',
+      })
       return
     }
     if (req.query.aktion === 'bestaetigen') {

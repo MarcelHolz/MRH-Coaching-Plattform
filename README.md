@@ -65,6 +65,7 @@ vercel dev
 | `SUPABASE_SERVICE_ROLE_KEY` | Server | Supabase service_role Key — **niemals im Client** |
 | `ADMIN_PASSWORD` | Server | Passwort für den Admin-Login |
 | `ADMIN_TOKEN_SECRET` | Server | Geheimnis zum Signieren der Admin-Session-Tokens |
+| `KUENDIGUNG_TOKEN_SECRET` | Server | **Pflicht.** Eigenes Geheimnis für die signierten Bestätigungslinks der Kündigungsseite (`/vertrag-kuendigen`). Kein Fallback auf `ADMIN_TOKEN_SECRET`; fehlt es, antworten Formular und Bestätigungslink mit 500 |
 | `APP_URL` | Server | Öffentliche URL der App, für den Redirect im Einladungslink |
 
 `.env.local` ist gitignored. `.env.example` dient als Vorlage.
@@ -72,7 +73,7 @@ vercel dev
 ## Deployment (Vercel)
 
 1. Projekt in Vercel importieren (dieses Repo).
-2. Unter **Settings → Environment Variables** alle sechs Variablen aus der
+2. Unter **Settings → Environment Variables** alle Variablen aus der
    Tabelle oben eintragen (Production/Preview je nach Bedarf).
 3. Deployen:
 

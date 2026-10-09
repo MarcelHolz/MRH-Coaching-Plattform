@@ -329,8 +329,8 @@ export default function KaufenPage() {
   const [error, setError] = useState('')
   const [kaufLaeuft, setKaufLaeuft] = useState(false)
   const [zustimmung, setZustimmung] = useState({
-    agbAkzeptiertAm: null,
-    widerrufsverzichtAm: null,
+    agb: false,
+    widerrufsverzicht: false,
   })
 
   useEffect(() => {
@@ -403,8 +403,8 @@ export default function KaufenPage() {
         body: JSON.stringify({
           slug,
           ...(ref ? { ref } : {}),
-          agbAkzeptiertAm: zustimmung.agbAkzeptiertAm,
-          widerrufsverzichtAm: zustimmung.widerrufsverzichtAm,
+          agb: zustimmung.agb,
+          widerrufsverzicht: zustimmung.widerrufsverzicht,
         }),
       })
       const data = await response.json().catch(() => null)
@@ -572,8 +572,8 @@ export default function KaufenPage() {
                 onClick={handleKaufen}
                 disabled={
                   kaufLaeuft ||
-                  !zustimmung.agbAkzeptiertAm ||
-                  !zustimmung.widerrufsverzichtAm
+                  !zustimmung.agb ||
+                  !zustimmung.widerrufsverzicht
                 }
                 className="w-full rounded-full bg-gradient-to-br from-mrh-gold to-mrh-gold-dark py-3 text-sm font-semibold text-white shadow-lg shadow-mrh-gold-dark/40 transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
               >

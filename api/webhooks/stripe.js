@@ -297,6 +297,8 @@ async function handleKursCheckoutAbgeschlossen(session, supabase, req) {
       programm_id: programmId,
       zugewiesen_am: new Date().toISOString(),
       zugriff_bis: zugriffBis,
+      // Erneuter Kauf nach einer Kündigung: der neue Vertrag ist ungekündigt.
+      gekuendigt_am: null,
       ...zustimmungAusSession(session),
     },
     { onConflict: 'coachie_id,programm_id' },

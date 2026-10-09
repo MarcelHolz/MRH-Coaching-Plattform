@@ -1,10 +1,11 @@
 import { AGB_URL, WIDERRUF_URL } from '../lib/rechtliches'
 
 // Pflicht-Checkboxen vor jedem kostenpflichtigen Checkout (AGB und
-// Widerrufsverzicht bei digitalen Inhalten, § 356 Abs. 5 BGB). Merkt sich
-// den Zeitpunkt des Anhakens, der an den Server geht und dort in den
+// Widerrufsverzicht bei digitalen Inhalten, § 356 Abs. 5 BGB). Der Client
+// meldet nur agb/widerrufsverzicht = true; den Zeitstempel setzt der
+// Server selbst (unabhängig von der Geräteuhr) und legt ihn in den
 // Metadaten der Stripe-Session sowie später in coachie_programme bzw.
-// mitgliedschaften landet. Abhaken setzt den Zeitpunkt zurück.
+// mitgliedschaften ab.
 
 function Checkbox({ checked, onChange, children }) {
   return (
@@ -24,14 +25,14 @@ const linkKlassen = 'underline hover:text-white'
 
 export default function KaufZustimmung({ zustimmung, onChange }) {
   function setze(feld, angehakt) {
-    onChange({ ...zustimmung, [feld]: angehakt ? new Date().toISOString() : null })
+    onChange({ ...zustimmung, [feld]: angehakt })
   }
 
   return (
     <div className="mb-5 space-y-3">
       <Checkbox
-        checked={Boolean(zustimmung.agbAkzeptiertAm)}
-        onChange={(angehakt) => setze('agbAkzeptiertAm', angehakt)}
+        checked={zustimmung.agb}
+        onChange={(angehakt) => setze('agb', angehakt)}
       >
         Ich habe die{' '}
         <a href={AGB_URL} target="_blank" rel="noopener noreferrer" className={linkKlassen}>
@@ -40,8 +41,8 @@ export default function KaufZustimmung({ zustimmung, onChange }) {
         gelesen und akzeptiere sie.
       </Checkbox>
       <Checkbox
-        checked={Boolean(zustimmung.widerrufsverzichtAm)}
-        onChange={(angehakt) => setze('widerrufsverzichtAm', angehakt)}
+        checked={zustimmung.widerrufsverzicht}
+        onChange={(angehakt) => setze('widerrufsverzicht', angehakt)}
       >
         Ich verlange ausdrücklich, dass vor Ablauf der Widerrufsfrist mit der
         Bereitstellung der digitalen Inhalte begonnen wird. Mir ist bekannt, dass
