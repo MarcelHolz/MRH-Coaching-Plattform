@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { sendMail } from '../_lib/mailer.js'
 
@@ -197,9 +198,17 @@ function testimonialEinladungsText(coachie, kandidat, appUrl, bewertungLink) {
   return zeilen.join('\n')
 }
 
+// Timing-sicherer Vergleich des Authorization-Headers über SHA-256-Hashes.
+function cronAutorisiert(header) {
+  const secret = process.env.CRON_SECRET
+  if (!secret || typeof header !== 'string') return false
+  const a = crypto.createHash('sha256').update(header).digest()
+  const b = crypto.createHash('sha256').update(`Bearer ${secret}`).digest()
+  return crypto.timingSafeEqual(a, b)
+}
+
 export default async function handler(req, res) {
-  const erwarteteAuth = `Bearer ${process.env.CRON_SECRET}`
-  if (!process.env.CRON_SECRET || req.headers.authorization !== erwarteteAuth) {
+  if (!cronAutorisiert(req.headers.authorization)) {
     res.status(401).json({ error: 'Nicht autorisiert.' })
     return
   }

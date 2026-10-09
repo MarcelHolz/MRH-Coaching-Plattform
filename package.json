@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
     "@supabase/supabase-js": "^2.45.4",
+    "dompurify": "^3.4.16",
     "marked": "^18.0.10",
     "nodemailer": "^9.0.5",
     "pdf-lib": "^1.17.1",

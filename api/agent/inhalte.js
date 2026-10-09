@@ -1,4 +1,4 @@
-import { requireAgent, requireAgentLesen } from '../_lib/agentAuth.js'
+import { requireAgent } from '../_lib/agentAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 // Schnittstelle für den externen Produktagenten: darf Kurse (Programm/
@@ -834,12 +834,9 @@ async function handleFaqEntwuerfe(req, res, supabase) {
 export default async function handler(req, res) {
   const { resource } = req.query
 
-  // ?resource=lesen erlaubt das Secret zusätzlich als Query-Parameter
-  // (siehe requireAgentLesen) -- alle anderen (schreibenden) Ressourcen
-  // bleiben bei der reinen Header-Prüfung.
-  const autorisiert =
-    resource === 'lesen' ? requireAgentLesen(req, res) : requireAgent(req, res)
-  if (!autorisiert) return
+  // Secret ausschließlich per Header x-agent-secret, für alle Ressourcen.
+  // Ein Secret in der URL landet in Server- und Proxy-Logs.
+  if (!requireAgent(req, res)) return
 
   const supabase = getSupabaseAdmin()
 

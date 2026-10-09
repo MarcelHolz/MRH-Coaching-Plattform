@@ -123,6 +123,11 @@ async function handleEmpfehlung(req, res, supabase) {
 // individuellen Fortschrittsdaten -- und wird explizit angewiesen,
 // Fragen zum persönlichen Fortschritt abzulehnen statt zu beantworten.
 const FAQ_CHAT_MAX_FRAGE_LAENGE = 2000
+// Modell für den FAQ-Chat. Hier zentral änderbar.
+const FAQ_CHAT_MODELL = 'claude-haiku-5-5'
+// Kostenbremse: höchstens so viele Fragen pro Coachie und Kalendertag
+// (Europe/Berlin), gezählt in faq_nutzung über faq_nutzung_buchen().
+const FAQ_CHAT_TAGESLIMIT = 20
 
 function baueFaqSystemPrompt(faqEintraege) {
   const wissensbasis = faqEintraege
@@ -163,6 +168,26 @@ async function handleFaqChat(req, res, supabase) {
     return
   }
 
+  // Frage zuerst atomar verbuchen; ist das Tageslimit erreicht, liefert
+  // die Funktion false und es erfolgt kein API-Aufruf.
+  const { data: gebucht, error: limitError } = await supabase.rpc('faq_nutzung_buchen', {
+    p_coachie_id: coachieId,
+    p_limit: FAQ_CHAT_TAGESLIMIT,
+  })
+
+  if (limitError) {
+    console.error('FAQ-Tageslimit konnte nicht geprüft werden:', limitError.message)
+    res.status(503).json({ error: 'Der Chat ist gerade nicht verfügbar. Bitte später erneut versuchen.' })
+    return
+  }
+
+  if (!gebucht) {
+    res.status(429).json({
+      error: `Du hast heute schon ${FAQ_CHAT_TAGESLIMIT} Fragen gestellt. Morgen geht es weiter. Bei dringenden Anliegen schreib uns gern eine E-Mail.`,
+    })
+    return
+  }
+
   const { data: faqEintraege, error: faqError } = await supabase
     .from('faq_eintraege')
     .select('frage, antwort')
@@ -177,7 +202,7 @@ async function handleFaqChat(req, res, supabase) {
   try {
     const client = new Anthropic()
     const response = await client.messages.create({
-      model: 'claude-opus-5',
+      model: FAQ_CHAT_MODELL,
       max_tokens: 1024,
       output_config: { effort: 'low' },
       system: baueFaqSystemPrompt(faqEintraege ?? []),
