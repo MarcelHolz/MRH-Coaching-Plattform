@@ -6,6 +6,7 @@ import { useMitgliedschaftAngebotAktiv } from '../lib/mitgliedschaftAngebot'
 import { initialen } from '../lib/initialen'
 import FaqChatWidget from '../components/FaqChatWidget'
 import OnboardingTour from '../components/OnboardingTour'
+import RechtsFooter from '../components/RechtsFooter'
 
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
@@ -194,12 +195,7 @@ export default function CoachieLayout() {
               </a>
             ))}
           </div>
-          <Link
-            to="/vertrag-kuendigen"
-            className="mt-4 inline-block text-xs text-mrh-grey hover:underline"
-          >
-            Vertrag kündigen
-          </Link>
+          <RechtsFooter linksbuendig className="mt-6" />
         </div>
       </footer>
       {session?.access_token && <FaqChatWidget accessToken={session.access_token} />}

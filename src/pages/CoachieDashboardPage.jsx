@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { formatPreis } from '../lib/preis'
+import { formatPreis, UST_HINWEIS } from '../lib/preis'
 import { stripMarkdown } from '../lib/markdown'
 import MitgliedschaftHinweis from '../components/MitgliedschaftHinweis'
 
@@ -423,11 +423,18 @@ export default function CoachieDashboardPage() {
                   {stripMarkdown(programm.beschreibung)}
                 </p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-mrh-gold-soft">
-                    {programm.preis_anzeigen
-                      ? (formatPreis(programm.preis_cent) ?? 'Preis auf Anfrage')
-                      : 'Preis auf Anfrage'}
-                  </span>
+                  <div>
+                    <span className="text-sm font-medium text-mrh-gold-soft">
+                      {!programm.preis_anzeigen || programm.preis_cent == null
+                        ? 'Preis auf Anfrage'
+                        : programm.preis_cent === 0
+                          ? 'Kostenlos'
+                          : formatPreis(programm.preis_cent)}
+                    </span>
+                    {programm.preis_anzeigen && programm.preis_cent > 0 && (
+                      <p className="text-[10px] text-white/50">{UST_HINWEIS}</p>
+                    )}
+                  </div>
                   {programm.oeffentlich_kaufbar && programm.slug && (
                     <a
                       href={`/kaufen/${programm.slug}`}

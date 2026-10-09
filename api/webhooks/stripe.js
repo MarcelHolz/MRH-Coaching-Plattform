@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { findeOderErstelleCoachie } from '../_lib/coachieAnlage.js'
 import { ermittleAppUrl } from '../_lib/appUrl.js'
 import { sendMail } from '../_lib/mailer.js'
+import { AGB_URL, WIDERRUF_URL } from '../../src/lib/rechtliches.js'
 
 // Stripe-Signaturprüfung braucht den unveränderten Roh-Body (byte-genau),
 // nicht das von Vercel automatisch geparste JSON-Objekt.
@@ -90,6 +91,7 @@ async function handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
       start_datum: new Date().toISOString(),
       naechste_abrechnung: ermittleNaechsteAbrechnung(subscription),
       aktualisiert_am: new Date().toISOString(),
+      ...zustimmungAusSession(session),
     },
     { onConflict: 'coachie_id' },
   )
@@ -97,6 +99,32 @@ async function handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
   if (error) return { error: error.message }
 
   await speichereStripeCustomerId(coachieId, session.customer, supabase)
+
+  const email = session.customer_details?.email
+  const naechste = ermittleNaechsteAbrechnung(subscription)
+  if (email) {
+    await sendeBestaetigung({
+      to: email,
+      subject: 'Bestätigung deiner MRH Community-Mitgliedschaft',
+      text: `Hallo${session.customer_details?.name ? ' ' + session.customer_details.name : ''},
+
+vielen Dank. Hiermit bestätigen wir den Abschluss deiner Mitgliedschaft.
+
+Mitgliedschaft: MRH Community-Mitgliedschaft
+Preis: ${formatBetrag(session.amount_total, session.currency)} pro Monat
+${naechste ? `Nächste Abrechnung: ${formatDatum(naechste)}\n` : ''}Laufzeit: monatlich, kündbar zum Ende des jeweiligen Abrechnungszeitraums
+
+${verzichtAbsatz(session)}
+
+AGB: ${AGB_URL}
+Widerrufsbelehrung: ${WIDERRUF_URL}
+Kündigen: ${ermittleAppUrl(req)}/vertrag-kuendigen
+
+Viele Grüße
+Marcel Holz
+MRH Beratung & Coaching`,
+    })
+  }
 
   return {}
 }
@@ -144,6 +172,78 @@ async function handleInvoicePaymentFailed(invoice, supabase) {
   return {}
 }
 
+// Zustimmung zu AGB und Widerrufsverzicht aus den Session-Metadaten
+// (gesetzt in api/checkout.js). Nur gültige Zeitpunkte übernehmen.
+function zustimmungAusSession(session) {
+  const felder = {}
+  for (const [meta, spalte] of [
+    ['agb_akzeptiert_am', 'agb_akzeptiert_am'],
+    ['widerrufsverzicht_am', 'widerrufsverzicht_am'],
+  ]) {
+    const wert = session.metadata?.[meta]
+    if (wert && !Number.isNaN(Date.parse(wert))) felder[spalte] = wert
+  }
+  return felder
+}
+
+function formatZeitpunkt(iso) {
+  return new Date(iso).toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    dateStyle: 'long',
+    timeStyle: 'short',
+  })
+}
+
+function formatDatum(iso) {
+  return new Date(iso).toLocaleDateString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    dateStyle: 'long',
+  })
+}
+
+function formatBetrag(cent, waehrung) {
+  if (cent == null) return 'siehe Rechnung'
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: (waehrung || 'eur').toUpperCase(),
+  }).format(cent / 100)
+}
+
+// Vertragsbestätigung auf dauerhaftem Datenträger (§ 312f BGB). Ein
+// Fehlversand blockiert die bereits erfolgte Freischaltung nicht, wird
+// aber protokolliert und dem Admin gemeldet.
+async function sendeBestaetigung({ to, subject, text }) {
+  try {
+    await sendMail({ to, subject, text })
+  } catch (err) {
+    console.error(`Bestätigungsmail an ${to} nicht versendet:`, err.message)
+    if (process.env.ADMIN_EMAIL) {
+      try {
+        await sendMail({
+          to: process.env.ADMIN_EMAIL,
+          subject: 'Kaufbestätigung konnte nicht versendet werden',
+          text: `Die Vertragsbestätigung an ${to} ist fehlgeschlagen (${err.message}). Bitte manuell nachsenden.\n\n${text}`,
+        })
+      } catch {
+        // Bereits protokolliert.
+      }
+    }
+  }
+}
+
+function verzichtAbsatz(session) {
+  const verzichtAm = session.metadata?.widerrufsverzicht_am
+  const agbAm = session.metadata?.agb_akzeptiert_am
+  const zeilen = []
+  if (agbAm) zeilen.push(`AGB akzeptiert am: ${formatZeitpunkt(agbAm)}`)
+  if (verzichtAm) {
+    zeilen.push(
+      `Du hast am ${formatZeitpunkt(verzichtAm)} ausdrücklich verlangt, dass wir vor Ablauf der Widerrufsfrist mit der Bereitstellung der digitalen Inhalte beginnen, und bestätigt, dass dein Widerrufsrecht mit Beginn der Bereitstellung erlischt.`,
+    )
+  }
+  return zeilen.join('\n')
+}
+
 // Kurskauf (mode 'payment'): Coachie finden/anlegen und dem Programm
 // zuordnen. Mehrfach ausführbar (upsert auf coachie_id,programm_id),
 // damit eine erneute Stripe-Zustellung nach einem Fehler den Kauf
@@ -169,7 +269,7 @@ async function handleKursCheckoutAbgeschlossen(session, supabase, req) {
 
   const { data: programm, error: programmError } = await supabase
     .from('programme')
-    .select('standard_zugriffsmonate')
+    .select('titel, standard_zugriffsmonate')
     .eq('id', programmId)
     .maybeSingle()
 
@@ -197,6 +297,7 @@ async function handleKursCheckoutAbgeschlossen(session, supabase, req) {
       programm_id: programmId,
       zugewiesen_am: new Date().toISOString(),
       zugriff_bis: zugriffBis,
+      ...zustimmungAusSession(session),
     },
     { onConflict: 'coachie_id,programm_id' },
   )
@@ -223,6 +324,32 @@ async function handleKursCheckoutAbgeschlossen(session, supabase, req) {
       console.error('Empfehlung konnte nicht protokolliert werden:', empfehlungError.message)
     }
   }
+
+  const appUrl = ermittleAppUrl(req)
+  const titel = programm?.titel ?? 'Programm'
+  await sendeBestaetigung({
+    to: email,
+    subject: `Bestätigung deines Kaufs: ${titel}`,
+    text: `Hallo${session.customer_details?.name ? ' ' + session.customer_details.name : ''},
+
+vielen Dank für deinen Kauf. Hiermit bestätigen wir den Vertragsschluss.
+
+Programm: ${titel}
+Preis: ${formatBetrag(session.amount_total, session.currency)}
+Zugriff: ${zugriffBis ? `bis ${formatDatum(zugriffBis)}` : 'unbefristet'}
+
+${verzichtAbsatz(session)}
+
+AGB: ${AGB_URL}
+Widerrufsbelehrung: ${WIDERRUF_URL}
+
+Deine Rechnung erhältst du separat von Stripe. Zum Login: ${appUrl}/login
+Falls du noch kein Passwort festgelegt hast, nutze die Einladungsmail oder auf der Login-Seite „Passwort vergessen“.
+
+Viele Grüße
+Marcel Holz
+MRH Beratung & Coaching`,
+  })
 
   return { coachieId, programmId, zugriffBis }
 }

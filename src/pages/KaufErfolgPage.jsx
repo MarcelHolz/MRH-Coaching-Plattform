@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
+import RechtsFooter from '../components/RechtsFooter'
 
 export default function KaufErfolgPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-mrh-cream px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-mrh-cream px-4 py-8">
       <div className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-sm">
         <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-mrh-gold/15">
           <svg viewBox="0 0 20 20" fill="currentColor" className="h-7 w-7 text-mrh-gold">
@@ -28,6 +29,7 @@ export default function KaufErfolgPage() {
           Zum Login
         </Link>
       </div>
+      <RechtsFooter />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
+import RechtsFooter from '../components/RechtsFooter'
 
 export default function SetPasswordPage() {
   const navigate = useNavigate()
@@ -85,6 +86,8 @@ export default function SetPasswordPage() {
               {submitting ? 'Speichert…' : 'Passwort speichern'}
             </button>
           </form>
+
+          <RechtsFooter linksbuendig className="mt-8" />
         </div>
       </div>
 

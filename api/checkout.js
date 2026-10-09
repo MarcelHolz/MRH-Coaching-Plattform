@@ -6,13 +6,24 @@ import {
   findeOderErstelleCoachie,
   normalisiereEmail,
 } from './_lib/coachieAnlage.js'
+import { requireCoachie } from './_lib/coachieAuth.js'
+import {
+  VERTRAG_LABEL,
+  erstelleKuendigungsToken,
+  formatZeitpunkt,
+  fuehreKuendigungAus,
+  normalisiereZeitpunkt,
+  pruefeKuendigungsToken,
+  zeitpunktText,
+} from './_lib/kuendigung.js'
 
-// Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions).
-// GET ?slug= übernimmt die frühere api/public/programme.js (öffentliche
-// Programm-Vorschau für /kaufen/:slug, kein Admin-Auth), POST erstellt
-// wie bisher die Stripe Checkout Session. Beide Zweige sind bewusst
-// ohne requireAdmin -- diese Route ist für nicht eingeloggte Besucher
-// der Kaufseite gedacht.
+// Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions), für
+// nicht eingeloggte Besucher gedacht, daher ohne requireAdmin:
+//   GET  ?slug=                     öffentliche Programm-Vorschau (/kaufen/:slug)
+//   POST                            Stripe Checkout Session (Kurskauf)
+//   POST ?aktion=gratis             Gratis-Anmeldung (preis_cent = 0)
+//   GET/POST ?resource=mitgliedschaft   Vorschau bzw. Checkout Mitgliedschaft
+//   POST ?resource=kuendigung[&aktion=bestaetigen|direkt]   Kündigungsbutton
 
 async function handleVorschau(req, res, supabase) {
   const { slug } = req.query
@@ -115,6 +126,39 @@ async function handleMitgliedschaftVorschau(req, res, supabase) {
   })
 }
 
+// Zustimmung zu AGB und Widerrufsverzicht (§ 356 Abs. 5 BGB) muss vor
+// jedem kostenpflichtigen Checkout vorliegen. Der Client schickt die
+// Zeitpunkte des Anhakens; akzeptiert werden nur plausible Werte (nicht
+// älter als 24 Stunden, nicht in der Zukunft).
+const ZUSTIMMUNG_MAX_ALTER_MS = 24 * 60 * 60 * 1000
+const ZUSTIMMUNG_MAX_VORLAUF_MS = 5 * 60 * 1000
+
+function pruefeZeitpunkt(wert) {
+  if (typeof wert !== 'string') return null
+  const zeit = Date.parse(wert)
+  if (Number.isNaN(zeit)) return null
+  const jetzt = Date.now()
+  if (zeit < jetzt - ZUSTIMMUNG_MAX_ALTER_MS || zeit > jetzt + ZUSTIMMUNG_MAX_VORLAUF_MS) {
+    return null
+  }
+  return new Date(zeit).toISOString()
+}
+
+function pruefeKaufZustimmung(body) {
+  const agbAkzeptiertAm = pruefeZeitpunkt(body?.agbAkzeptiertAm)
+  const widerrufsverzichtAm = pruefeZeitpunkt(body?.widerrufsverzichtAm)
+  if (!agbAkzeptiertAm || !widerrufsverzichtAm) {
+    return {
+      error:
+        'Bitte bestätige die AGB und den Hinweis zum Widerrufsrecht, bevor du zur Bezahlung gehst.',
+    }
+  }
+  return { agbAkzeptiertAm, widerrufsverzichtAm }
+}
+
+const WIDERRUFSVERZICHT_HINWEIS =
+  'Du hast verlangt, dass wir vor Ablauf der Widerrufsfrist mit der Bereitstellung der digitalen Inhalte beginnen. Mit Beginn der Bereitstellung erlischt dein Widerrufsrecht.'
+
 // Erstellt eine Stripe-Subscription-Checkout-Session (mode: 'subscription'
 // statt 'payment') -- eigenständig buchbar, unabhängig von jedem
 // Kurskauf. Der eigentliche Mitgliedschafts-Datensatz wird erst im
@@ -135,6 +179,12 @@ async function handleMitgliedschaftVorschau(req, res, supabase) {
 // sowohl die öffentliche Vorschau (handleMitgliedschaftVorschau) als
 // auch den tatsächlichen Checkout-Preis.
 async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
+  const zustimmung = pruefeKaufZustimmung(req.body)
+  if (zustimmung.error) {
+    res.status(400).json({ error: zustimmung.error })
+    return
+  }
+
   const { data: einstellungen, error } = await supabase
     .from('mitgliedschaft_einstellungen')
     .select('titel, preis_cent, mitgliedschaft_aktiv')
@@ -170,222 +220,298 @@ async function handleMitgliedschaftCheckoutSession(req, res, supabase) {
     ],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/mitgliedschaft?abgebrochen=1`,
-    metadata: { typ: 'mitgliedschaft' },
+    custom_text: { submit: { message: WIDERRUFSVERZICHT_HINWEIS } },
+    metadata: {
+      typ: 'mitgliedschaft',
+      agb_akzeptiert_am: zustimmung.agbAkzeptiertAm,
+      widerrufsverzicht_am: zustimmung.widerrufsverzichtAm,
+    },
   })
 
   res.status(200).json({ url: session.url })
 }
 
-// Kündigungsbutton (§ 312k BGB, Punkt 1): öffentlich, ohne Login --
-// bewusst ein generischer Baustein für beide Vertragsarten
-// (Mitgliedschaft = Stripe Subscription, Kurszugriff = Einmalzahlung
-// mit Laufzeit), keine zwei getrennten Lösungen. Zwei Schritte über
-// denselben POST-Zweig, unterschieden am Body: {email} sucht die
-// kündbaren Verträge, {email, vertragTyp, vertragId} führt die
-// Kündigung aus. Absichtlich KEIN Login-Zwang -- die E-Mail-Adresse
-// dient der Identifikation, wie im Auftrag beschrieben.
+// Kündigungsbutton (§ 312k BGB). Drei Wege über dieselbe Route:
 //
-// Hinweis (kein Ersatz für rechtliche Prüfung): Diese Umsetzung folgt
-// der im Auftrag beschriebenen Rechtslage (u. a. eine im Juli 2026
-// genannte BGH-Entscheidung), die sich in dieser Sandbox nicht
-// unabhängig verifizieren lässt (kein Zugriff auf eine juristische
-// Datenbank). Vor dem Live-Einsatz bitte juristisch gegenprüfen lassen,
-// insbesondere ob eine sofortige Kündigung der Mitgliedschaft (statt
-// zum Ende der bezahlten Periode) hier tatsächlich zutreffend ist.
-async function handleKuendigungSuche(req, res, supabase) {
-  const { email } = req.body ?? {}
+// 1. Öffentliches Formular (POST ?resource=kuendigung): nimmt die
+//    Kündigungserklärung entgegen, protokolliert sie und bestätigt den
+//    Eingang per Mail. Gibt KEINE Vertragsdaten zurück und antwortet
+//    immer gleich, damit niemand über eine fremde Adresse Buchungen
+//    einsehen oder beenden kann. Gehört die Adresse einem Coachie,
+//    enthält die Mail einen signierten Bestätigungslink.
+// 2. Bestätigungslink (POST ?resource=kuendigung&aktion=bestaetigen):
+//    führt die protokollierte Kündigung erst nach Klick aus.
+// 3. Eingeloggte Coachies (POST ?resource=kuendigung&aktion=direkt,
+//    Bearer-Token): sofortige Ausführung ohne Mailbestätigung.
+//
+// Mitgliedschaften enden zum Ende der bezahlten Periode
+// (cancel_at_period_end), nicht sofort.
+const KUENDIGUNG_EINGANG = {
+  status: 'eingegangen',
+  meldung: 'Deine Kündigung ist eingegangen. Du erhältst eine Bestätigung per E-Mail.',
+}
+const KUENDIGUNG_LIMIT_PRO_TAG = 5
 
-  if (!email) {
-    res.status(400).json({ error: 'email ist erforderlich.' })
+function adminAdresse() {
+  return process.env.ADMIN_EMAIL || process.env.SMTP_FROM || process.env.SMTP_USER
+}
+
+async function sendeOhneAbbruch(mail) {
+  try {
+    await sendMail(mail)
+    return true
+  } catch (err) {
+    console.error(`Mail an ${mail.to} nicht versendet:`, err.message)
+    return false
+  }
+}
+
+function erklaerungsText({ name, email, vertrag, angaben, zeitpunkt, erstelltAm }) {
+  return [
+    `Eingegangen am: ${formatZeitpunkt(erstelltAm)}`,
+    `Name: ${name}`,
+    `E-Mail: ${email}`,
+    `Vertrag: ${VERTRAG_LABEL[vertrag] ?? vertrag}`,
+    ...(angaben ? [`Angaben: ${angaben}`] : []),
+    `Gewünschter Zeitpunkt: ${zeitpunktText(zeitpunkt)}`,
+  ].join('\n')
+}
+
+async function handleKuendigungErklaerung(req, res, supabase) {
+  const { name, email, vertrag, angaben, zeitpunkt, website } = req.body ?? {}
+
+  if (website) {
+    res.status(200).json(KUENDIGUNG_EINGANG)
     return
   }
 
-  const { data: coachie, error: coachieError } = await supabase
+  const normalisiert = normalisiereEmail(email)
+  const nameSauber = typeof name === 'string' ? name.trim().slice(0, 200) : ''
+  const vertragSauber = VERTRAG_LABEL[vertrag] ? vertrag : 'alle'
+  const angabenSauber = typeof angaben === 'string' ? angaben.trim().slice(0, 1000) : ''
+  const zeitpunktSauber = normalisiereZeitpunkt(zeitpunkt)
+
+  if (!nameSauber || !EMAIL_MUSTER.test(normalisiert)) {
+    res.status(400).json({ error: 'Bitte Name und eine gültige E-Mail-Adresse angeben.' })
+    return
+  }
+  if (!zeitpunktSauber) {
+    res.status(400).json({ error: 'Bitte ein gültiges Datum in der Zukunft wählen.' })
+    return
+  }
+
+  const seit = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count } = await supabase
+    .from('kuendigungserklaerungen')
+    .select('id', { count: 'exact', head: true })
+    .eq('email', normalisiert)
+    .gte('erstellt_am', seit)
+
+  if ((count ?? 0) >= KUENDIGUNG_LIMIT_PRO_TAG) {
+    res.status(429).json({
+      error: 'Zu viele Kündigungen mit dieser Adresse. Bitte versuche es morgen erneut.',
+    })
+    return
+  }
+
+  const { data: coachie } = await supabase
     .from('coachies')
-    .select('id, name')
-    .eq('email', email)
+    .select('id')
+    .eq('email', normalisiert)
     .maybeSingle()
 
-  if (coachieError) {
-    res.status(500).json({ error: coachieError.message })
+  const { data: erklaerung, error: insertError } = await supabase
+    .from('kuendigungserklaerungen')
+    .insert({
+      name: nameSauber,
+      email: normalisiert,
+      vertrag: vertragSauber,
+      angaben: angabenSauber || null,
+      zeitpunkt: zeitpunktSauber,
+      quelle: 'formular',
+      coachie_id: coachie?.id ?? null,
+      status: coachie ? 'eingegangen' : 'manuell_pruefen',
+    })
+    .select('id, erstellt_am')
+    .single()
+
+  if (insertError) {
+    res.status(500).json({ error: insertError.message })
     return
   }
 
-  // Bewusst kein 404/Fehler bei unbekannter E-Mail -- liefert einfach
-  // eine leere Vertragsliste, analog zum bestehenden
-  // Passwort-vergessen-Muster (LoginPage.jsx), das ebenfalls nicht
-  // verrät, ob eine E-Mail-Adresse als Coachie existiert.
-  if (!coachie) {
-    res.status(200).json({ vertraege: [] })
+  const inhalt = erklaerungsText({
+    name: nameSauber,
+    email: normalisiert,
+    vertrag: vertragSauber,
+    angaben: angabenSauber,
+    zeitpunkt: zeitpunktSauber,
+    erstelltAm: erklaerung.erstellt_am,
+  })
+
+  const link = coachie
+    ? `${ermittleAppUrl(req)}/vertrag-kuendigen?token=${encodeURIComponent(
+        erstelleKuendigungsToken(erklaerung.id),
+      )}`
+    : null
+
+  await sendeOhneAbbruch({
+    to: normalisiert,
+    subject: 'Eingangsbestätigung deiner Kündigung',
+    text: `Hallo ${nameSauber},\n\nwir bestätigen den Eingang deiner Kündigungserklärung mit folgendem Inhalt:\n\n${inhalt}\n\n${
+      link
+        ? `Bitte bestätige die Kündigung über diesen Link (gültig 7 Tage):\n${link}\n\nErst nach der Bestätigung wird die Kündigung ausgeführt. Damit stellen wir sicher, dass niemand ohne dein Wissen in deinem Namen kündigt.`
+        : 'Wir prüfen deine Kündigung und melden uns kurzfristig bei dir.'
+    }\n\nFalls du diese Kündigung nicht abgeschickt hast, kannst du diese E-Mail ignorieren.\n\nViele Grüße\nMRH Beratung & Coaching`,
+  })
+
+  await sendeOhneAbbruch({
+    to: adminAdresse(),
+    subject: 'Kündigungserklärung eingegangen',
+    text: `Über /vertrag-kuendigen ist eine Kündigung eingegangen.\n\n${inhalt}\n\n${
+      coachie
+        ? 'Die Adresse gehört zu einem Coachie. Ausführung nach Klick auf den Bestätigungslink.'
+        : 'Kein Coachie mit dieser Adresse gefunden. Bitte manuell prüfen.'
+    }`,
+    replyTo: normalisiert,
+  })
+
+  res.status(200).json(KUENDIGUNG_EINGANG)
+}
+
+async function schliesseKuendigungAb(req, res, supabase, erklaerung, coachie) {
+  let ergebnis
+  try {
+    ergebnis = await fuehreKuendigungAus(supabase, {
+      coachieId: erklaerung.coachie_id,
+      vertrag: erklaerung.vertrag,
+      vertragId: erklaerung.vertrag_id,
+      zeitpunkt: erklaerung.zeitpunkt,
+    })
+  } catch (err) {
+    console.error('Kündigung konnte nicht ausgeführt werden:', err)
+    await sendeOhneAbbruch({
+      to: adminAdresse(),
+      subject: 'Kündigung konnte nicht ausgeführt werden',
+      text: `Kündigungserklärung ${erklaerung.id} (${erklaerung.email}) ist fehlgeschlagen: ${err.message}\nBitte manuell ausführen.`,
+    })
+    await supabase
+      .from('kuendigungserklaerungen')
+      .update({ status: 'fehler', ergebnis: err.message })
+      .eq('id', erklaerung.id)
+    res.status(500).json({
+      error:
+        'Die Kündigung ist bei uns eingegangen, konnte aber nicht automatisch ausgeführt werden. Wir kümmern uns darum und melden uns.',
+    })
     return
   }
 
-  const [{ data: mitgliedschaft }, { data: kursZuordnungen }] = await Promise.all([
-    supabase
-      .from('mitgliedschaften')
-      .select('id, status')
-      .eq('coachie_id', coachie.id)
-      .eq('status', 'aktiv')
-      .maybeSingle(),
-    supabase
-      .from('coachie_programme')
-      .select('id, zugriff_bis, gekuendigt_am, programme(titel)')
-      .eq('coachie_id', coachie.id)
-      .is('gekuendigt_am', null),
-  ])
+  const jetzt = new Date().toISOString()
+  await supabase
+    .from('kuendigungserklaerungen')
+    .update({ status: 'ausgefuehrt', ausgefuehrt_am: jetzt, ergebnis: ergebnis.join('\n') })
+    .eq('id', erklaerung.id)
 
-  const vertraege = []
+  const text = `Hallo ${coachie?.name || erklaerung.name},\n\nwir bestätigen deine Kündigung vom ${formatZeitpunkt(
+    erklaerung.erstellt_am,
+  )}.\n\n${ergebnis.join('\n')}\n\nViele Grüße\nMRH Beratung & Coaching`
 
-  if (mitgliedschaft) {
-    vertraege.push({
-      vertragTyp: 'mitgliedschaft',
-      vertragId: mitgliedschaft.id,
-      bezeichnung: 'MRH Community-Mitgliedschaft',
-    })
-  }
+  await sendeOhneAbbruch({
+    to: erklaerung.email,
+    subject: 'Bestätigung deiner Kündigung',
+    text,
+  })
+  await sendeOhneAbbruch({
+    to: adminAdresse(),
+    subject: 'Kündigung ausgeführt',
+    text: `Kopie der Kündigungsbestätigung an ${erklaerung.email}:\n\n${text}`,
+  })
 
-  for (const zuordnung of kursZuordnungen ?? []) {
-    vertraege.push({
-      vertragTyp: 'kurs',
-      vertragId: zuordnung.id,
-      bezeichnung: zuordnung.programme?.titel ?? 'Programm',
-      zugriffBis: zuordnung.zugriff_bis,
-    })
-  }
-
-  res.status(200).json({ vertraege })
+  res.status(200).json({ status: 'ausgefuehrt', ergebnis })
 }
 
 async function handleKuendigungBestaetigen(req, res, supabase) {
-  const { email, vertragTyp, vertragId } = req.body ?? {}
+  const erklaerungId = pruefeKuendigungsToken(req.body?.token)
+  if (!erklaerungId) {
+    res.status(400).json({
+      error: 'Der Link ist ungültig oder abgelaufen. Bitte sende die Kündigung erneut ab.',
+    })
+    return
+  }
 
-  if (!email || !vertragTyp || !vertragId) {
-    res
-      .status(400)
-      .json({ error: 'email, vertragTyp und vertragId sind erforderlich.' })
+  const { data: erklaerung, error } = await supabase
+    .from('kuendigungserklaerungen')
+    .select('*')
+    .eq('id', erklaerungId)
+    .maybeSingle()
+
+  if (error) {
+    res.status(500).json({ error: error.message })
+    return
+  }
+  if (!erklaerung?.coachie_id) {
+    res.status(404).json({ error: 'Kündigung nicht gefunden.' })
+    return
+  }
+  if (erklaerung.status === 'ausgefuehrt') {
+    res.status(200).json({ status: 'bereits_ausgefuehrt' })
+    return
+  }
+
+  const { data: coachie } = await supabase
+    .from('coachies')
+    .select('name')
+    .eq('id', erklaerung.coachie_id)
+    .maybeSingle()
+
+  await schliesseKuendigungAb(req, res, supabase, erklaerung, coachie)
+}
+
+async function handleKuendigungDirekt(req, res, supabase) {
+  const coachieId = await requireCoachie(req, res, supabase)
+  if (!coachieId) return
+
+  const { vertrag, vertragId, zeitpunkt } = req.body ?? {}
+  const vertragSauber = VERTRAG_LABEL[vertrag] ? vertrag : null
+  const zeitpunktSauber = normalisiereZeitpunkt(zeitpunkt)
+
+  if (!vertragSauber || !zeitpunktSauber) {
+    res.status(400).json({ error: 'Ungültige Angaben zur Kündigung.' })
     return
   }
 
   const { data: coachie, error: coachieError } = await supabase
     .from('coachies')
-    .select('id, name, email')
-    .eq('email', email)
-    .maybeSingle()
+    .select('name, email')
+    .eq('id', coachieId)
+    .single()
 
   if (coachieError) {
     res.status(500).json({ error: coachieError.message })
     return
   }
 
-  if (!coachie) {
-    res.status(404).json({ error: 'Kein Vertrag zu dieser E-Mail-Adresse gefunden.' })
-    return
-  }
-
-  let bezeichnung = ''
-
-  if (vertragTyp === 'mitgliedschaft') {
-    const { data: mitgliedschaft, error: mitgliedschaftError } = await supabase
-      .from('mitgliedschaften')
-      .select('id, stripe_subscription_id, status')
-      .eq('id', vertragId)
-      .eq('coachie_id', coachie.id)
-      .maybeSingle()
-
-    if (mitgliedschaftError) {
-      res.status(500).json({ error: mitgliedschaftError.message })
-      return
-    }
-    if (!mitgliedschaft || mitgliedschaft.status !== 'aktiv') {
-      res.status(404).json({ error: 'Mitgliedschaft nicht gefunden oder bereits gekündigt.' })
-      return
-    }
-
-    try {
-      const stripe = getStripe()
-      await stripe.subscriptions.cancel(mitgliedschaft.stripe_subscription_id)
-    } catch (err) {
-      res.status(500).json({ error: `Stripe-Kündigung fehlgeschlagen: ${err.message}` })
-      return
-    }
-
-    const { error: updateError } = await supabase
-      .from('mitgliedschaften')
-      .update({ status: 'gekuendigt', aktualisiert_am: new Date().toISOString() })
-      .eq('id', vertragId)
-
-    if (updateError) {
-      res.status(500).json({ error: updateError.message })
-      return
-    }
-
-    bezeichnung = 'MRH Community-Mitgliedschaft'
-  } else if (vertragTyp === 'kurs') {
-    const { data: zuordnung, error: zuordnungError } = await supabase
-      .from('coachie_programme')
-      .select('id, gekuendigt_am, zugriff_bis, programme(titel)')
-      .eq('id', vertragId)
-      .eq('coachie_id', coachie.id)
-      .maybeSingle()
-
-    if (zuordnungError) {
-      res.status(500).json({ error: zuordnungError.message })
-      return
-    }
-    if (!zuordnung || zuordnung.gekuendigt_am) {
-      res.status(404).json({ error: 'Zugang nicht gefunden oder bereits gekündigt.' })
-      return
-    }
-
-    const { error: updateError } = await supabase
-      .from('coachie_programme')
-      .update({ gekuendigt_am: new Date().toISOString() })
-      .eq('id', vertragId)
-
-    if (updateError) {
-      res.status(500).json({ error: updateError.message })
-      return
-    }
-
-    bezeichnung = zuordnung.programme?.titel ?? 'Programm'
-  } else {
-    res.status(400).json({ error: 'Unbekannter vertragTyp.' })
-    return
-  }
-
-  const jetzt = new Date()
-
-  const { error: logError } = await supabase.from('kuendigungen').insert({
-    coachie_id: coachie.id,
-    vertrag_typ: vertragTyp,
-    vertrag_referenz_id: vertragId,
-    email: coachie.email,
-    erstellt_am: jetzt.toISOString(),
-  })
-
-  if (logError) {
-    res.status(500).json({ error: logError.message })
-    return
-  }
-
-  // Bestätigungsmail als Nachweis für den Zugang der Erklärung -- rein
-  // informativ, ein Fehlversand blockiert die bereits ausgeführte
-  // Kündigung nicht mehr.
-  try {
-    await sendMail({
-      to: coachie.email,
-      subject: 'Bestätigung deiner Kündigung',
-      text: `Hallo,\n\nwir bestätigen den Eingang deiner Kündigung vom ${jetzt.toLocaleString('de-DE')} für: ${bezeichnung}.\n\n${
-        vertragTyp === 'mitgliedschaft'
-          ? 'Deine Mitgliedschaft ist damit beendet.'
-          : 'Dein bereits bezahlter Zugriff bleibt bis zum Ende der Laufzeit bestehen, verlängert sich aber nicht automatisch weiter.'
-      }\n\nViele Grüße\nMRH Beratung & Coaching`,
+  const { data: erklaerung, error: insertError } = await supabase
+    .from('kuendigungserklaerungen')
+    .insert({
+      name: coachie.name || coachie.email,
+      email: coachie.email,
+      vertrag: vertragSauber,
+      vertrag_id: typeof vertragId === 'string' ? vertragId : null,
+      zeitpunkt: zeitpunktSauber,
+      quelle: 'eingeloggt',
+      coachie_id: coachieId,
+      status: 'eingegangen',
     })
-  } catch (err) {
-    console.error('Kündigungsbestätigung konnte nicht versendet werden:', err.message)
+    .select('*')
+    .single()
+
+  if (insertError) {
+    res.status(500).json({ error: insertError.message })
+    return
   }
 
-  res.status(200).json({ bezeichnung, zeitpunkt: jetzt.toISOString() })
+  await schliesseKuendigungAb(req, res, supabase, erklaerung, coachie)
 }
 
 // Gratis-Anmeldung für Programme mit preis_cent = 0 (z. B. die
@@ -535,6 +661,12 @@ async function handleCheckoutSession(req, res, supabase) {
     return
   }
 
+  const zustimmung = pruefeKaufZustimmung(req.body)
+  if (zustimmung.error) {
+    res.status(400).json({ error: zustimmung.error })
+    return
+  }
+
   // Empfehlungsprogramm: ref ist der persönliche Empfehlungscode eines
   // werbenden Coachies (siehe api/certificate.js?resource=empfehlung).
   // Ein unbekannter/ungültiger Code blockiert den Kauf nicht -- er wird
@@ -611,8 +743,11 @@ async function handleCheckoutSession(req, res, supabase) {
     // Gilt nur für ab jetzt neu erstellte Sessions, nicht rückwirkend.
     customer_creation: 'always',
     invoice_creation: { enabled: true },
+    custom_text: { submit: { message: WIDERRUFSVERZICHT_HINWEIS } },
     metadata: {
       programm_id: programm.id,
+      agb_akzeptiert_am: zustimmung.agbAkzeptiertAm,
+      widerrufsverzicht_am: zustimmung.widerrufsverzichtAm,
       ...(werberCoachieId ? { werber_coachie_id: werberCoachieId } : {}),
     },
   })
@@ -641,10 +776,12 @@ export default async function handler(req, res) {
       res.status(405).json({ error: 'Methode nicht erlaubt.' })
       return
     }
-    if (req.body?.vertragTyp) {
+    if (req.query.aktion === 'bestaetigen') {
       await handleKuendigungBestaetigen(req, res, supabase)
+    } else if (req.query.aktion === 'direkt') {
+      await handleKuendigungDirekt(req, res, supabase)
     } else {
-      await handleKuendigungSuche(req, res, supabase)
+      await handleKuendigungErklaerung(req, res, supabase)
     }
     return
   }

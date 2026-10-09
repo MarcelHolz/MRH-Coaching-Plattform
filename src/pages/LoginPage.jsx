@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
+import RechtsFooter from '../components/RechtsFooter'
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
@@ -141,12 +142,7 @@ export default function LoginPage() {
             </form>
           )}
 
-          <Link
-            to="/vertrag-kuendigen"
-            className="mt-6 block text-sm text-mrh-grey hover:underline"
-          >
-            Vertrag kündigen
-          </Link>
+          <RechtsFooter linksbuendig className="mt-8" />
         </div>
       </div>
 

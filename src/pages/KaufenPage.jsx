@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { formatPreis } from '../lib/preis'
+import { formatPreis, UST_HINWEIS } from '../lib/preis'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
 import { DATENSCHUTZ_URL } from '../lib/rechtliches'
+import RechtsFooter from '../components/RechtsFooter'
+import KaufZustimmung from '../components/KaufZustimmung'
 
 // Empfehlungsprogramm: ?ref=<Code> wird in sessionStorage gemerkt, damit
 // der Code auch dann noch beim Checkout mitgeschickt wird, wenn der
@@ -281,6 +283,10 @@ export default function KaufenPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [kaufLaeuft, setKaufLaeuft] = useState(false)
+  const [zustimmung, setZustimmung] = useState({
+    agbAkzeptiertAm: null,
+    widerrufsverzichtAm: null,
+  })
 
   useEffect(() => {
     const refAusUrl = searchParams.get('ref')
@@ -338,7 +344,12 @@ export default function KaufenPage() {
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, ...(ref ? { ref } : {}) }),
+        body: JSON.stringify({
+          slug,
+          ...(ref ? { ref } : {}),
+          agbAkzeptiertAm: zustimmung.agbAkzeptiertAm,
+          widerrufsverzichtAm: zustimmung.widerrufsverzichtAm,
+        }),
       })
       const data = await response.json().catch(() => null)
 
@@ -487,6 +498,9 @@ export default function KaufenPage() {
               </p>
             )
           )}
+          {!istGratis && programm.preis_cent != null && (
+            <p className="mb-1 text-xs text-white/50">{UST_HINWEIS}</p>
+          )}
           {programm.standard_zugriffsmonate != null && (
             <p className="mb-6 text-xs text-white/60">
               Zugriff für {programm.standard_zugriffsmonate}{' '}
@@ -498,11 +512,17 @@ export default function KaufenPage() {
             <GratisAnmeldung slug={slug} />
           ) : (
             <>
+              <KaufZustimmung zustimmung={zustimmung} onChange={setZustimmung} />
+
               {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
               <button
                 onClick={handleKaufen}
-                disabled={kaufLaeuft}
+                disabled={
+                  kaufLaeuft ||
+                  !zustimmung.agbAkzeptiertAm ||
+                  !zustimmung.widerrufsverzichtAm
+                }
                 className="w-full rounded-full bg-gradient-to-br from-mrh-gold to-mrh-gold-dark py-3 text-sm font-semibold text-white shadow-lg shadow-mrh-gold-dark/40 transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 {kaufLaeuft ? 'Weiterleitung…' : programm.cta_text || 'Jetzt kaufen'}
@@ -514,6 +534,7 @@ export default function KaufenPage() {
             </>
           )}
         </div>
+        <RechtsFooter dunkel className="mt-12" />
       </div>
     </div>
   )
