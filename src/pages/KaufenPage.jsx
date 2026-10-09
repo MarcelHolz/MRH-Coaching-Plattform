@@ -151,6 +151,51 @@ function AbgrenzungSection({ abgrenzungText }) {
   )
 }
 
+// Trailer als Zwei-Klick-Lösung: Vor dem Klick wird nichts von YouTube
+// geladen (auch kein Vorschaubild). Erst "Abspielen" lädt das iframe von
+// youtube-nocookie.com. Vorschau ist das Programmbild oder eine
+// neutrale Fläche.
+function TrailerZweiKlick({ embedUrl, titel, bildUrl }) {
+  const [aktiv, setAktiv] = useState(false)
+
+  if (aktiv) {
+    return (
+      <div className="mb-8 aspect-video overflow-hidden rounded-2xl bg-black">
+        <iframe
+          src={`${embedUrl}?autoplay=1&rel=0`}
+          title={`Trailer: ${titel}`}
+          className="h-full w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setAktiv(true)}
+      className="group relative mb-8 block aspect-video w-full overflow-hidden rounded-2xl bg-mrh-navy text-left"
+    >
+      {bildUrl && (
+        <img src={bildUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-60" />
+      )}
+      <span className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-mrh-gold text-white shadow-lg transition group-hover:scale-105">
+          <svg viewBox="0 0 24 24" fill="currentColor" className="ml-1 h-7 w-7" aria-hidden="true">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+        <span className="text-sm font-semibold text-white">Trailer abspielen</span>
+        <span className="max-w-sm text-xs text-white/80">
+          Beim Abspielen werden Daten an YouTube übertragen.
+        </span>
+      </span>
+    </button>
+  )
+}
+
 // Gratis-Anmeldung für Programme mit preis_cent = 0 (z. B. die
 // Standortbestimmung): statt Stripe ein kurzes Formular, das
 // api/checkout.js?aktion=gratis aufruft. Das Feld "website" ist ein
@@ -407,15 +452,11 @@ export default function KaufenPage() {
         )}
 
         {trailerEmbedUrl ? (
-          <div className="mb-8 aspect-video overflow-hidden rounded-2xl bg-black">
-            <iframe
-              src={trailerEmbedUrl}
-              title={`Trailer: ${programm.titel}`}
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
+          <TrailerZweiKlick
+            embedUrl={trailerEmbedUrl}
+            titel={programm.titel}
+            bildUrl={programm.bild_url}
+          />
         ) : (
           programm.bild_url && (
             <div className="mb-8 overflow-hidden rounded-2xl">
