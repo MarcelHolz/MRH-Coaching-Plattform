@@ -1,5 +1,9 @@
 import { getStripe } from '../_lib/stripeClient.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { findeOderErstelleCoachie } from '../_lib/coachieAnlage.js'
+import { ermittleAppUrl } from '../_lib/appUrl.js'
+import { sendMail } from '../_lib/mailer.js'
+import { AGB_URL, WIDERRUF_URL } from '../../src/lib/rechtliches.js'
 
 // Stripe-Signaturprüfung braucht den unveränderten Roh-Body (byte-genau),
 // nicht das von Vercel automatisch geparste JSON-Objekt.
@@ -16,54 +20,6 @@ function readRawBody(req) {
     req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
-}
-
-// Sucht einen Coachie per E-Mail oder legt ihn neu an (inkl. Einladungs-
-// mail, Passwort-Setzen-Flow aus Phase 1) -- gemeinsam für den
-// bestehenden Kurs-Kauf-Flow und den neuen Mitgliedschafts-Flow, damit
-// beide exakt dasselbe Verhalten für "neuer vs. bestehender Coachie"
-// haben. Ein bereits bestehender Coachie bekommt bewusst KEINE erneute
-// Einladung.
-async function findeOderErstelleCoachie(session, supabase, req) {
-  const email = session.customer_details?.email
-  if (!email) return { error: 'E-Mail fehlt im Event.' }
-
-  const { data: bestehenderCoachie, error: lookupError } = await supabase
-    .from('coachies')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle()
-
-  if (lookupError) return { error: lookupError.message }
-  if (bestehenderCoachie?.id) return { coachieId: bestehenderCoachie.id }
-
-  const appUrl =
-    process.env.APP_URL ||
-    `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
-
-  const { data: invited, error: inviteError } =
-    await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${appUrl}/passwort-festlegen`,
-    })
-
-  if (inviteError) return { error: inviteError.message }
-
-  const { data: neuerCoachie, error: insertCoachieError } = await supabase
-    .from('coachies')
-    .insert({
-      id: invited.user.id,
-      name: session.customer_details?.name || email,
-      email,
-    })
-    .select()
-    .single()
-
-  if (insertCoachieError) {
-    await supabase.auth.admin.deleteUser(invited.user.id)
-    return { error: insertCoachieError.message }
-  }
-
-  return { coachieId: neuerCoachie.id }
 }
 
 // Speichert die Stripe-Customer-ID einmalig je Coachie (Rechnungs-
@@ -115,11 +71,12 @@ function ermittleMitgliedschaftsStatus(subscriptionStatus) {
 // coachie_programme befüllt wird. Der sonstige Kurszugriff des Coachies
 // bleibt dabei unberührt (andere Tabelle).
 async function handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req) {
-  const { coachieId, error: coachieError } = await findeOderErstelleCoachie(
-    session,
+  const { coachieId, error: coachieError } = await findeOderErstelleCoachie({
+    email: session.customer_details?.email,
+    name: session.customer_details?.name,
     supabase,
-    req,
-  )
+    appUrl: ermittleAppUrl(req),
+  })
   if (coachieError) return { error: coachieError }
 
   const stripe = getStripe()
@@ -134,6 +91,7 @@ async function handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
       start_datum: new Date().toISOString(),
       naechste_abrechnung: ermittleNaechsteAbrechnung(subscription),
       aktualisiert_am: new Date().toISOString(),
+      ...zustimmungAusSession(session),
     },
     { onConflict: 'coachie_id' },
   )
@@ -141,6 +99,32 @@ async function handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
   if (error) return { error: error.message }
 
   await speichereStripeCustomerId(coachieId, session.customer, supabase)
+
+  const email = session.customer_details?.email
+  const naechste = ermittleNaechsteAbrechnung(subscription)
+  if (email) {
+    await sendeBestaetigung({
+      to: email,
+      subject: 'Bestätigung deiner MRH Community-Mitgliedschaft',
+      text: `Hallo${session.customer_details?.name ? ' ' + session.customer_details.name : ''},
+
+vielen Dank. Hiermit bestätigen wir den Abschluss deiner Mitgliedschaft.
+
+Mitgliedschaft: MRH Community-Mitgliedschaft
+Preis: ${formatBetrag(session.amount_total, session.currency)} pro Monat
+${naechste ? `Nächste Abrechnung: ${formatDatum(naechste)}\n` : ''}Laufzeit: monatlich, kündbar zum Ende des jeweiligen Abrechnungszeitraums
+
+${verzichtAbsatz(session)}
+
+AGB: ${AGB_URL}
+Widerrufsbelehrung: ${WIDERRUF_URL}
+Kündigen: ${ermittleAppUrl(req)}/vertrag-kuendigen
+
+Viele Grüße
+Marcel Holz
+MRH Beratung & Coaching`,
+    })
+  }
 
   return {}
 }
@@ -188,6 +172,280 @@ async function handleInvoicePaymentFailed(invoice, supabase) {
   return {}
 }
 
+// Zustimmung zu AGB und Widerrufsverzicht aus den Session-Metadaten
+// (gesetzt in api/checkout.js). Nur gültige Zeitpunkte übernehmen.
+function zustimmungAusSession(session) {
+  const felder = {}
+  for (const [meta, spalte] of [
+    ['agb_akzeptiert_am', 'agb_akzeptiert_am'],
+    ['widerrufsverzicht_am', 'widerrufsverzicht_am'],
+  ]) {
+    const wert = session.metadata?.[meta]
+    if (wert && !Number.isNaN(Date.parse(wert))) felder[spalte] = wert
+  }
+  return felder
+}
+
+function formatZeitpunkt(iso) {
+  return new Date(iso).toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    dateStyle: 'long',
+    timeStyle: 'short',
+  })
+}
+
+function formatDatum(iso) {
+  return new Date(iso).toLocaleDateString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    dateStyle: 'long',
+  })
+}
+
+function formatBetrag(cent, waehrung) {
+  if (cent == null) return 'siehe Rechnung'
+  return new Intl.NumberFormat('de-DE', {
+    style: 'currency',
+    currency: (waehrung || 'eur').toUpperCase(),
+  }).format(cent / 100)
+}
+
+// Vertragsbestätigung auf dauerhaftem Datenträger (§ 312f BGB). Ein
+// Fehlversand blockiert die bereits erfolgte Freischaltung nicht, wird
+// aber protokolliert und dem Admin gemeldet.
+async function sendeBestaetigung({ to, subject, text }) {
+  try {
+    await sendMail({ to, subject, text })
+  } catch (err) {
+    console.error(`Bestätigungsmail an ${to} nicht versendet:`, err.message)
+    if (process.env.ADMIN_EMAIL) {
+      try {
+        await sendMail({
+          to: process.env.ADMIN_EMAIL,
+          subject: 'Kaufbestätigung konnte nicht versendet werden',
+          text: `Die Vertragsbestätigung an ${to} ist fehlgeschlagen (${err.message}). Bitte manuell nachsenden.\n\n${text}`,
+        })
+      } catch {
+        // Bereits protokolliert.
+      }
+    }
+  }
+}
+
+function verzichtAbsatz(session) {
+  const verzichtAm = session.metadata?.widerrufsverzicht_am
+  const agbAm = session.metadata?.agb_akzeptiert_am
+  const zeilen = []
+  if (agbAm) zeilen.push(`AGB akzeptiert am: ${formatZeitpunkt(agbAm)}`)
+  if (verzichtAm) {
+    zeilen.push(
+      `Du hast am ${formatZeitpunkt(verzichtAm)} ausdrücklich verlangt, dass wir vor Ablauf der Widerrufsfrist mit der Bereitstellung der digitalen Inhalte beginnen, und bestätigt, dass dein Widerrufsrecht mit Beginn der Bereitstellung erlischt.`,
+    )
+  }
+  return zeilen.join('\n')
+}
+
+// Kurskauf (mode 'payment'): Coachie finden/anlegen und dem Programm
+// zuordnen. Mehrfach ausführbar (upsert auf coachie_id,programm_id),
+// damit eine erneute Stripe-Zustellung nach einem Fehler den Kauf
+// sicher abschließen kann.
+async function handleKursCheckoutAbgeschlossen(session, supabase, req) {
+  const email = session.customer_details?.email
+  const programmId = session.metadata?.programm_id
+
+  if (!email || !programmId) {
+    console.error(
+      `Stripe-Session ${session.id}: E-Mail oder Programm-ID fehlt, keine Freischaltung möglich.`,
+    )
+    return { warning: 'E-Mail oder Programm-ID fehlt im Event.' }
+  }
+
+  const { coachieId, error: coachieError } = await findeOderErstelleCoachie({
+    email,
+    name: session.customer_details?.name,
+    supabase,
+    appUrl: ermittleAppUrl(req),
+  })
+  if (coachieError) return { error: coachieError }
+
+  const { data: programm, error: programmError } = await supabase
+    .from('programme')
+    .select('titel, standard_zugriffsmonate')
+    .eq('id', programmId)
+    .maybeSingle()
+
+  if (programmError) return { error: programmError.message }
+
+  let zugriffBis = null
+  if (programm?.standard_zugriffsmonate) {
+    const datum = new Date()
+    datum.setMonth(datum.getMonth() + programm.standard_zugriffsmonate)
+    zugriffBis = datum.toISOString()
+  }
+
+  // Nur für Tests der Wiederholungslogik (A2): simuliert einen Fehler bei
+  // der Zuordnung. Wirkt nie in Production.
+  if (
+    process.env.STRIPE_WEBHOOK_TESTFEHLER === '1' &&
+    process.env.VERCEL_ENV !== 'production'
+  ) {
+    return { error: 'Simulierter Fehler bei der Zuordnung (STRIPE_WEBHOOK_TESTFEHLER).' }
+  }
+
+  const { error: assignmentError } = await supabase.from('coachie_programme').upsert(
+    {
+      coachie_id: coachieId,
+      programm_id: programmId,
+      zugewiesen_am: new Date().toISOString(),
+      zugriff_bis: zugriffBis,
+      // Erneuter Kauf nach einer Kündigung: der neue Vertrag ist ungekündigt.
+      gekuendigt_am: null,
+      ...zustimmungAusSession(session),
+    },
+    { onConflict: 'coachie_id,programm_id' },
+  )
+
+  if (assignmentError) return { error: assignmentError.message }
+
+  await speichereStripeCustomerId(coachieId, session.customer, supabase)
+
+  // Empfehlungsprogramm: nur protokollieren, nicht den Webhook
+  // scheitern lassen -- der Kauf selbst ist bereits abgeschlossen.
+  // unique(geworbener_coachie_id, programm_id) in empfehlungen.sql
+  // macht das idempotent gegen Stripe-Retry-Zustellungen des gleichen
+  // Events; ein Selbst-Verweis (Coachie kauft mit eigenem Code) wird
+  // ignoriert.
+  const werberCoachieId = session.metadata?.werber_coachie_id
+  if (werberCoachieId && werberCoachieId !== coachieId) {
+    const { error: empfehlungError } = await supabase.from('empfehlungen').insert({
+      werber_coachie_id: werberCoachieId,
+      geworbener_coachie_id: coachieId,
+      programm_id: programmId,
+    })
+
+    if (empfehlungError && empfehlungError.code !== '23505') {
+      console.error('Empfehlung konnte nicht protokolliert werden:', empfehlungError.message)
+    }
+  }
+
+  const appUrl = ermittleAppUrl(req)
+  const titel = programm?.titel ?? 'Programm'
+  await sendeBestaetigung({
+    to: email,
+    subject: `Bestätigung deines Kaufs: ${titel}`,
+    text: `Hallo${session.customer_details?.name ? ' ' + session.customer_details.name : ''},
+
+vielen Dank für deinen Kauf. Hiermit bestätigen wir den Vertragsschluss.
+
+Programm: ${titel}
+Preis: ${formatBetrag(session.amount_total, session.currency)}
+Zugriff: ${zugriffBis ? `bis ${formatDatum(zugriffBis)}` : 'unbefristet'}
+
+${verzichtAbsatz(session)}
+
+AGB: ${AGB_URL}
+Widerrufsbelehrung: ${WIDERRUF_URL}
+
+Deine Rechnung erhältst du separat von Stripe. Zum Login: ${appUrl}/login
+Falls du noch kein Passwort festgelegt hast, nutze die Einladungsmail oder auf der Login-Seite „Passwort vergessen“.
+
+Viele Grüße
+Marcel Holz
+MRH Beratung & Coaching`,
+  })
+
+  return { coachieId, programmId, zugriffBis }
+}
+
+// Gemeinsamer Freischaltungspfad für checkout.session.completed (sofort
+// bezahlt) und checkout.session.async_payment_succeeded (z. B. SEPA,
+// Klarna: Zahlung erst später bestätigt).
+async function schalteFrei(session, supabase, req) {
+  if (session.mode === 'subscription') {
+    return handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
+  }
+  return handleKursCheckoutAbgeschlossen(session, supabase, req)
+}
+
+async function meldeFehlgeschlageneZahlung(session) {
+  const email = session.customer_details?.email ?? 'unbekannt'
+  console.warn(
+    `Stripe-Session ${session.id}: asynchrone Zahlung fehlgeschlagen (${email}). Keine Freischaltung.`,
+  )
+
+  const adminEmail = process.env.ADMIN_EMAIL
+  if (!adminEmail) return
+  try {
+    await sendMail({
+      to: adminEmail,
+      subject: 'Zahlung fehlgeschlagen (Stripe)',
+      text: `Eine verzögerte Zahlung ist fehlgeschlagen. Es wurde kein Zugang freigeschaltet.\n\nStripe-Session: ${session.id}\nE-Mail: ${email}\nModus: ${session.mode}\nProgramm-ID: ${session.metadata?.programm_id ?? 'keine'}`,
+    })
+  } catch (err) {
+    console.error('Admin-Hinweis zur fehlgeschlagenen Zahlung nicht versendet:', err.message)
+  }
+}
+
+async function verarbeiteEvent(event, supabase, req) {
+  switch (event.type) {
+    case 'customer.subscription.updated':
+    case 'customer.subscription.deleted':
+      return handleSubscriptionLifecycle(event.data.object, event.type, supabase)
+
+    case 'invoice.payment_failed':
+      return handleInvoicePaymentFailed(event.data.object, supabase)
+
+    case 'checkout.session.completed': {
+      const session = event.data.object
+      // Nur bei tatsächlich eingegangener Zahlung freischalten. Bei
+      // verzögerten Zahlarten (SEPA, teils Klarna) ist payment_status
+      // hier noch 'unpaid'; die Freischaltung folgt dann über
+      // checkout.session.async_payment_succeeded.
+      if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        console.info(
+          `Stripe-Session ${session.id}: payment_status=${session.payment_status}, warte auf async_payment_succeeded.`,
+        )
+        return { info: 'Zahlung noch nicht abgeschlossen.' }
+      }
+      return schalteFrei(session, supabase, req)
+    }
+
+    case 'checkout.session.async_payment_succeeded':
+      return schalteFrei(event.data.object, supabase, req)
+
+    case 'checkout.session.async_payment_failed':
+      await meldeFehlgeschlageneZahlung(event.data.object)
+      return {}
+
+    default:
+      return {}
+  }
+}
+
+// Idempotenz: Das Event wird zuerst mit verarbeitet = false eingetragen
+// und erst NACH erfolgreicher Verarbeitung auf true gesetzt. Eine erneute
+// Zustellung trifft also nur dann auf "already_processed", wenn der
+// vorherige Durchlauf wirklich fertig war. Scheiterte er (Fehler, Timeout,
+// Absturz der Function), bleibt verarbeitet = false und die nächste
+// Zustellung verarbeitet erneut. Alle Verarbeitungsschritte sind dafür
+// wiederholbar (upsert bzw. Unique-Constraints).
+async function beanspruche(eventId, supabase) {
+  const { error } = await supabase
+    .from('stripe_events')
+    .insert({ id: eventId, verarbeitet: false })
+
+  if (!error) return { weiter: true }
+  if (error.code !== '23505') return { error: error.message }
+
+  const { data, error: lookupError } = await supabase
+    .from('stripe_events')
+    .select('verarbeitet')
+    .eq('id', eventId)
+    .maybeSingle()
+
+  if (lookupError) return { error: lookupError.message }
+  return { weiter: !data?.verarbeitet }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Methode nicht erlaubt.' })
@@ -212,134 +470,41 @@ export default async function handler(req, res) {
 
   const supabase = getSupabaseAdmin()
 
-  // Idempotenz nach dem Insert-first-Prinzip: Bei Unique-Violation wurde
-  // dieses Event bereits verarbeitet (z. B. Stripe-Retry-Zustellung) --
-  // dann ohne erneute Verarbeitung mit 200 antworten, damit Stripe nicht
-  // weiter retried.
-  const { error: insertEventError } = await supabase
+  const anspruch = await beanspruche(event.id, supabase)
+  if (anspruch.error) {
+    res.status(500).json({ error: anspruch.error })
+    return
+  }
+  if (!anspruch.weiter) {
+    res.status(200).json({ received: true, already_processed: true })
+    return
+  }
+
+  let ergebnis
+  try {
+    ergebnis = await verarbeiteEvent(event, supabase, req)
+  } catch (err) {
+    console.error(`Stripe-Event ${event.id} (${event.type}) fehlgeschlagen:`, err)
+    res.status(500).json({ error: err.message })
+    return
+  }
+
+  if (ergebnis?.error) {
+    console.error(`Stripe-Event ${event.id} (${event.type}) fehlgeschlagen:`, ergebnis.error)
+    res.status(500).json({ error: ergebnis.error })
+    return
+  }
+
+  const { error: markError } = await supabase
     .from('stripe_events')
-    .insert({ id: event.id })
+    .update({ verarbeitet: true, verarbeitet_am: new Date().toISOString() })
+    .eq('id', event.id)
 
-  if (insertEventError) {
-    if (insertEventError.code === '23505') {
-      res.status(200).json({ received: true, already_processed: true })
-      return
-    }
-    res.status(500).json({ error: insertEventError.message })
-    return
+  if (markError) {
+    // Verarbeitung war erfolgreich; schlimmstenfalls wird das Event bei
+    // einer erneuten Zustellung noch einmal (idempotent) verarbeitet.
+    console.error(`Stripe-Event ${event.id} konnte nicht als verarbeitet markiert werden:`, markError.message)
   }
 
-  if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-    const { error } = await handleSubscriptionLifecycle(event.data.object, event.type, supabase)
-    if (error) {
-      res.status(500).json({ error })
-      return
-    }
-    res.status(200).json({ received: true })
-    return
-  }
-
-  if (event.type === 'invoice.payment_failed') {
-    const { error } = await handleInvoicePaymentFailed(event.data.object, supabase)
-    if (error) {
-      res.status(500).json({ error })
-      return
-    }
-    res.status(200).json({ received: true })
-    return
-  }
-
-  if (event.type !== 'checkout.session.completed') {
-    res.status(200).json({ received: true })
-    return
-  }
-
-  const session = event.data.object
-
-  if (session.mode === 'subscription') {
-    const { error } = await handleMitgliedschaftCheckoutAbgeschlossen(session, supabase, req)
-    if (error) {
-      res.status(500).json({ error })
-      return
-    }
-    res.status(200).json({ received: true })
-    return
-  }
-
-  const email = session.customer_details?.email
-  const programmId = session.metadata?.programm_id
-
-  if (!email || !programmId) {
-    res
-      .status(200)
-      .json({ received: true, warning: 'E-Mail oder Programm-ID fehlt im Event.' })
-    return
-  }
-
-  const { coachieId, error: coachieError } = await findeOderErstelleCoachie(
-    session,
-    supabase,
-    req,
-  )
-
-  if (coachieError) {
-    res.status(500).json({ error: coachieError })
-    return
-  }
-
-  const { data: programm, error: programmError } = await supabase
-    .from('programme')
-    .select('standard_zugriffsmonate')
-    .eq('id', programmId)
-    .maybeSingle()
-
-  if (programmError) {
-    res.status(500).json({ error: programmError.message })
-    return
-  }
-
-  let zugriffBis = null
-  if (programm?.standard_zugriffsmonate) {
-    const datum = new Date()
-    datum.setMonth(datum.getMonth() + programm.standard_zugriffsmonate)
-    zugriffBis = datum.toISOString()
-  }
-
-  const { error: assignmentError } = await supabase.from('coachie_programme').upsert(
-    {
-      coachie_id: coachieId,
-      programm_id: programmId,
-      zugewiesen_am: new Date().toISOString(),
-      zugriff_bis: zugriffBis,
-    },
-    { onConflict: 'coachie_id,programm_id' },
-  )
-
-  if (assignmentError) {
-    res.status(500).json({ error: assignmentError.message })
-    return
-  }
-
-  await speichereStripeCustomerId(coachieId, session.customer, supabase)
-
-  // Empfehlungsprogramm: nur protokollieren, nicht den Webhook
-  // scheitern lassen -- der Kauf selbst ist bereits abgeschlossen.
-  // unique(geworbener_coachie_id, programm_id) in empfehlungen.sql
-  // macht das idempotent gegen Stripe-Retry-Zustellungen des gleichen
-  // Events; ein Selbst-Verweis (Coachie kauft mit eigenem Code) wird
-  // ignoriert.
-  const werberCoachieId = session.metadata?.werber_coachie_id
-  if (werberCoachieId && werberCoachieId !== coachieId) {
-    const { error: empfehlungError } = await supabase.from('empfehlungen').insert({
-      werber_coachie_id: werberCoachieId,
-      geworbener_coachie_id: coachieId,
-      programm_id: programmId,
-    })
-
-    if (empfehlungError && empfehlungError.code !== '23505') {
-      console.error('Empfehlung konnte nicht protokolliert werden:', empfehlungError.message)
-    }
-  }
-
-  res.status(200).json({ received: true })
+  res.status(200).json({ received: true, ...(ergebnis?.warning ? { warning: ergebnis.warning } : {}) })
 }

@@ -379,6 +379,138 @@ function MeineDatenSection({ coachie, accessToken }) {
 // selbst verlangt für updateUser() keine Re-Authentifizierung, aber
 // ohne diese Prüfung könnte jeder mit einer offenen Sitzung (z. B. an
 // einem fremden Rechner) das Passwort ändern, ohne es zu kennen.
+// Kündigung für eingeloggte Coachies (§ 312k BGB): direkt ausgeführt,
+// ohne Mailbestätigung, da authentifiziert. Mitgliedschaften enden zum
+// Ende der bezahlten Periode. Siehe api/checkout.js?resource=kuendigung.
+function VertraegeSection({ coachie, accessToken }) {
+  const [mitgliedschaft, setMitgliedschaft] = useState(null)
+  const [kurse, setKurse] = useState([])
+  const [laedt, setLaedt] = useState(true)
+  const [laeuft, setLaeuft] = useState(null)
+  const [fehler, setFehler] = useState('')
+  const [ergebnis, setErgebnis] = useState([])
+
+  useEffect(() => {
+    if (!coachie?.id) return
+    let cancelled = false
+
+    async function laden() {
+      const [{ data: eigeneMitgliedschaft }, { data: zuordnungen }] = await Promise.all([
+        supabase
+          .from('mitgliedschaften')
+          .select('id, status')
+          .eq('coachie_id', coachie.id)
+          .maybeSingle(),
+        supabase
+          .from('coachie_programme')
+          .select('id, zugriff_bis, gekuendigt_am, programme(titel)')
+          .eq('coachie_id', coachie.id),
+      ])
+      if (cancelled) return
+      setMitgliedschaft(eigeneMitgliedschaft?.status === 'aktiv' ? eigeneMitgliedschaft : null)
+      setKurse((zuordnungen ?? []).filter((z) => !z.gekuendigt_am))
+      setLaedt(false)
+    }
+
+    laden()
+    return () => {
+      cancelled = true
+    }
+  }, [coachie, ergebnis])
+
+  async function kuendigen(vertrag, vertragId, bezeichnung) {
+    if (!window.confirm(`${bezeichnung} jetzt kündigen?`)) return
+    setFehler('')
+    setLaeuft(vertragId ?? vertrag)
+    try {
+      const response = await fetch('/api/checkout?resource=kuendigung&aktion=direkt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ vertrag, vertragId, zeitpunkt: 'naechstmoeglich' }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.error || 'Kündigung fehlgeschlagen.')
+      setErgebnis(data.ergebnis ?? [])
+    } catch (err) {
+      setFehler(err.message)
+    } finally {
+      setLaeuft(null)
+    }
+  }
+
+  const knopf =
+    'shrink-0 rounded-lg border border-red-300 px-3 py-1.5 text-sm text-red-600 transition hover:bg-red-50 disabled:opacity-50'
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h2 className="mb-1 font-semibold text-slate-800">Verträge kündigen</h2>
+      <p className="mb-4 text-sm text-mrh-grey">
+        Kündigungen gelten zum nächstmöglichen Zeitpunkt. Du erhältst eine
+        Bestätigung per E-Mail.
+      </p>
+
+      {ergebnis.length > 0 && (
+        <ul className="mb-4 space-y-1 rounded-lg bg-mrh-cream p-3 text-sm text-slate-700">
+          {ergebnis.map((zeile) => (
+            <li key={zeile}>{zeile}</li>
+          ))}
+        </ul>
+      )}
+      {fehler && <p className="mb-4 text-sm text-red-600">{fehler}</p>}
+
+      {laedt ? null : !mitgliedschaft && kurse.length === 0 ? (
+        <p className="text-sm text-slate-500">Keine laufenden Verträge.</p>
+      ) : (
+        <div className="space-y-2">
+          {mitgliedschaft && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3">
+              <p className="text-sm font-medium text-slate-800">
+                MRH Community-Mitgliedschaft
+              </p>
+              <button
+                onClick={() => kuendigen('mitgliedschaft', null, 'Die Mitgliedschaft')}
+                disabled={laeuft !== null}
+                className={knopf}
+              >
+                {laeuft === 'mitgliedschaft' ? 'Kündigt…' : 'Jetzt kündigen'}
+              </button>
+            </div>
+          )}
+          {kurse.map((kurs) => (
+            <div
+              key={kurs.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  {kurs.programme?.titel ?? 'Programm'}
+                </p>
+                {kurs.zugriff_bis && (
+                  <p className="text-xs text-mrh-grey">
+                    Zugriff bis {formatDatum(kurs.zugriff_bis)}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() =>
+                  kuendigen('kurs', kurs.id, `„${kurs.programme?.titel ?? 'Programm'}“`)
+                }
+                disabled={laeuft !== null}
+                className={knopf}
+              >
+                {laeuft === kurs.id ? 'Kündigt…' : 'Jetzt kündigen'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EinstellungenPage() {
   const { coachie, session, refreshCoachie } = useAuth()
   const [avatarFehler, setAvatarFehler] = useState('')
@@ -477,6 +609,8 @@ export default function EinstellungenPage() {
       <EmpfehlungsprogrammSection accessToken={session?.access_token} />
 
       <MeineDatenSection coachie={coachie} accessToken={session?.access_token} />
+
+      <VertraegeSection coachie={coachie} accessToken={session?.access_token} />
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <h2 className="mb-4 font-semibold text-slate-800">Passwort ändern</h2>

@@ -16,7 +16,7 @@ const MRH_GOLD = rgb(0xb9 / 255, 0x91 / 255, 0x3f / 255)
 
 function dateiname(titel) {
   const sicher = titel.replace(/[^a-zA-Z0-9äöüÄÖÜß]+/g, '-').replace(/^-|-$/g, '')
-  return `Zertifikat-${sicher || 'Programm'}.pdf`
+  return `Teilnahmebestaetigung-${sicher || 'Programm'}.pdf`
 }
 
 // Vergibt einen neuen, eindeutigen Empfehlungscode für einen Coachie
@@ -123,6 +123,11 @@ async function handleEmpfehlung(req, res, supabase) {
 // individuellen Fortschrittsdaten -- und wird explizit angewiesen,
 // Fragen zum persönlichen Fortschritt abzulehnen statt zu beantworten.
 const FAQ_CHAT_MAX_FRAGE_LAENGE = 2000
+// Modell für den FAQ-Chat. Hier zentral änderbar.
+const FAQ_CHAT_MODELL = 'claude-haiku-5-5'
+// Kostenbremse: höchstens so viele Fragen pro Coachie und Kalendertag
+// (Europe/Berlin), gezählt in faq_nutzung über faq_nutzung_buchen().
+const FAQ_CHAT_TAGESLIMIT = 20
 
 function baueFaqSystemPrompt(faqEintraege) {
   const wissensbasis = faqEintraege
@@ -163,6 +168,26 @@ async function handleFaqChat(req, res, supabase) {
     return
   }
 
+  // Frage zuerst atomar verbuchen; ist das Tageslimit erreicht, liefert
+  // die Funktion false und es erfolgt kein API-Aufruf.
+  const { data: gebucht, error: limitError } = await supabase.rpc('faq_nutzung_buchen', {
+    p_coachie_id: coachieId,
+    p_limit: FAQ_CHAT_TAGESLIMIT,
+  })
+
+  if (limitError) {
+    console.error('FAQ-Tageslimit konnte nicht geprüft werden:', limitError.message)
+    res.status(503).json({ error: 'Der Chat ist gerade nicht verfügbar. Bitte später erneut versuchen.' })
+    return
+  }
+
+  if (!gebucht) {
+    res.status(429).json({
+      error: `Du hast heute schon ${FAQ_CHAT_TAGESLIMIT} Fragen gestellt. Morgen geht es weiter. Bei dringenden Anliegen schreib uns gern eine E-Mail.`,
+    })
+    return
+  }
+
   const { data: faqEintraege, error: faqError } = await supabase
     .from('faq_eintraege')
     .select('frage, antwort')
@@ -177,7 +202,7 @@ async function handleFaqChat(req, res, supabase) {
   try {
     const client = new Anthropic()
     const response = await client.messages.create({
-      model: 'claude-opus-5',
+      model: FAQ_CHAT_MODELL,
       max_tokens: 1024,
       output_config: { effort: 'low' },
       system: baueFaqSystemPrompt(faqEintraege ?? []),
@@ -501,7 +526,7 @@ async function handleZertifikat(req, res, supabase) {
     color: MRH_NAVY,
   })
 
-  const titelText = 'Teilnahmezertifikat'
+  const titelText = 'Teilnahmebestätigung'
   page.drawText(titelText, {
     x: width / 2 - serifBold.widthOfTextAtSize(titelText, 28) / 2,
     y: height - 190,
@@ -510,7 +535,7 @@ async function handleZertifikat(req, res, supabase) {
     color: MRH_NAVY,
   })
 
-  const name = coachie?.name || 'Teilnehmer:in'
+  const name = coachie?.name || 'Teilnehmende Person'
   page.drawText(name, {
     x: width / 2 - serifBold.widthOfTextAtSize(name, 22) / 2,
     y: height - 270,
@@ -519,7 +544,9 @@ async function handleZertifikat(req, res, supabase) {
     color: MRH_GOLD,
   })
 
-  const satz = `hat das Programm "${programm.titel}" erfolgreich abgeschlossen.`
+  // FernUSG: reine Teilnahmebestätigung, keine Aussage über eine
+  // Lernerfolgskontrolle.
+  const satz = `hat am Programm "${programm.titel}" teilgenommen.`
   page.drawText(satz, {
     x: width / 2 - serif.widthOfTextAtSize(satz, 14) / 2,
     y: height - 310,

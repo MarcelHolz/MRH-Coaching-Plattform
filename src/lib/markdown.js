@@ -1,14 +1,23 @@
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true })
 
-// Nur einfache Formatierung vorgesehen (fett, Überschrift, Liste,
-// Absätze) -- Inhalt kommt ausschließlich aus dem admin-geschützten
-// Programmformular (api/admin/programme.js, requireAdmin), daher kein
-// zusätzliches Sanitizing nötig.
+// Links, die in einem neuen Tab öffnen, bekommen rel="noopener noreferrer",
+// damit die Zielseite keinen Zugriff auf window.opener hat.
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+    node.setAttribute('rel', 'noopener noreferrer')
+  }
+})
+
+// Inhalte kommen aus dem Admin-Formular und über die Agenten-API
+// (api/agent/inhalte.js). Das von marked erzeugte HTML wird deshalb vor
+// der Ausgabe per dangerouslySetInnerHTML mit DOMPurify bereinigt
+// (entfernt Skripte, Event-Handler und javascript:-Links).
 export function renderMarkdown(text) {
   if (!text) return ''
-  return marked.parse(text)
+  return DOMPurify.sanitize(marked.parse(text), { ADD_ATTR: ['target'] })
 }
 
 // Für zeilenbegrenzte Karten-Vorschauen (line-clamp): gerendertes HTML

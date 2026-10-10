@@ -1,5 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Fraunces lokal ausgeliefert statt über Google Fonts (keine
+// Übertragung der IP-Adresse an Google). Nur die genutzten Schnitte.
+import '@fontsource/fraunces/500.css'
+import '@fontsource/fraunces/500-italic.css'
+import '@fontsource/fraunces/600.css'
+import '@fontsource/fraunces/600-italic.css'
 import './index.css'
 import App from './App.jsx'
 

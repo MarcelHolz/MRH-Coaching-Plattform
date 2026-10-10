@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatPreis } from '../lib/preis'
+import { formatPreis, UST_HINWEIS } from '../lib/preis'
+import RechtsFooter from '../components/RechtsFooter'
+import KaufZustimmung from '../components/KaufZustimmung'
 
 // Eigenständige Verkaufsseite für die Mitgliedschaft (Mitgliederbereich
 // Punkt 5) -- analog zu KaufenPage.jsx, aber ohne :slug (die
@@ -15,6 +17,10 @@ export default function MitgliedschaftPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [kaufLaeuft, setKaufLaeuft] = useState(false)
+  const [zustimmung, setZustimmung] = useState({
+    agb: false,
+    widerrufsverzicht: false,
+  })
 
   const abgebrochen = searchParams.get('abgebrochen') === '1'
 
@@ -51,6 +57,8 @@ export default function MitgliedschaftPage() {
     try {
       const response = await fetch('/api/checkout?resource=mitgliedschaft', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(zustimmung),
       })
       const data = await response.json().catch(() => null)
 
@@ -69,6 +77,20 @@ export default function MitgliedschaftPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-mrh-cream">
         <p className="text-mrh-grey">Lädt…</p>
+      </div>
+    )
+  }
+
+  if (mitgliedschaft && !mitgliedschaft.aktiv) {
+    return (
+      <div className="min-h-screen bg-mrh-black text-white">
+        <div className="mx-auto max-w-2xl px-4 py-16">
+          <h1 className="mb-4 font-serif text-4xl font-semibold">
+            MRH Community-Mitgliedschaft
+          </h1>
+          <p className="text-white/70">Die Mitgliedschaft startet in Kürze.</p>
+          <RechtsFooter dunkel className="mt-12" />
+        </div>
       </div>
     )
   }
@@ -98,20 +120,33 @@ export default function MitgliedschaftPage() {
             </p>
           )}
 
+          {mitgliedschaft?.preis_cent != null && (
+            <p className="mb-4 text-xs text-white/50">{UST_HINWEIS}</p>
+          )}
+
           {mitgliedschaft?.bezahltext && (
             <p className="mb-6 text-sm text-white/60">{mitgliedschaft.bezahltext}</p>
           )}
 
           {abgebrochen && (
             <p className="mb-4 text-sm text-white/60">
-              Vorgang abgebrochen -- du kannst es jederzeit erneut versuchen.
+              Vorgang abgebrochen. Du kannst es jederzeit erneut versuchen.
             </p>
           )}
+          {mitgliedschaft?.preis_cent != null && (
+            <KaufZustimmung zustimmung={zustimmung} onChange={setZustimmung} />
+          )}
+
           {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
           <button
             onClick={handleBeitreten}
-            disabled={kaufLaeuft || mitgliedschaft?.preis_cent == null}
+            disabled={
+              kaufLaeuft ||
+              mitgliedschaft?.preis_cent == null ||
+              !zustimmung.agb ||
+              !zustimmung.widerrufsverzicht
+            }
             className="w-full rounded-full bg-gradient-to-br from-mrh-gold to-mrh-gold-dark py-3 text-sm font-semibold text-white shadow-lg shadow-mrh-gold-dark/40 transition hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {kaufLaeuft ? 'Weiterleitung…' : 'Jetzt Mitglied werden'}
@@ -122,6 +157,7 @@ export default function MitgliedschaftPage() {
             Passworts.
           </p>
         </div>
+        <RechtsFooter dunkel className="mt-12" />
       </div>
     </div>
   )

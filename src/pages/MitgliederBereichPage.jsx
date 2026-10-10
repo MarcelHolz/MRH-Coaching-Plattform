@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { useMitgliedschaftAngebotAktiv } from '../lib/mitgliedschaftAngebot'
 import { getSignedMitgliederDateiUrl } from '../lib/storage'
 
 const TYP_LABEL = {
@@ -78,6 +79,7 @@ export default function MitgliederBereichPage() {
   const [mitgliedschaft, setMitgliedschaft] = useState(null)
   const [inhalte, setInhalte] = useState([])
   const [loading, setLoading] = useState(true)
+  const angebotAktiv = useMitgliedschaftAngebotAktiv()
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -129,12 +131,16 @@ export default function MitgliederBereichPage() {
                 ? 'Bei deiner letzten Zahlung gab es ein Problem -- bitte prüfe dein Zahlungsmittel.'
                 : 'Exklusive Inhalte und Live-Sitzungen für Mitglieder der MRH Community.'}
           </p>
-          <Link
-            to="/mitgliedschaft"
-            className="inline-block rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
-          >
-            Mehr erfahren
-          </Link>
+          {angebotAktiv ? (
+            <Link
+              to="/mitgliedschaft"
+              className="inline-block rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
+            >
+              Mehr erfahren
+            </Link>
+          ) : (
+            <p className="text-sm text-mrh-grey">Die Mitgliedschaft startet in Kürze.</p>
+          )}
         </div>
       </div>
     )

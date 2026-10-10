@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
+import { useMitgliedschaftAngebotAktiv } from '../lib/mitgliedschaftAngebot'
 import { initialen } from '../lib/initialen'
 import FaqChatWidget from '../components/FaqChatWidget'
 import OnboardingTour from '../components/OnboardingTour'
+import RechtsFooter from '../components/RechtsFooter'
 
 const NAV_ITEMS = [
   { to: '/coachie', label: 'Programme', end: true },
@@ -38,6 +41,32 @@ export default function CoachieLayout() {
   // wieder verschwinden, statt einmal vollständig durchlaufen zu
   // werden.
   const [tourOffen, setTourOffen] = useState(() => istErsterLogin)
+  const angebotAktiv = useMitgliedschaftAngebotAktiv()
+  const [hatMitgliedschaft, setHatMitgliedschaft] = useState(false)
+
+  // Menüpunkt Mitgliederbereich: für bestehende Mitglieder (auch manuell
+  // angelegte) immer, für alle anderen nur, wenn die Mitgliedschaft im
+  // Admin eingeschaltet ist.
+  useEffect(() => {
+    if (!coachie?.id) return
+    let cancelled = false
+    supabase
+      .from('mitgliedschaften')
+      .select('id')
+      .eq('coachie_id', coachie.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setHatMitgliedschaft(Boolean(data))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [coachie])
+
+  const navItems = NAV_ITEMS.filter(
+    (item) =>
+      item.to !== '/coachie/mitgliederbereich' || angebotAktiv || hatMitgliedschaft,
+  )
 
   async function handleLogout() {
     await logout()
@@ -106,7 +135,7 @@ export default function CoachieLayout() {
           </div>
         </div>
         <nav className="mx-auto hidden max-w-5xl gap-1 px-4 md:flex">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -125,7 +154,7 @@ export default function CoachieLayout() {
         </nav>
         {menuOffen && (
           <nav className="mx-auto flex max-w-5xl flex-col gap-1 px-4 pb-4 md:hidden">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -166,12 +195,7 @@ export default function CoachieLayout() {
               </a>
             ))}
           </div>
-          <Link
-            to="/vertrag-kuendigen"
-            className="mt-4 inline-block text-xs text-mrh-grey hover:underline"
-          >
-            Vertrag kündigen
-          </Link>
+          <RechtsFooter linksbuendig className="mt-6" />
         </div>
       </footer>
       {session?.access_token && <FaqChatWidget accessToken={session.access_token} />}

@@ -65,6 +65,7 @@ vercel dev
 | `SUPABASE_SERVICE_ROLE_KEY` | Server | Supabase service_role Key — **niemals im Client** |
 | `ADMIN_PASSWORD` | Server | Passwort für den Admin-Login |
 | `ADMIN_TOKEN_SECRET` | Server | Geheimnis zum Signieren der Admin-Session-Tokens |
+| `KUENDIGUNG_TOKEN_SECRET` | Server | **Pflicht.** Eigenes Geheimnis für die signierten Bestätigungslinks der Kündigungsseite (`/vertrag-kuendigen`). Kein Fallback auf `ADMIN_TOKEN_SECRET`; fehlt es, antworten Formular und Bestätigungslink mit 500 |
 | `APP_URL` | Server | Öffentliche URL der App, für den Redirect im Einladungslink |
 
 `.env.local` ist gitignored. `.env.example` dient als Vorlage.
@@ -72,7 +73,7 @@ vercel dev
 ## Deployment (Vercel)
 
 1. Projekt in Vercel importieren (dieses Repo).
-2. Unter **Settings → Environment Variables** alle sechs Variablen aus der
+2. Unter **Settings → Environment Variables** alle Variablen aus der
    Tabelle oben eintragen (Production/Preview je nach Bedarf).
 3. Deployen:
 
@@ -544,14 +545,10 @@ Alle Requests brauchen den Header `x-agent-secret: <Secret>`.
   bereits mit erfasst. Optionaler Filter `?programm_id=<uuid>` reduziert
   die Antwort auf ein einzelnes Programm, falls die volle Antwort (voller
   Sessiontext + Materialien für alle Programme, aktuell ca. 400 KB) zu
-  groß wird. **Nur bei dieser einen Resource** wird das Secret
-  zusätzlich als Query-Parameter akzeptiert
-  (`?resource=lesen&secret=<Secret>`), für Tools wie Copilot Studio, die
-  keinen Custom-Header setzen können — der Header bleibt der primäre,
-  empfohlene Weg. Bewusst nicht für die schreibenden Ressourcen
-  verfügbar: ein Secret in der URL landet in Server-/Proxy-Logs und im
-  Browser-Verlauf, für Lesezugriff vertretbar, für Schreibzugriff ein
-  unnötiges Risiko.
+  groß wird. Das Secret wird (wie bei allen
+  Ressourcen) ausschließlich im Header `x-agent-secret` akzeptiert, nicht
+  mehr als Query-Parameter: ein Secret in der URL landet in Server- und
+  Proxy-Logs sowie im Browser-Verlauf.
 - `GET /api/agent/inhalte?resource=materials` — rohe, ungefilterte
   `session_material`-Liste (`select('*')`), analog zum GET-Zweig von
   `?resource=module`/`?resource=sessions`, aber bewusst nur `GET` (auch

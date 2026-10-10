@@ -1,6 +1,9 @@
 import crypto from 'node:crypto'
 
 const TOKEN_TTL_MS = 8 * 60 * 60 * 1000
+// Typ-Claim: nur Tokens mit typ 'admin' gelten als Admin-Session. Ältere
+// Tokens ohne typ werden abgelehnt (einmaliger Neu-Login nötig).
+const TOKEN_TYP = 'admin'
 
 function base64UrlEncode(input) {
   return Buffer.from(input).toString('base64url')
@@ -22,7 +25,7 @@ export function createAdminToken() {
   }
 
   const payload = base64UrlEncode(
-    JSON.stringify({ exp: Date.now() + TOKEN_TTL_MS }),
+    JSON.stringify({ typ: TOKEN_TYP, exp: Date.now() + TOKEN_TTL_MS }),
   )
   const signature = sign(payload)
   return `${payload}.${signature}`
@@ -47,8 +50,8 @@ export function verifyAdminToken(token) {
   }
 
   try {
-    const { exp } = JSON.parse(base64UrlDecode(payload))
-    return typeof exp === 'number' && exp > Date.now()
+    const { typ, exp } = JSON.parse(base64UrlDecode(payload))
+    return typ === TOKEN_TYP && typeof exp === 'number' && exp > Date.now()
   } catch {
     return false
   }

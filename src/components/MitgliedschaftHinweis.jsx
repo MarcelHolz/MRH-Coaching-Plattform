@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { useMitgliedschaftAngebotAktiv } from '../lib/mitgliedschaftAngebot'
 
 // Dezenter Hinweis für Nicht-Mitglieder (Mitgliederbereich Punkt 5) --
 // bewusst zurückhaltend (schmale Zeile statt Banner/Modal, kein
@@ -10,6 +11,8 @@ import { useAuth } from '../context/AuthContext'
 export default function MitgliedschaftHinweis() {
   const { coachie } = useAuth()
   const [istAktivesMitglied, setIstAktivesMitglied] = useState(null)
+  // Solange die Mitgliedschaft im Admin ausgeschaltet ist, kein Hinweis.
+  const angebotAktiv = useMitgliedschaftAngebotAktiv()
 
   useEffect(() => {
     if (!coachie?.id) return
@@ -29,7 +32,7 @@ export default function MitgliedschaftHinweis() {
     }
   }, [coachie])
 
-  if (istAktivesMitglied !== false) return null
+  if (!angebotAktiv || istAktivesMitglied !== false) return null
 
   return (
     <p className="text-xs text-mrh-grey">
