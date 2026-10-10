@@ -204,6 +204,7 @@ function GratisAnmeldung({ slug }) {
   const [vorname, setVorname] = useState('')
   const [email, setEmail] = useState('')
   const [datenschutz, setDatenschutz] = useState(false)
+  const [newsletter, setNewsletter] = useState(false)
   const [website, setWebsite] = useState('')
   const [laeuft, setLaeuft] = useState(false)
   const [fehler, setFehler] = useState('')
@@ -217,7 +218,7 @@ function GratisAnmeldung({ slug }) {
       const response = await fetch('/api/checkout?aktion=gratis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, name: vorname, email, website }),
+        body: JSON.stringify({ slug, name: vorname, email, website, newsletter }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) {
@@ -303,6 +304,22 @@ function GratisAnmeldung({ slug }) {
           </a>{' '}
           gelesen und bin mit der Verarbeitung meiner Angaben zur Bereitstellung
           des Zugangs einverstanden.
+        </span>
+      </label>
+      {/* Freiwillig und nie vorausgefüllt. Bei Haken schickt der Server die
+          Adresse an Brevo, Brevo verschickt die Bestätigungsmail
+          (Double-Opt-in). Ohne Haken passiert nichts. */}
+      <label className="flex items-start gap-2 text-xs text-white/70">
+        <input
+          type="checkbox"
+          checked={newsletter}
+          onChange={(e) => setNewsletter(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-mrh-gold"
+        />
+        <span>
+          Ich möchte etwa zweimal im Monat Impulse von Marcel Holz per E-Mail
+          erhalten. Freiwillig, jederzeit mit einem Klick abbestellbar. Du
+          bekommst dazu eine Bestätigungsmail.
         </span>
       </label>
       <p className="text-xs text-white/70">

@@ -7,6 +7,7 @@ import {
   normalisiereEmail,
 } from './_lib/coachieAnlage.js'
 import { requireCoachie } from './_lib/coachieAuth.js'
+import { meldeNewsletterAn } from './_lib/brevo.js'
 import {
   VERTRAG_LABEL,
   erstelleKuendigungsToken,
@@ -26,6 +27,8 @@ import {
 //   POST                            Stripe Checkout Session (Kurskauf)
 //   POST ?aktion=gratis             Gratis-Anmeldung (preis_cent = 0)
 //   POST ?aktion=widerruf           Widerrufsbutton (§ 356a BGB)
+//   POST/OPTIONS ?aktion=newsletter Newsletter-Anmeldung (Double-Opt-in über Brevo),
+//                                   auch vom Kurztest (mrh-quiz.vercel.app) aus aufrufbar
 //   GET/POST ?resource=mitgliedschaft   Vorschau bzw. Checkout Mitgliedschaft
 //   POST ?resource=kuendigung[&aktion=bestaetigen|direkt]   Kündigungsbutton
 
@@ -736,7 +739,7 @@ const GRATIS_ERFOLG = { status: 'ok' }
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 async function handleGratisAnmeldung(req, res, supabase) {
-  const { slug, name, email, website } = req.body ?? {}
+  const { slug, name, email, website, newsletter } = req.body ?? {}
 
   // Honeypot: echte Besucher sehen das Feld nicht. Still verwerfen, mit
   // derselben Erfolgsantwort, damit Bots nichts lernen.
@@ -848,6 +851,13 @@ async function handleGratisAnmeldung(req, res, supabase) {
     }
   }
 
+  // Newsletter nur bei ausdrücklich angehaktem Kästchen (nie vorausgefüllt).
+  // Brevo verschickt die Bestätigungsmail selbst, ein Fehler hier bricht die
+  // Anmeldung zum Kurs nicht ab.
+  if (newsletter === true) {
+    await meldeNewsletterAn({ email: normalisiert, vorname, quelle: `gratiskurs-${slug}` })
+  }
+
   // Neu eingeladene Coachies haben die Supabase-Einladung bereits im
   // Postfach. Bestehende bekommen stattdessen einen kurzen Hinweis.
   if (!neu) {
@@ -863,6 +873,56 @@ async function handleGratisAnmeldung(req, res, supabase) {
   }
 
   res.status(200).json(GRATIS_ERFOLG)
+}
+
+// Eigenständige Newsletter-Anmeldung, z. B. aus dem Kurztest. Der Kurztest
+// ist eine reine Browser-App ohne eigenen Server, deshalb liegt der
+// Brevo-Schlüssel nur hier. Missbrauch begrenzen Honeypot, feste Liste
+// erlaubter Quellen und das Double-Opt-in: Ohne Klick auf den
+// Bestätigungslink landet niemand in der Liste.
+const NEWSLETTER_QUELLEN = new Set(['kurztest', 'kurztest-gross'])
+const NEWSLETTER_ERLAUBTE_URSPRUENGE = new Set([
+  'https://mrh-quiz.vercel.app',
+  'https://app.mrh-beratung.de',
+])
+
+function setzeNewsletterCors(req, res) {
+  const ursprung = req.headers.origin
+  if (ursprung && NEWSLETTER_ERLAUBTE_URSPRUENGE.has(ursprung)) {
+    res.setHeader('Access-Control-Allow-Origin', ursprung)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  }
+}
+
+async function handleNewsletter(req, res) {
+  const { email, name, quelle, website, einwilligung } = req.body ?? {}
+
+  if (website) {
+    res.status(200).json({ status: 'ok' })
+    return
+  }
+
+  const normalisiert = normalisiereEmail(email)
+  const vorname = typeof name === 'string' ? name.trim().slice(0, 100) : ''
+
+  if (einwilligung !== true) {
+    res.status(400).json({ error: 'Ohne Einwilligung keine Anmeldung.' })
+    return
+  }
+  if (!EMAIL_MUSTER.test(normalisiert) || normalisiert.length > 254) {
+    res.status(400).json({ error: 'Bitte eine gültige E-Mail-Adresse angeben.' })
+    return
+  }
+  if (!NEWSLETTER_QUELLEN.has(quelle)) {
+    res.status(400).json({ error: 'Unbekannte Quelle.' })
+    return
+  }
+
+  await meldeNewsletterAn({ email: normalisiert, vorname, quelle })
+  // Immer dieselbe Antwort, unabhängig vom Ergebnis bei Brevo.
+  res.status(200).json({ status: 'ok' })
 }
 
 async function handleCheckoutSession(req, res, supabase) {
@@ -1054,6 +1114,20 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST' && req.query.aktion === 'widerruf') {
     await handleWiderruf(req, res, supabase)
+    return
+  }
+
+  if (req.query.aktion === 'newsletter') {
+    setzeNewsletterCors(req, res)
+    if (req.method === 'OPTIONS') {
+      res.status(204).end()
+      return
+    }
+    if (req.method === 'POST') {
+      await handleNewsletter(req, res)
+      return
+    }
+    res.status(405).json({ error: 'Methode nicht erlaubt.' })
     return
   }
 
