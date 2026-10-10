@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { formatPreis, UST_HINWEIS } from '../lib/preis'
 import { toYoutubeEmbedUrl } from '../lib/youtube'
-import { DATENSCHUTZ_URL } from '../lib/rechtliches'
+import { AGB_PFAD, DATENSCHUTZ_URL } from '../lib/rechtliches'
 import RechtsFooter from '../components/RechtsFooter'
 import KaufZustimmung from '../components/KaufZustimmung'
 
@@ -305,6 +305,22 @@ function GratisAnmeldung({ slug }) {
           des Zugangs einverstanden.
         </span>
       </label>
+      <p className="text-xs text-white/70">
+        Mit der Anmeldung gelten unsere{' '}
+        <Link to={AGB_PFAD} target="_blank" className="underline hover:text-white">
+          AGB
+        </Link>
+        . Hinweise zum Datenschutz findest du in der{' '}
+        <a
+          href={DATENSCHUTZ_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white"
+        >
+          Datenschutzerklärung
+        </a>
+        .
+      </p>
       {fehler && <p className="text-sm text-red-400">{fehler}</p>}
       <button
         type="submit"

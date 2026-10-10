@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { findeOderErstelleCoachie } from '../_lib/coachieAnlage.js'
 import { ermittleAppUrl } from '../_lib/appUrl.js'
 import { sendMail } from '../_lib/mailer.js'
+import { rechtstexteAlsKlartext } from '../_lib/rechtstexte.js'
 import {
   AGB_PFAD,
   VERTRAG_WIDERRUFEN_PFAD,
@@ -126,7 +127,11 @@ Kündigen: ${ermittleAppUrl(req)}/vertrag-kuendigen
 
 Viele Grüße
 Marcel Holz
-MRH Beratung & Coaching`,
+MRH Beratung & Coaching
+
+Zu deinen Unterlagen folgen die AGB und die Widerrufsbelehrung im vollständigen Wortlaut.
+
+${rechtstexteAlsKlartext(ermittleAppUrl(req))}`,
     })
   }
 
@@ -364,7 +369,11 @@ Falls du noch kein Passwort festgelegt hast, nutze die Einladungsmail oder auf d
 
 Viele Grüße
 Marcel Holz
-MRH Beratung & Coaching`,
+MRH Beratung & Coaching
+
+Zu deinen Unterlagen folgen die AGB und die Widerrufsbelehrung im vollständigen Wortlaut.
+
+${rechtstexteAlsKlartext(appUrl)}`,
   })
 
   return { coachieId, programmId, zugriffBis }
