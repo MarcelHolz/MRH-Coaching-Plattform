@@ -17,10 +17,12 @@ export function AdminAuthProvider({ children }) {
     setIsAuthenticated(!!getAdminToken())
   }, [])
 
-  async function login(password) {
+  // Mit E-Mail: persönliches Admin-Konto. Ohne E-Mail: Notfallzugang
+  // über das gemeinsame ADMIN_PASSWORD (solange es in Vercel gesetzt ist).
+  async function login(email, password) {
     const data = await adminFetch('/api/admin/login', {
       method: 'POST',
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(email ? { email, password } : { password }),
     })
     setAdminToken(data.token)
     setIsAuthenticated(true)

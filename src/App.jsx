@@ -43,6 +43,7 @@ import AdminEventsPage from './admin/AdminEventsPage'
 import AdminMitgliedschaftPage from './admin/AdminMitgliedschaftPage'
 import AdminMitgliederInhaltePage from './admin/AdminMitgliederInhaltePage'
 import AdminWiderrufePage from './admin/AdminWiderrufePage'
+import AdminAdminsPage from './admin/AdminAdminsPage'
 
 export default function App() {
   return (
@@ -62,7 +63,7 @@ export default function App() {
             <Route
               path="/passwort-festlegen"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute coachiePflicht={false}>
                   <SetPasswordPage />
                 </ProtectedRoute>
               }
@@ -114,6 +115,7 @@ export default function App() {
               <Route path="testimonials" element={<AdminTestimonialsPage />} />
               <Route path="empfehlungen" element={<AdminEmpfehlungenPage />} />
               <Route path="widerrufe" element={<AdminWiderrufePage />} />
+              <Route path="admins" element={<AdminAdminsPage />} />
               <Route path="entwuerfe" element={<AdminEntwuerfePage />} />
               <Route path="faq" element={<AdminFaqPage />} />
               <Route

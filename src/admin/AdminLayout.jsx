@@ -8,7 +8,12 @@ import { useAdminAuth } from './AdminAuthContext'
 // ergänzen. "Übersicht" ist bewusst ungruppiert und immer zuerst, als
 // fester Startpunkt.
 const NAV_GROUPS = [
-  { items: [{ to: '/admin', label: 'Übersicht', end: true }] },
+  {
+    items: [
+      { to: '/admin', label: 'Übersicht', end: true },
+      { to: '/admin/admins', label: 'Admins' },
+    ],
+  },
   {
     label: 'Kurse',
     items: [
