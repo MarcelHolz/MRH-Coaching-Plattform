@@ -896,7 +896,7 @@ async function handleCheckoutSession(req, res, supabase) {
   const { data: programm, error } = await supabase
     .from('programme')
     .select(
-      'id, stripe_price_id, stripe_price_id_einfuehrung, einfuehrungspreis_gueltig_bis',
+      'id, titel, preis_cent, einfuehrungspreis_cent, stripe_price_id, stripe_price_id_einfuehrung, einfuehrungspreis_gueltig_bis',
     )
     .eq('slug', slug)
     .eq('oeffentlich_kaufbar', true)
@@ -913,16 +913,43 @@ async function handleCheckoutSession(req, res, supabase) {
   // ISO-Datumsstring (YYYY-MM-DD), da einfuehrungspreis_gueltig_bis eine
   // reine date-Spalte ohne Uhrzeit ist.
   const heute = new Date().toISOString().slice(0, 10)
-  const einfuehrungAktiv =
-    programm?.stripe_price_id_einfuehrung &&
-    programm?.einfuehrungspreis_gueltig_bis &&
+  const einfuehrungsfristLaeuft =
+    !!programm?.einfuehrungspreis_gueltig_bis &&
     heute <= programm.einfuehrungspreis_gueltig_bis
+  const einfuehrungAktiv =
+    einfuehrungsfristLaeuft && !!programm?.stripe_price_id_einfuehrung
 
   const priceId = einfuehrungAktiv
     ? programm.stripe_price_id_einfuehrung
     : programm?.stripe_price_id
 
-  if (!programm || !priceId) {
+  // Fallback wie bei der Mitgliedschaft (siehe handleMitgliedschaftCheckoutSession):
+  // Ist für ein Programm keine Stripe-Price-ID hinterlegt, wird der Preis
+  // inline per price_data aus preis_cent bzw. einfuehrungspreis_cent erzeugt.
+  // Vorher lieferte der Kauf für jedes Programm ohne manuell angelegten
+  // Stripe-Price einen 404 "Programm ist nicht käuflich", obwohl die
+  // Verkaufsseite einen Preis und einen Kaufen-Button zeigte.
+  let lineItem = null
+  if (priceId) {
+    lineItem = { price: priceId, quantity: 1 }
+  } else if (programm) {
+    const betragCent =
+      einfuehrungsfristLaeuft && programm.einfuehrungspreis_cent > 0
+        ? programm.einfuehrungspreis_cent
+        : programm.preis_cent
+    if (betragCent > 0) {
+      lineItem = {
+        price_data: {
+          currency: 'eur',
+          unit_amount: betragCent,
+          product_data: { name: programm.titel || 'MRH Online-Programm' },
+        },
+        quantity: 1,
+      }
+    }
+  }
+
+  if (!programm || !lineItem) {
     res.status(404).json({ error: 'Programm ist nicht käuflich.' })
     return
   }
@@ -933,7 +960,7 @@ async function handleCheckoutSession(req, res, supabase) {
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [lineItem],
     success_url: `${appUrl}/kauf-erfolgreich`,
     cancel_url: `${appUrl}/kaufen/${slug}?abgebrochen=1`,
     // Bewusst KEIN explizites payment_method_types: ['card', 'klarna']
