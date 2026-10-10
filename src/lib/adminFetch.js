@@ -23,7 +23,16 @@ export async function adminFetch(path, options = {}) {
   const response = await fetch(path, { ...options, headers })
 
   if (response.status === 401) {
+    // Beim Login selbst bedeutet 401 "falsche Zugangsdaten".
+    if (path.startsWith('/api/admin/login')) {
+      const data = await response.json().catch(() => null)
+      throw new Error(data?.error || 'Anmeldung fehlgeschlagen.')
+    }
+    // Sitzung abgelaufen oder Admin deaktiviert: zurück zum Login.
     clearAdminToken()
+    if (!window.location.pathname.startsWith('/admin/login')) {
+      window.location.assign('/admin/login')
+    }
     throw new Error('Admin-Sitzung abgelaufen. Bitte erneut anmelden.')
   }
 

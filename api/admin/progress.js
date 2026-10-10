@@ -2,7 +2,7 @@ import { requireAdmin } from '../_lib/adminAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Methode nicht erlaubt.' })

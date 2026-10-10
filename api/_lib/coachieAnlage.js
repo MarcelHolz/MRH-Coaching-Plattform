@@ -41,7 +41,7 @@ async function sucheCoachie(supabase, email, rohEmail) {
 // bei jeder Zustellung mit 500 scheitern und der Kauf nie freigeschaltet.
 // generateLink verschickt selbst keine Mail, liefert aber den
 // bestehenden Auth-Nutzer zurück.
-async function bestehenderAuthNutzer(supabase, email) {
+export async function bestehenderAuthNutzer(supabase, email) {
   const { data, error } = await supabase.auth.admin.generateLink({
     type: 'magiclink',
     email,

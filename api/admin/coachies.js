@@ -1,6 +1,13 @@
 import crypto from 'node:crypto'
 import { requireAdmin } from '../_lib/adminAuth.js'
 import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { sendMail } from '../_lib/mailer.js'
+import { ermittleAppUrl } from '../_lib/appUrl.js'
+import {
+  bestehenderAuthNutzer,
+  findeOderErstelleCoachie,
+  normalisiereEmail,
+} from '../_lib/coachieAnlage.js'
 
 // Konsolidierte Route (Vercel Hobby: max. 12 Serverless Functions).
 // ?resource= steuert, welche der drei früher getrennten Dateien
@@ -32,29 +39,41 @@ async function handleCoachies(req, res, supabase) {
       return
     }
 
-    const appUrl =
-      process.env.APP_URL ||
-      `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`
+    const normalisiert = normalisiereEmail(email)
+    const { data: bereitsCoachie } = await supabase
+      .from('coachies')
+      .select('id')
+      .eq('email', normalisiert)
+      .maybeSingle()
 
-    const { data: invited, error: inviteError } =
-      await supabase.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${appUrl}/passwort-festlegen`,
-      })
-
-    if (inviteError) {
-      res.status(500).json({ error: inviteError.message })
+    if (bereitsCoachie) {
+      res.status(409).json({ error: 'Zu dieser E-Mail-Adresse gibt es bereits einen Coachie.' })
       return
     }
 
-    const { data: coachie, error: insertError } = await supabase
+    // Gemeinsame Anlage wie bei Kauf und Gratis-Anmeldung: neue Adresse
+    // bekommt eine Einladung; existiert schon ein Auth-Nutzer (z. B. ein
+    // reiner Admin), wird nur die coachies-Zeile mit derselben ID angelegt.
+    const { coachieId, error: anlageError } = await findeOderErstelleCoachie({
+      email: normalisiert,
+      name,
+      supabase,
+      appUrl: ermittleAppUrl(req),
+    })
+
+    if (anlageError) {
+      res.status(500).json({ error: anlageError })
+      return
+    }
+
+    const { data: coachie, error: ladeError } = await supabase
       .from('coachies')
-      .insert({ id: invited.user.id, name, email })
-      .select()
+      .select('*')
+      .eq('id', coachieId)
       .single()
 
-    if (insertError) {
-      await supabase.auth.admin.deleteUser(invited.user.id)
-      res.status(500).json({ error: insertError.message })
+    if (ladeError) {
+      res.status(500).json({ error: ladeError.message })
       return
     }
 
@@ -97,6 +116,19 @@ async function handleCoachies(req, res, supabase) {
 
     if (coachieError) {
       res.status(500).json({ error: coachieError.message })
+      return
+    }
+
+    // Ist dieselbe Person auch Admin, bleibt das Auth-Konto bestehen,
+    // sonst wäre der Admin-Zugang mit gelöscht.
+    const { data: istAdmin } = await supabase
+      .from('admin_benutzer')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (istAdmin) {
+      res.status(204).end()
       return
     }
 
@@ -490,11 +522,166 @@ async function handleWiderrufe(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Admin-Konten (Admin > Admins). GET listet alle Admins und kennzeichnet
+// den angemeldeten. POST lädt per E-Mail ein: neuer Auth-Nutzer über
+// inviteUserByEmail (Passwort festlegen, danach Login unter /admin/login),
+// bestehender Auth-Nutzer (z. B. ein Coachie) behält sein Passwort und
+// bekommt eine Hinweis-Mail. Ein Admin wird dadurch NICHT Coachie.
+// PATCH aktiviert/deaktiviert. Niemand kann sich selbst deaktivieren, und
+// der letzte aktive Admin bleibt aktiv.
+async function handleAdmins(req, res, supabase, angemeldet) {
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('admin_benutzer')
+      .select('id, email, name, aktiv, erstellt_am, letzter_login_am')
+      .order('erstellt_am', { ascending: true })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({
+      admins: data ?? [],
+      ich: angemeldet.notfall ? null : angemeldet.id,
+      notfall: angemeldet.notfall,
+    })
+    return
+  }
+
+  if (req.method === 'POST') {
+    const email = normalisiereEmail(req.body?.email)
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 200) : ''
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Bitte eine gültige E-Mail-Adresse angeben.' })
+      return
+    }
+
+    const { data: vorhanden } = await supabase
+      .from('admin_benutzer')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (vorhanden) {
+      res.status(409).json({ error: 'Diese Adresse ist bereits als Admin eingetragen.' })
+      return
+    }
+
+    const appUrl = ermittleAppUrl(req)
+    let authUserId = null
+    let neuEingeladen = true
+
+    const { data: invited, error: inviteError } =
+      await supabase.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${appUrl}/passwort-festlegen`,
+      })
+
+    if (inviteError) {
+      // Auth-Nutzer existiert schon (z. B. als Coachie): dieselbe ID
+      // verwenden, Passwort bleibt unverändert.
+      const bestehend = await bestehenderAuthNutzer(supabase, email)
+      if (!bestehend) {
+        res.status(500).json({ error: inviteError.message })
+        return
+      }
+      authUserId = bestehend.id
+      neuEingeladen = false
+    } else {
+      authUserId = invited.user.id
+    }
+
+    const { data: admin, error: insertError } = await supabase
+      .from('admin_benutzer')
+      .insert({ id: authUserId, email, name: name || null })
+      .select('id, email, name, aktiv, erstellt_am, letzter_login_am')
+      .single()
+
+    if (insertError) {
+      // Nur einen gerade frisch eingeladenen Auth-Nutzer wieder entfernen.
+      if (neuEingeladen) await supabase.auth.admin.deleteUser(authUserId)
+      res.status(500).json({ error: insertError.message })
+      return
+    }
+
+    if (!neuEingeladen) {
+      try {
+        await sendMail({
+          to: email,
+          subject: 'Dein Admin-Zugang zur MRH Coaching-Plattform',
+          text: `Hallo${name ? ' ' + name : ''},\n\ndu hast jetzt Zugang zum Admin-Bereich der MRH Coaching-Plattform.\n\nAnmelden: ${appUrl}/admin/login\nDu meldest dich mit deiner E-Mail-Adresse und deinem bestehenden Passwort an. Falls du es nicht mehr weißt, nutze dort „Passwort vergessen?“.\n\nViele Grüße\nMRH Beratung & Coaching`,
+        })
+      } catch (err) {
+        console.error('Hinweis-Mail an neuen Admin nicht versendet:', err.message)
+      }
+    }
+
+    res.status(201).json({ admin, eingeladen: neuEingeladen })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, aktiv } = req.body ?? {}
+
+    if (!id || typeof aktiv !== 'boolean') {
+      res.status(400).json({ error: 'id und aktiv sind erforderlich.' })
+      return
+    }
+
+    if (!aktiv) {
+      if (!angemeldet.notfall && id === angemeldet.id) {
+        res.status(409).json({ error: 'Du kannst dich nicht selbst deaktivieren.' })
+        return
+      }
+
+      const { count, error: countError } = await supabase
+        .from('admin_benutzer')
+        .select('id', { count: 'exact', head: true })
+        .eq('aktiv', true)
+        .neq('id', id)
+
+      if (countError) {
+        res.status(500).json({ error: countError.message })
+        return
+      }
+
+      if ((count ?? 0) === 0) {
+        res.status(409).json({ error: 'Der letzte aktive Admin kann nicht deaktiviert werden.' })
+        return
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('admin_benutzer')
+      .update({ aktiv })
+      .eq('id', id)
+      .select('id, email, name, aktiv, erstellt_am, letzter_login_am')
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ admin: data })
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  const angemeldet = await requireAdmin(req, res)
+  if (!angemeldet) return
 
   const supabase = getSupabaseAdmin()
   const { resource } = req.query
+
+  if (resource === 'admins') {
+    await handleAdmins(req, res, supabase, angemeldet)
+    return
+  }
 
   if (resource === 'resend') {
     await handleResend(req, res, supabase)

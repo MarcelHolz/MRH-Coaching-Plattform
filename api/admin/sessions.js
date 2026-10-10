@@ -399,7 +399,7 @@ async function handleMaterials(req, res, supabase) {
 }
 
 export default async function handler(req, res) {
-  if (!requireAdmin(req, res)) return
+  if (!(await requireAdmin(req, res))) return
 
   const supabase = getSupabaseAdmin()
   const { resource } = req.query

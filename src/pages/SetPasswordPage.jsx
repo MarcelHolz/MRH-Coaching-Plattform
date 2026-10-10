@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
+import { verbraucheAdminZiel } from '../lib/passwortZiel'
 import RechtsFooter from '../components/RechtsFooter'
 import PasswortFeld from '../components/PasswortFeld'
 
 export default function SetPasswordPage() {
   const navigate = useNavigate()
+  const { coachie, logout } = useAuth()
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [error, setError] = useState('')
@@ -34,6 +37,19 @@ export default function SetPasswordPage() {
     }
 
     pendingPasswordSetup.active = false
+
+    // Admin-Einladung oder "Passwort vergessen" im Admin-Login: zurück zum
+    // Admin-Login, ohne eine Coachie-Sitzung offen zu lassen. Reine Admins
+    // (ohne coachies-Zeile) landen immer dort.
+    if (verbraucheAdminZiel() || !coachie) {
+      await logout()
+      navigate('/admin/login', {
+        replace: true,
+        state: { hinweis: 'Dein Passwort ist gespeichert. Melde dich jetzt im Admin-Bereich an.' },
+      })
+      return
+    }
+
     navigate('/coachie', { replace: true })
   }
 
