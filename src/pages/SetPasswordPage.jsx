@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
 import RechtsFooter from '../components/RechtsFooter'
+import PasswortFeld from '../components/PasswortFeld'
 
 export default function SetPasswordPage() {
   const navigate = useNavigate()
@@ -50,11 +51,12 @@ export default function SetPasswordPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="neues-passwort" className="mb-1 block text-sm font-medium text-slate-700">
                 Neues Passwort
               </label>
-              <input
-                type="password"
+              <PasswortFeld
+                id="neues-passwort"
+                autoComplete="new-password"
                 required
                 minLength={8}
                 value={password}
@@ -63,11 +65,12 @@ export default function SetPasswordPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="neues-passwort-wiederholung" className="mb-1 block text-sm font-medium text-slate-700">
                 Passwort bestätigen
               </label>
-              <input
-                type="password"
+              <PasswortFeld
+                id="neues-passwort-wiederholung"
+                autoComplete="new-password"
                 required
                 minLength={8}
                 value={passwordConfirm}

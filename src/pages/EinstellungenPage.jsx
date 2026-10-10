@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import AvatarUpload from '../components/AvatarUpload'
 import { initialen } from '../lib/initialen'
+import PasswortFeld from '../components/PasswortFeld'
 
 function formatEmpfehlungsDatum(iso) {
   return new Date(iso).toLocaleDateString('de-DE', {
@@ -617,11 +618,12 @@ export default function EinstellungenPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="aktuelles-passwort" className="mb-1 block text-sm font-medium text-slate-700">
               Aktuelles Passwort
             </label>
-            <input
-              type="password"
+            <PasswortFeld
+              id="aktuelles-passwort"
+              autoComplete="current-password"
               required
               value={aktuellesPasswort}
               onChange={(e) => setAktuellesPasswort(e.target.value)}
@@ -629,11 +631,12 @@ export default function EinstellungenPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="neues-passwort" className="mb-1 block text-sm font-medium text-slate-700">
               Neues Passwort
             </label>
-            <input
-              type="password"
+            <PasswortFeld
+              id="neues-passwort"
+              autoComplete="new-password"
               required
               minLength={8}
               value={neuesPasswort}
@@ -642,11 +645,12 @@ export default function EinstellungenPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="neues-passwort-wiederholung" className="mb-1 block text-sm font-medium text-slate-700">
               Neues Passwort wiederholen
             </label>
-            <input
-              type="password"
+            <PasswortFeld
+              id="neues-passwort-wiederholung"
+              autoComplete="new-password"
               required
               minLength={8}
               value={neuesPasswortWiederholung}
