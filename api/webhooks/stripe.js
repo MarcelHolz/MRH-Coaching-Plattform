@@ -3,7 +3,11 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { findeOderErstelleCoachie } from '../_lib/coachieAnlage.js'
 import { ermittleAppUrl } from '../_lib/appUrl.js'
 import { sendMail } from '../_lib/mailer.js'
-import { AGB_URL, WIDERRUF_URL } from '../../src/lib/rechtliches.js'
+import {
+  AGB_PFAD,
+  WIDERRUF_PFAD,
+  absoluteUrl,
+} from '../../src/lib/rechtliches.js'
 
 // Stripe-Signaturprüfung braucht den unveränderten Roh-Body (byte-genau),
 // nicht das von Vercel automatisch geparste JSON-Objekt.
@@ -116,8 +120,7 @@ ${naechste ? `Nächste Abrechnung: ${formatDatum(naechste)}\n` : ''}Laufzeit: mo
 
 ${verzichtAbsatz(session)}
 
-AGB: ${AGB_URL}
-Widerrufsbelehrung: ${WIDERRUF_URL}
+${rechtsLinks(ermittleAppUrl(req))}
 Kündigen: ${ermittleAppUrl(req)}/vertrag-kuendigen
 
 Viele Grüße
@@ -231,6 +234,14 @@ async function sendeBestaetigung({ to, subject, text }) {
   }
 }
 
+// Links auf die Rechtstexte in Mails: immer absolute URLs (über APP_URL).
+function rechtsLinks(appUrl) {
+  return [
+    `AGB: ${absoluteUrl(appUrl, AGB_PFAD)}`,
+    `Widerrufsbelehrung: ${absoluteUrl(appUrl, WIDERRUF_PFAD)}`,
+  ].join('\n')
+}
+
 function verzichtAbsatz(session) {
   const verzichtAm = session.metadata?.widerrufsverzicht_am
   const agbAm = session.metadata?.agb_akzeptiert_am
@@ -342,8 +353,7 @@ Zugriff: ${zugriffBis ? `bis ${formatDatum(zugriffBis)}` : 'unbefristet'}
 
 ${verzichtAbsatz(session)}
 
-AGB: ${AGB_URL}
-Widerrufsbelehrung: ${WIDERRUF_URL}
+${rechtsLinks(appUrl)}
 
 Deine Rechnung erhältst du separat von Stripe. Zum Login: ${appUrl}/login
 Falls du noch kein Passwort festgelegt hast, nutze die Einladungsmail oder auf der Login-Seite „Passwort vergessen“.

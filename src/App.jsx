@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage'
 import SetPasswordPage from './pages/SetPasswordPage'
 import KaufenPage from './pages/KaufenPage'
 import StartPage from './pages/StartPage'
+import AgbPage from './pages/AgbPage'
+import WiderrufsbelehrungPage from './pages/WiderrufsbelehrungPage'
 import KaufErfolgPage from './pages/KaufErfolgPage'
 import CoachieLayout from './layouts/CoachieLayout'
 import CoachieDashboardPage from './pages/CoachieDashboardPage'
@@ -51,6 +53,8 @@ export default function App() {
             <Route path="/kaufen/:slug" element={<KaufenPage />} />
             <Route path="/mitgliedschaft" element={<MitgliedschaftPage />} />
             <Route path="/vertrag-kuendigen" element={<VertragKuendigenPage />} />
+            <Route path="/agb" element={<AgbPage />} />
+            <Route path="/widerruf" element={<WiderrufsbelehrungPage />} />
             <Route path="/kauf-erfolgreich" element={<KaufErfolgPage />} />
             <Route
               path="/passwort-festlegen"
