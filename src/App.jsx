@@ -7,6 +7,7 @@ import KaufenPage from './pages/KaufenPage'
 import StartPage from './pages/StartPage'
 import AgbPage from './pages/AgbPage'
 import WiderrufsbelehrungPage from './pages/WiderrufsbelehrungPage'
+import VertragWiderrufenPage from './pages/VertragWiderrufenPage'
 import KaufErfolgPage from './pages/KaufErfolgPage'
 import CoachieLayout from './layouts/CoachieLayout'
 import CoachieDashboardPage from './pages/CoachieDashboardPage'
@@ -41,6 +42,7 @@ import AdminVollstaendigkeitPage from './admin/AdminVollstaendigkeitPage'
 import AdminEventsPage from './admin/AdminEventsPage'
 import AdminMitgliedschaftPage from './admin/AdminMitgliedschaftPage'
 import AdminMitgliederInhaltePage from './admin/AdminMitgliederInhaltePage'
+import AdminWiderrufePage from './admin/AdminWiderrufePage'
 
 export default function App() {
   return (
@@ -55,6 +57,7 @@ export default function App() {
             <Route path="/vertrag-kuendigen" element={<VertragKuendigenPage />} />
             <Route path="/agb" element={<AgbPage />} />
             <Route path="/widerruf" element={<WiderrufsbelehrungPage />} />
+            <Route path="/vertrag-widerrufen" element={<VertragWiderrufenPage />} />
             <Route path="/kauf-erfolgreich" element={<KaufErfolgPage />} />
             <Route
               path="/passwort-festlegen"
@@ -110,6 +113,7 @@ export default function App() {
               <Route path="fortschritt" element={<AdminProgressPage />} />
               <Route path="testimonials" element={<AdminTestimonialsPage />} />
               <Route path="empfehlungen" element={<AdminEmpfehlungenPage />} />
+              <Route path="widerrufe" element={<AdminWiderrufePage />} />
               <Route path="entwuerfe" element={<AdminEntwuerfePage />} />
               <Route path="faq" element={<AdminFaqPage />} />
               <Route

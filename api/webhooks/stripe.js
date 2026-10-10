@@ -5,6 +5,7 @@ import { ermittleAppUrl } from '../_lib/appUrl.js'
 import { sendMail } from '../_lib/mailer.js'
 import {
   AGB_PFAD,
+  VERTRAG_WIDERRUFEN_PFAD,
   WIDERRUF_PFAD,
   absoluteUrl,
 } from '../../src/lib/rechtliches.js'
@@ -235,10 +236,13 @@ async function sendeBestaetigung({ to, subject, text }) {
 }
 
 // Links auf die Rechtstexte in Mails: immer absolute URLs (über APP_URL).
+// Dazu der Hinweis auf den Widerrufsbutton (§ 356a BGB).
 function rechtsLinks(appUrl) {
   return [
     `AGB: ${absoluteUrl(appUrl, AGB_PFAD)}`,
     `Widerrufsbelehrung: ${absoluteUrl(appUrl, WIDERRUF_PFAD)}`,
+    '',
+    `Einen Widerruf kannst du jederzeit online erklären: ${absoluteUrl(appUrl, VERTRAG_WIDERRUFEN_PFAD)}. Bitte beachte, dass dein Widerrufsrecht durch den oben erteilten Verzicht bereits erloschen sein kann.`,
   ].join('\n')
 }
 

@@ -25,6 +25,7 @@ import {
 //   GET  ?resource=linkvorschau     HTML mit Open-Graph-Tags für Crawler
 //   POST                            Stripe Checkout Session (Kurskauf)
 //   POST ?aktion=gratis             Gratis-Anmeldung (preis_cent = 0)
+//   POST ?aktion=widerruf           Widerrufsbutton (§ 356a BGB)
 //   GET/POST ?resource=mitgliedschaft   Vorschau bzw. Checkout Mitgliedschaft
 //   POST ?resource=kuendigung[&aktion=bestaetigen|direkt]   Kündigungsbutton
 
@@ -590,6 +591,141 @@ async function handleKuendigungDirekt(req, res, supabase) {
   await schliesseKuendigungAb(req, res, supabase, erklaerung, coachie)
 }
 
+// Widerrufsbutton (§ 356a BGB): öffentlich, ohne Login. Nimmt die
+// Widerrufserklärung entgegen, protokolliert sie in
+// widerrufserklaerungen und bestätigt den Eingang unverzüglich per Mail
+// (Inhalt, Datum und Uhrzeit sekundengenau). Kopie an ADMIN_EMAIL.
+// Es wird NICHTS automatisch erstattet oder gesperrt; ob das
+// Widerrufsrecht wegen Widerrufsverzicht erloschen ist, prüft der Admin
+// manuell (Admin > Widerrufe). Antwort immer gleich.
+const WIDERRUF_LIMIT_PRO_TAG = 5
+const WIDERRUF_EINGANG = {
+  status: 'eingegangen',
+  meldung:
+    'Dein Widerruf ist bei uns eingegangen. Du erhältst eine Eingangsbestätigung per E-Mail.',
+}
+
+function formatEingang(iso) {
+  return `${new Date(iso).toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    dateStyle: 'long',
+    timeStyle: 'medium',
+  })} Uhr`
+}
+
+function kurz(wert, max) {
+  return typeof wert === 'string' ? wert.trim().slice(0, max) : ''
+}
+
+async function ermittleWiderrufsVertrag(supabase, auswahl) {
+  if (auswahl === 'mitgliedschaft') return { vertrag: 'Mitgliedschaft', programmId: null }
+  if (typeof auswahl === 'string' && auswahl.startsWith('programm:')) {
+    const slug = auswahl.slice('programm:'.length)
+    const { data } = await supabase
+      .from('programme')
+      .select('id, titel')
+      .eq('slug', slug)
+      .maybeSingle()
+    if (data) return { vertrag: data.titel, programmId: data.id }
+  }
+  return { vertrag: 'Anderer Vertrag', programmId: null }
+}
+
+async function handleWiderruf(req, res, supabase) {
+  const { name, email, vertrag, kaufdatumOderBestellnr, anmerkung, website } = req.body ?? {}
+
+  if (website) {
+    res.status(200).json(WIDERRUF_EINGANG)
+    return
+  }
+
+  const normalisiert = normalisiereEmail(email)
+  const nameSauber = kurz(name, 200)
+  if (!nameSauber || !EMAIL_MUSTER.test(normalisiert) || !vertrag) {
+    res.status(400).json({
+      error: 'Bitte Name, E-Mail-Adresse und den Vertrag angeben.',
+    })
+    return
+  }
+
+  const { vertrag: vertragText, programmId } = await ermittleWiderrufsVertrag(
+    supabase,
+    vertrag,
+  )
+  const kaufangabe = kurz(kaufdatumOderBestellnr, 200)
+  const anmerkungSauber = kurz(anmerkung, 2000)
+
+  // Missbrauchsbremse gegen Mail-Flut: Ab dem Limit wird die Erklärung
+  // trotzdem gespeichert (eine Widerrufserklärung darf nie verloren
+  // gehen), aber ohne weitere Mails und zur manuellen Prüfung markiert.
+  const seit = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count } = await supabase
+    .from('widerrufserklaerungen')
+    .select('id', { count: 'exact', head: true })
+    .eq('email', normalisiert)
+    .gte('eingegangen_am', seit)
+  const ueberLimit = (count ?? 0) >= WIDERRUF_LIMIT_PRO_TAG
+
+  const { data: coachie } = await supabase
+    .from('coachies')
+    .select('id')
+    .eq('email', normalisiert)
+    .maybeSingle()
+
+  const { data: erklaerung, error: insertError } = await supabase
+    .from('widerrufserklaerungen')
+    .insert({
+      name: nameSauber,
+      email: normalisiert,
+      vertrag: vertragText,
+      vertrag_programm_id: programmId,
+      kaufdatum_oder_bestellnr: kaufangabe || null,
+      anmerkung: anmerkungSauber || null,
+      coachie_id: coachie?.id ?? null,
+      status: ueberLimit ? 'manuell_pruefen' : 'eingegangen',
+    })
+    .select('id, eingegangen_am')
+    .single()
+
+  if (insertError) {
+    console.error('Widerruf konnte nicht gespeichert werden:', insertError.message)
+    res.status(500).json({
+      error:
+        'Dein Widerruf konnte gerade nicht übermittelt werden. Bitte versuche es erneut oder schreib an info@mrh-beratung.de.',
+    })
+    return
+  }
+
+  if (!ueberLimit) {
+    const eingang = formatEingang(erklaerung.eingegangen_am)
+    const inhalt = [
+      `Eingegangen am: ${eingang}`,
+      `Name: ${nameSauber}`,
+      `E-Mail: ${normalisiert}`,
+      `Vertrag: ${vertragText}`,
+      `Kaufdatum oder Bestellnummer: ${kaufangabe || 'keine Angabe'}`,
+      `Anmerkung: ${anmerkungSauber || 'keine Angabe'}`,
+    ].join('\n')
+
+    await sendeOhneAbbruch({
+      to: normalisiert,
+      subject: 'Eingangsbestätigung deines Widerrufs',
+      text: `Hallo ${nameSauber},\n\nwir bestätigen den Eingang deiner Widerrufserklärung mit folgendem Inhalt:\n\n${inhalt}\n\nDiese E-Mail belegt den Eingang deines Widerrufs mit Datum und Uhrzeit. Wir bearbeiten ihn und melden uns bei dir.\n\nViele Grüße\nMRH Beratung & Coaching\nMarcel Holz, Bausdorfstraße 14A, 12621 Berlin, info@mrh-beratung.de`,
+    })
+
+    await sendeOhneAbbruch({
+      to: adminAdresse(),
+      subject: `Widerruf eingegangen: ${vertragText}`,
+      text: `Über /vertrag-widerrufen ist ein Widerruf eingegangen.\n\n${inhalt}\n\n${
+        coachie ? 'Die Adresse gehört zu einem Coachie.' : 'Kein Coachie mit dieser Adresse gefunden.'
+      }\n\nBearbeiten: ${ermittleAppUrl(req)}/admin/widerrufe\n\nEs wurde nichts automatisch erstattet oder gesperrt.`,
+      replyTo: normalisiert,
+    })
+  }
+
+  res.status(200).json(WIDERRUF_EINGANG)
+}
+
 // Gratis-Anmeldung für Programme mit preis_cent = 0 (z. B. die
 // Standortbestimmung): kein Stripe, direkt Coachie anlegen bzw. finden
 // und zuordnen. Alle Bedingungen werden serverseitig geprüft, nie dem
@@ -886,6 +1022,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     await handleVorschau(req, res, supabase)
+    return
+  }
+
+  if (req.method === 'POST' && req.query.aktion === 'widerruf') {
+    await handleWiderruf(req, res, supabase)
     return
   }
 

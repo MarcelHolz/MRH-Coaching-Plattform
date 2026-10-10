@@ -430,8 +430,9 @@ export default function KaufenPage() {
 
   if (error || !programm) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-mrh-cream px-4">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-mrh-cream px-4">
         <p className="text-red-600">{error || 'Programm nicht gefunden.'}</p>
+        <RechtsFooter />
       </div>
     )
   }

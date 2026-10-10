@@ -387,6 +387,109 @@ async function handleAssignments(req, res, supabase) {
   res.status(405).json({ error: 'Methode nicht erlaubt.' })
 }
 
+// Admin-Übersicht der Widerrufe (Widerrufsbutton § 356a BGB). GET liefert
+// alle Erklärungen, für Kurse zusätzlich den Widerrufsverzicht aus
+// coachie_programme und für die Mitgliedschaft aus mitgliedschaften,
+// damit der Admin prüfen kann, ob das Widerrufsrecht erloschen ist.
+// PATCH ändert nur Status und Notiz. Keine automatische Erstattung oder
+// Sperre.
+const WIDERRUF_STATUS = ['eingegangen', 'erstattet', 'abgelehnt_erloschen', 'manuell_pruefen']
+
+async function handleWiderrufe(req, res, supabase) {
+  if (req.method === 'GET') {
+    const { data: widerrufe, error } = await supabase
+      .from('widerrufserklaerungen')
+      .select('*')
+      .order('eingegangen_am', { ascending: false })
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    const coachieIds = [...new Set(widerrufe.map((w) => w.coachie_id).filter(Boolean))]
+
+    let zuordnungen = []
+    let mitgliedschaften = []
+    if (coachieIds.length > 0) {
+      const [zuordnungenErgebnis, mitgliedschaftenErgebnis] = await Promise.all([
+        supabase
+          .from('coachie_programme')
+          .select('coachie_id, programm_id, zugewiesen_am, widerrufsverzicht_am')
+          .in('coachie_id', coachieIds),
+        supabase
+          .from('mitgliedschaften')
+          .select('coachie_id, start_datum, widerrufsverzicht_am')
+          .in('coachie_id', coachieIds),
+      ])
+      if (zuordnungenErgebnis.error || mitgliedschaftenErgebnis.error) {
+        res.status(500).json({
+          error: (zuordnungenErgebnis.error ?? mitgliedschaftenErgebnis.error).message,
+        })
+        return
+      }
+      zuordnungen = zuordnungenErgebnis.data ?? []
+      mitgliedschaften = mitgliedschaftenErgebnis.data ?? []
+    }
+
+    const ergebnis = widerrufe.map((w) => {
+      let vertragsdaten = null
+      if (w.coachie_id && w.vertrag_programm_id) {
+        const z = zuordnungen.find(
+          (eintrag) =>
+            eintrag.coachie_id === w.coachie_id && eintrag.programm_id === w.vertrag_programm_id,
+        )
+        vertragsdaten = z
+          ? { art: 'kurs', seit: z.zugewiesen_am, widerrufsverzicht_am: z.widerrufsverzicht_am }
+          : { art: 'kurs', nicht_gefunden: true }
+      } else if (w.coachie_id && w.vertrag === 'Mitgliedschaft') {
+        const m = mitgliedschaften.find((eintrag) => eintrag.coachie_id === w.coachie_id)
+        vertragsdaten = m
+          ? {
+              art: 'mitgliedschaft',
+              seit: m.start_datum,
+              widerrufsverzicht_am: m.widerrufsverzicht_am,
+            }
+          : { art: 'mitgliedschaft', nicht_gefunden: true }
+      }
+      return { ...w, vertragsdaten }
+    })
+
+    res.status(200).json({ widerrufe: ergebnis })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const { id, status, notiz } = req.body ?? {}
+
+    if (!id || !WIDERRUF_STATUS.includes(status)) {
+      res.status(400).json({ error: 'id und ein gültiger status sind erforderlich.' })
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('widerrufserklaerungen')
+      .update({
+        status,
+        notiz: typeof notiz === 'string' && notiz.trim() ? notiz.trim() : null,
+        bearbeitet_am: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) {
+      res.status(500).json({ error: error.message })
+      return
+    }
+
+    res.status(200).json({ widerruf: data })
+    return
+  }
+
+  res.status(405).json({ error: 'Methode nicht erlaubt.' })
+}
+
 export default async function handler(req, res) {
   if (!requireAdmin(req, res)) return
 
@@ -415,6 +518,11 @@ export default async function handler(req, res) {
 
   if (resource === 'mitgliedschaften') {
     await handleMitgliedschaften(req, res, supabase)
+    return
+  }
+
+  if (resource === 'widerrufe') {
+    await handleWiderrufe(req, res, supabase)
     return
   }
 
