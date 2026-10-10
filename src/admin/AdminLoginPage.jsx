@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAdminAuth } from './AdminAuthContext'
+import PasswortFeld from '../components/PasswortFeld'
 
 export default function AdminLoginPage() {
   const { login, isAuthenticated } = useAdminAuth()
@@ -37,11 +38,12 @@ export default function AdminLoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="admin-passwort" className="mb-1 block text-sm font-medium text-slate-700">
               Passwort
             </label>
-            <input
-              type="password"
+            <PasswortFeld
+              id="admin-passwort"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

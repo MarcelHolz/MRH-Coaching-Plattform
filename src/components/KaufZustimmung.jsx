@@ -1,4 +1,4 @@
-import { AGB_URL, WIDERRUF_URL } from '../lib/rechtliches'
+import { AGB_PFAD, WIDERRUF_PFAD } from '../lib/rechtliches'
 
 // Pflicht-Checkboxen vor jedem kostenpflichtigen Checkout (AGB und
 // Widerrufsverzicht bei digitalen Inhalten, § 356 Abs. 5 BGB). Der Client
@@ -35,7 +35,7 @@ export default function KaufZustimmung({ zustimmung, onChange }) {
         onChange={(angehakt) => setze('agb', angehakt)}
       >
         Ich habe die{' '}
-        <a href={AGB_URL} target="_blank" rel="noopener noreferrer" className={linkKlassen}>
+        <a href={AGB_PFAD} target="_blank" rel="noopener noreferrer" className={linkKlassen}>
           AGB
         </a>{' '}
         gelesen und akzeptiere sie.
@@ -48,7 +48,7 @@ export default function KaufZustimmung({ zustimmung, onChange }) {
         Bereitstellung der digitalen Inhalte begonnen wird. Mir ist bekannt, dass
         ich mit Beginn der Bereitstellung mein{' '}
         <a
-          href={WIDERRUF_URL}
+          href={WIDERRUF_PFAD}
           target="_blank"
           rel="noopener noreferrer"
           className={linkKlassen}

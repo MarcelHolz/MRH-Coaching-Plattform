@@ -3,7 +3,13 @@ import { getSupabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { findeOderErstelleCoachie } from '../_lib/coachieAnlage.js'
 import { ermittleAppUrl } from '../_lib/appUrl.js'
 import { sendMail } from '../_lib/mailer.js'
-import { AGB_URL, WIDERRUF_URL } from '../../src/lib/rechtliches.js'
+import { rechtstexteAlsKlartext } from '../_lib/rechtstexte.js'
+import {
+  AGB_PFAD,
+  VERTRAG_WIDERRUFEN_PFAD,
+  WIDERRUF_PFAD,
+  absoluteUrl,
+} from '../../src/lib/rechtliches.js'
 
 // Stripe-Signaturprüfung braucht den unveränderten Roh-Body (byte-genau),
 // nicht das von Vercel automatisch geparste JSON-Objekt.
@@ -116,13 +122,16 @@ ${naechste ? `Nächste Abrechnung: ${formatDatum(naechste)}\n` : ''}Laufzeit: mo
 
 ${verzichtAbsatz(session)}
 
-AGB: ${AGB_URL}
-Widerrufsbelehrung: ${WIDERRUF_URL}
+${rechtsLinks(ermittleAppUrl(req))}
 Kündigen: ${ermittleAppUrl(req)}/vertrag-kuendigen
 
 Viele Grüße
 Marcel Holz
-MRH Beratung & Coaching`,
+MRH Beratung & Coaching
+
+Zu deinen Unterlagen folgen die AGB und die Widerrufsbelehrung im vollständigen Wortlaut.
+
+${rechtstexteAlsKlartext(ermittleAppUrl(req))}`,
     })
   }
 
@@ -229,6 +238,17 @@ async function sendeBestaetigung({ to, subject, text }) {
       }
     }
   }
+}
+
+// Links auf die Rechtstexte in Mails: immer absolute URLs (über APP_URL).
+// Dazu der Hinweis auf den Widerrufsbutton (§ 356a BGB).
+function rechtsLinks(appUrl) {
+  return [
+    `AGB: ${absoluteUrl(appUrl, AGB_PFAD)}`,
+    `Widerrufsbelehrung: ${absoluteUrl(appUrl, WIDERRUF_PFAD)}`,
+    '',
+    `Einen Widerruf kannst du jederzeit online erklären: ${absoluteUrl(appUrl, VERTRAG_WIDERRUFEN_PFAD)}. Bitte beachte, dass dein Widerrufsrecht durch den oben erteilten Verzicht bereits erloschen sein kann.`,
+  ].join('\n')
 }
 
 function verzichtAbsatz(session) {
@@ -342,15 +362,18 @@ Zugriff: ${zugriffBis ? `bis ${formatDatum(zugriffBis)}` : 'unbefristet'}
 
 ${verzichtAbsatz(session)}
 
-AGB: ${AGB_URL}
-Widerrufsbelehrung: ${WIDERRUF_URL}
+${rechtsLinks(appUrl)}
 
 Deine Rechnung erhältst du separat von Stripe. Zum Login: ${appUrl}/login
 Falls du noch kein Passwort festgelegt hast, nutze die Einladungsmail oder auf der Login-Seite „Passwort vergessen“.
 
 Viele Grüße
 Marcel Holz
-MRH Beratung & Coaching`,
+MRH Beratung & Coaching
+
+Zu deinen Unterlagen folgen die AGB und die Widerrufsbelehrung im vollständigen Wortlaut.
+
+${rechtstexteAlsKlartext(appUrl)}`,
   })
 
   return { coachieId, programmId, zugriffBis }

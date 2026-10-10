@@ -97,3 +97,49 @@ body {
 .session-liste {
   overflow-anchor: none;
 }
+
+/* Rechtstexte (/agb, /widerruf): gut lesbare Textspalte mit klarer
+   Überschriftenhierarchie. Ergänzt .markdown-inhalt. */
+.rechtstext h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  margin-bottom: 0.5em;
+}
+.rechtstext h2 {
+  font-size: 1.25rem;
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+}
+.rechtstext p,
+.rechtstext li {
+  line-height: 1.7;
+}
+.rechtstext ol {
+  margin-bottom: 0.75em;
+  padding-left: 1.5em;
+  list-style: decimal;
+}
+.rechtstext li {
+  margin-bottom: 0.25em;
+}
+.rechtstext a {
+  color: var(--color-mrh-navy);
+  text-decoration: underline;
+}
+.rechtstext hr {
+  margin: 2.5em 0;
+  border-color: rgb(203 213 225);
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .rechtstext {
+    font-size: 11pt;
+    color: #000;
+  }
+  .rechtstext a {
+    color: #000;
+  }
+}

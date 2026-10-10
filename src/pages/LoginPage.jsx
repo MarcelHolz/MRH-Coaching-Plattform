@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { pendingPasswordSetup, supabase } from '../lib/supabaseClient'
 import RechtsFooter from '../components/RechtsFooter'
+import PasswortFeld from '../components/PasswortFeld'
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth()
@@ -73,11 +74,12 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label htmlFor="login-passwort" className="mb-1 block text-sm font-medium text-slate-700">
                 Passwort
               </label>
-              <input
-                type="password"
+              <PasswortFeld
+                id="login-passwort"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
