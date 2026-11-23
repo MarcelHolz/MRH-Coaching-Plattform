@@ -9,6 +9,7 @@ import AgbPage from './pages/AgbPage'
 import WiderrufsbelehrungPage from './pages/WiderrufsbelehrungPage'
 import VertragWiderrufenPage from './pages/VertragWiderrufenPage'
 import KaufErfolgPage from './pages/KaufErfolgPage'
+import NewsletterBestaetigtPage from './pages/NewsletterBestaetigtPage'
 import CoachieLayout from './layouts/CoachieLayout'
 import CoachieDashboardPage from './pages/CoachieDashboardPage'
 import CoachieProgramPage from './pages/CoachieProgramPage'
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="/widerruf" element={<WiderrufsbelehrungPage />} />
             <Route path="/vertrag-widerrufen" element={<VertragWiderrufenPage />} />
             <Route path="/kauf-erfolgreich" element={<KaufErfolgPage />} />
+            <Route path="/newsletter-bestaetigt" element={<NewsletterBestaetigtPage />} />
             <Route
               path="/passwort-festlegen"
               element={

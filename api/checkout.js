@@ -882,6 +882,7 @@ async function handleGratisAnmeldung(req, res, supabase) {
 // Bestätigungslink landet niemand in der Liste.
 const NEWSLETTER_QUELLEN = new Set(['kurztest', 'kurztest-gross'])
 const NEWSLETTER_ERLAUBTE_URSPRUENGE = new Set([
+  'https://kurztest.mrh-beratung.de',
   'https://mrh-quiz.vercel.app',
   'https://app.mrh-beratung.de',
 ])
@@ -920,8 +921,16 @@ async function handleNewsletter(req, res) {
     return
   }
 
-  await meldeNewsletterAn({ email: normalisiert, vorname, quelle })
-  // Immer dieselbe Antwort, unabhängig vom Ergebnis bei Brevo.
+  const angemeldet = await meldeNewsletterAn({ email: normalisiert, vorname, quelle })
+  if (!angemeldet) {
+    // Kein stilles "ok" mehr: Ohne Brevo kommt die Adresse nirgends an.
+    // Brevo antwortet bei neuen und bekannten Adressen gleich, ein Fehler
+    // verrät also nicht, ob eine Adresse schon eingetragen ist.
+    res
+      .status(503)
+      .json({ error: 'Die Anmeldung ist gerade nicht möglich. Bitte versuche es später noch einmal.' })
+    return
+  }
   res.status(200).json({ status: 'ok' })
 }
 
