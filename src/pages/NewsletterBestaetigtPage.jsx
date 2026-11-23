@@ -1,0 +1,35 @@
+import { Link } from 'react-router-dom'
+import RechtsFooter from '../components/RechtsFooter'
+
+// Zielseite nach Klick auf den Double-Opt-in-Link von Brevo
+// (Umgebungsvariable BREVO_DOI_REDIRECT_URL).
+export default function NewsletterBestaetigtPage() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-mrh-cream px-4 py-8">
+      <div className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-sm">
+        <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-mrh-gold/15">
+          <svg viewBox="0 0 20 20" fill="currentColor" className="h-7 w-7 text-mrh-gold">
+            <path
+              fillRule="evenodd"
+              d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.8 6.8-6.8a1 1 0 0 1 1.4 0Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </span>
+        <h1 className="mb-2 font-serif text-xl italic text-mrh-navy">Anmeldung bestätigt</h1>
+        <p className="mb-6 text-sm text-mrh-grey">
+          Danke, deine E-Mail-Adresse ist bestätigt. Du bekommst ab jetzt Impulse zu Zahlen,
+          Führung und Entscheidungen. Abmelden kannst du dich jederzeit über den Link in jeder
+          E-Mail.
+        </p>
+        <Link
+          to="/"
+          className="inline-block rounded-lg bg-mrh-navy px-4 py-2 text-sm font-medium text-white transition hover:bg-mrh-navy-dark"
+        >
+          Zu den Programmen
+        </Link>
+      </div>
+      <RechtsFooter />
+    </div>
+  )
+}
